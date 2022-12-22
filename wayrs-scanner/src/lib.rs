@@ -1,6 +1,8 @@
 mod parser;
 mod types;
 
+use std::path::PathBuf;
+
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 
@@ -10,8 +12,17 @@ use convert_case::{Case, Casing};
 
 #[proc_macro]
 pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let path = syn::parse_macro_input!(input as syn::LitStr);
-    let file = std::fs::read_to_string(path.value()).expect("could not read the file");
+    let path = syn::parse_macro_input!(input as syn::LitStr).value();
+    let path = match std::env::var_os("CARGO_MANIFEST_DIR") {
+        Some(manifest) => {
+            let mut full = PathBuf::from(manifest);
+            full.push(path);
+            full
+        }
+        None => PathBuf::from(path),
+    };
+
+    let file = std::fs::read_to_string(path).expect("could not read the file");
     let parser = Parser::new(&file);
     let protocol = parser.get_grotocol();
 
