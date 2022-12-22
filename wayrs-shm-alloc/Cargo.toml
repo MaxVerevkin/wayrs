@@ -1,0 +1,13 @@
+[package]
+name = "wayrs-shm-alloc"
+description = "A helper crate for wayrs-client for shared memory allocation"
+repository = "https://github.com/MaxVerevkin/wayrs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
+
+[dependencies]
+memmap2 = "0.5.8"
+shmemfdrs = "0.1.4"
+wayrs-client = { version = "0.1.0", path = "../wayrs-client" }

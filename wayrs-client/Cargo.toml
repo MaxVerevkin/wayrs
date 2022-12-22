@@ -1,0 +1,17 @@
+[package]
+name = "wayrs-client"
+description = "A simple wayland library"
+repository = "https://github.com/MaxVerevkin/wayrs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
+
+[dependencies]
+wayrs-scanner = { version = "0.1.0", path = "../wayrs-scanner" }
+thiserror = "1.0"
+
+[dependencies.nix]
+version = "0.26"
+default-features = false
+features = ["socket", "uio"]
