@@ -13,8 +13,8 @@ proc-macro = true
 [dependencies]
 quick-xml = "0.26"
 quote = "1.0"
-proc-macro2 = "1.0.47"
-convert_case = "0.6.0"
+proc-macro2 = "1.0"
+convert_case = "0.6"
 
 [dependencies.syn]
 version = "1.0"
