@@ -10,9 +10,12 @@ use crate::protocol::wl_registry::WL_REGISTRY_INTERFACE;
 use crate::object::{Object, ObjectId};
 use crate::protocol::wl_callback::WlCallback;
 use crate::protocol::wl_registry::WlRegistry;
-use crate::socket::{BufferedSocket, IoMode};
+use crate::socket::{BufferedSocket, IoMode, SendMessageError};
 use crate::wire::{ArgValue, Message, MessageHeader};
 use crate::ConnectError;
+
+#[cfg(feature = "tokio")]
+use tokio::io::unix::AsyncFd;
 
 pub struct Connection {
     socket: BufferedSocket,
@@ -21,6 +24,9 @@ pub struct Connection {
     reusable_ids: Vec<ObjectId>,
     last_id: ObjectId,
     requests_queue: VecDeque<Message>,
+
+    #[cfg(feature = "tokio")]
+    pub(crate) async_fd: Option<AsyncFd<RawFd>>,
 }
 
 impl AsRawFd for Connection {
@@ -38,6 +44,9 @@ impl Connection {
             reusable_ids: Vec::new(),
             last_id: ObjectId::DISPLAY,
             requests_queue: VecDeque::with_capacity(32),
+
+            #[cfg(feature = "tokio")]
+            async_fd: None,
         })
     }
 
@@ -95,17 +104,55 @@ impl Connection {
         Ok(event)
     }
 
+    #[cfg(feature = "tokio")]
+    pub async fn async_recv_event(&mut self) -> io::Result<Message> {
+        let mut async_fd = match self.async_fd.take() {
+            Some(fd) => fd,
+            None => AsyncFd::new(self.as_raw_fd())?,
+        };
+
+        loop {
+            let mut fd_guard = async_fd.readable_mut().await?;
+            match fd_guard.try_io(|_| self.recv_event(IoMode::NonBlocking)) {
+                Ok(result) => {
+                    self.async_fd = Some(async_fd);
+                    return result;
+                }
+                Err(_would_block) => continue,
+            }
+        }
+    }
+
     pub fn flush(&mut self, mode: IoMode) -> io::Result<()> {
         // Send pending messages
         while let Some(msg) = self.requests_queue.pop_front() {
-            if let Err(err) = self.socket.write_message(msg, mode) {
-                self.requests_queue.push_front(err.msg);
-                return Err(err.err);
+            if let Err(SendMessageError { msg, err }) = self.socket.write_message(msg, mode) {
+                self.requests_queue.push_front(msg);
+                return Err(err);
             }
         }
 
         // Flush socket
         self.socket.flush(mode)
+    }
+
+    #[cfg(feature = "tokio")]
+    pub async fn async_flush(&mut self) -> io::Result<()> {
+        let mut async_fd = match self.async_fd.take() {
+            Some(fd) => fd,
+            None => AsyncFd::new(self.as_raw_fd())?,
+        };
+
+        loop {
+            let mut fd_guard = async_fd.writable_mut().await?;
+            match fd_guard.try_io(|_| self.flush(IoMode::NonBlocking)) {
+                Ok(result) => {
+                    self.async_fd = Some(async_fd);
+                    return result;
+                }
+                Err(_would_block) => continue,
+            }
+        }
     }
 
     pub fn get_object(&self, id: ObjectId) -> Option<Object> {
@@ -143,6 +190,16 @@ impl Connection {
             self.last_id = id;
             id
         })
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl Drop for Connection {
+    fn drop(&mut self) {
+        // Drop AsyncFd before BufferedSocket
+        if let Some(async_fd) = self.async_fd.take() {
+            let _ = async_fd.into_inner();
+        }
     }
 }
 

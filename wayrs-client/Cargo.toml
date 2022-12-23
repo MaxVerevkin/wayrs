@@ -15,3 +15,9 @@ thiserror = "1.0"
 version = "0.26"
 default-features = false
 features = ["socket", "uio"]
+
+[dependencies.tokio]
+version = "1"
+optional = true
+default-features = false
+features = ["net"]

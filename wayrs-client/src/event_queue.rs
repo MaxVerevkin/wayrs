@@ -52,6 +52,40 @@ impl<D: Dispatcher> EventQueue<D> {
         Ok((globals, event_queue))
     }
 
+    #[cfg(feature = "tokio")]
+    pub async fn async_init() -> Result<(Vec<GlobalArgs>, Self), ConnectError>
+    where
+        D: Dispatch<WlRegistry>,
+    {
+        let mut connection = Connection::connect()?;
+        let registry = WlDisplay.get_registry(&mut connection);
+
+        let mut event_queue = Self {
+            conn: connection,
+            registry,
+            event_queue: VecDeque::new(),
+            callbacks: HashMap::new(),
+            break_dispatch: false,
+        };
+
+        event_queue.async_roundtrip().await?;
+
+        let mut globals = Vec::new();
+        for event in event_queue.event_queue.drain(..) {
+            assert_eq!(event.header.object_id, registry.id());
+            match event.try_into().unwrap() {
+                wl_registry::Event::Global(global) => globals.push(global),
+                wl_registry::Event::GlobalRemove(name) => {
+                    globals.retain(|g| g.name != name);
+                }
+            }
+        }
+
+        event_queue.set_callback::<WlRegistry>();
+
+        Ok((globals, event_queue))
+    }
+
     pub fn registry(&self) -> WlRegistry {
         self.registry
     }
@@ -83,6 +117,19 @@ impl<D: Dispatcher> EventQueue<D> {
         }
     }
 
+    #[cfg(feature = "tokio")]
+    pub async fn async_recv_events(&mut self) -> io::Result<()> {
+        self.event_queue
+            .push_back(self.conn.async_recv_event().await?);
+        loop {
+            match self.conn.recv_event(IoMode::NonBlocking) {
+                Ok(msg) => self.event_queue.push_back(msg),
+                Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(()),
+                Err(e) => return Err(e),
+            };
+        }
+    }
+
     pub fn dispatch_events(&mut self, state: &mut D) -> Result<(), D::Error> {
         while let Some(event) = self.event_queue.pop_front() {
             if event.header.object_id == ObjectId::DISPLAY {
@@ -94,14 +141,6 @@ impl<D: Dispatcher> EventQueue<D> {
                 .conn
                 .get_object(event.header.object_id)
             else { continue };
-
-            // for x in self.callbacks.keys() {
-            //     let x: &'static Interface = x;
-            //     eprintln!("{x:p}: {:?}", x.name);
-            // }
-            //
-            // let x: &'static Interface = object.interface;
-            // eprintln!("-> {x:p}: {:?}", x.name);
 
             let cb = self
                 .callbacks
@@ -128,6 +167,20 @@ impl<D: Dispatcher> EventQueue<D> {
 
         loop {
             let event = self.conn.recv_event(IoMode::Blocking)?;
+            match event.header.object_id {
+                id if id == sync_cb.id() => return Ok(()),
+                _ => self.event_queue.push_back(event),
+            }
+        }
+    }
+
+    #[cfg(feature = "tokio")]
+    pub async fn async_roundtrip(&mut self) -> io::Result<()> {
+        let sync_cb = WlDisplay.sync(&mut self.conn);
+        self.conn.async_flush().await?;
+
+        loop {
+            let event = self.conn.async_recv_event().await?;
             match event.header.object_id {
                 id if id == sync_cb.id() => return Ok(()),
                 _ => self.event_queue.push_back(event),
