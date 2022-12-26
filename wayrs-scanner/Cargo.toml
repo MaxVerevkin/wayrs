@@ -2,7 +2,8 @@
 name = "wayrs-scanner"
 description = "Generates code for wayrs-client from xml files"
 repository = "https://github.com/MaxVerevkin/wayrs"
-version = "0.1.0"
+readme = "../README.md"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
