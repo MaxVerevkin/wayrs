@@ -2,6 +2,7 @@
 name = "wayrs-shm-alloc"
 description = "A helper crate for wayrs-client for shared memory allocation"
 repository = "https://github.com/MaxVerevkin/wayrs"
+readme = "../README.md"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
