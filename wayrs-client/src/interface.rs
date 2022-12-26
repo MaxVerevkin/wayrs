@@ -11,7 +11,7 @@ pub struct Interface {
     pub requests: &'static [MessageDesc],
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct MessageDesc {
     pub name: &'static str,
     pub is_destructor: bool,

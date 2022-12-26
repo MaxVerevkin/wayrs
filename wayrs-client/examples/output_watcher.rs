@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::ffi::CString;
 
-use wayrs_client::event_queue::EventQueue;
+use wayrs_client::connection::Connection;
 use wayrs_client::global::GlobalExt;
 use wayrs_client::protocol::wl_output::{self, WlOutput};
 use wayrs_client::protocol::wl_registry::{self, GlobalArgs, WlRegistry};
@@ -9,23 +9,17 @@ use wayrs_client::proxy::{Dispatch, Dispatcher};
 use wayrs_client::socket::IoMode;
 
 fn main() {
-    let (initial_globals, mut event_queue) = EventQueue::blocking_init().unwrap();
-
-    let outputs = initial_globals
-        .iter()
-        .filter(|g| g.is::<WlOutput>())
-        .map(|g| Output::bind(&mut event_queue, g))
-        .collect();
-
-    let mut state = State { outputs };
+    let mut conn = Connection::connect().unwrap();
+    let mut state = State::default();
 
     loop {
-        event_queue.connection().flush(IoMode::Blocking).unwrap();
-        event_queue.recv_events(IoMode::Blocking).unwrap();
-        event_queue.dispatch_events(&mut state).unwrap();
+        conn.flush(IoMode::Blocking).unwrap();
+        conn.recv_events(IoMode::Blocking).unwrap();
+        conn.dispatch_events(&mut state).unwrap();
     }
 }
 
+#[derive(Default)]
 struct State {
     outputs: Vec<Output>,
 }
@@ -41,10 +35,10 @@ struct Output {
 }
 
 impl Output {
-    fn bind(event_queue: &mut EventQueue<State>, global: &GlobalArgs) -> Self {
+    fn bind(conn: &mut Connection<State>, global: &GlobalArgs) -> Self {
         Self {
             registry_name: global.name,
-            wl_output: global.bind(event_queue, 3..=4).unwrap(),
+            wl_output: global.bind(conn, 3..=4).unwrap(),
             name: None,
             desc: None,
             scale: None,
@@ -58,21 +52,16 @@ impl Dispatcher for State {
 }
 
 impl Dispatch<WlRegistry> for State {
-    fn event(
-        &mut self,
-        event_queue: &mut EventQueue<Self>,
-        _: WlRegistry,
-        event: wl_registry::Event,
-    ) {
+    fn event(&mut self, conn: &mut Connection<Self>, _: WlRegistry, event: wl_registry::Event) {
         match event {
             wl_registry::Event::Global(global) if global.is::<WlOutput>() => {
-                self.outputs.push(Output::bind(event_queue, &global));
+                self.outputs.push(Output::bind(conn, &global));
             }
             wl_registry::Event::GlobalRemove(name) => {
                 if let Some(i) = self.outputs.iter().position(|o| o.registry_name == name) {
                     let output = self.outputs.swap_remove(i);
                     eprintln!("removed output: {}", output.name.unwrap().to_str().unwrap());
-                    output.wl_output.release(event_queue);
+                    output.wl_output.release(conn);
                 }
             }
             _ => (),
@@ -81,7 +70,7 @@ impl Dispatch<WlRegistry> for State {
 }
 
 impl Dispatch<WlOutput> for State {
-    fn event(&mut self, _: &mut EventQueue<Self>, output: WlOutput, event: wl_output::Event) {
+    fn event(&mut self, _: &mut Connection<Self>, output: WlOutput, event: wl_output::Event) {
         let output = &mut self
             .outputs
             .iter_mut()

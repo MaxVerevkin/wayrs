@@ -5,67 +5,152 @@ use std::os::unix::io::{AsRawFd, RawFd};
 
 use crate::interface::{Interface, MessageDesc};
 use crate::protocol::wl_callback::WL_CALLBACK_INTERFACE;
-use crate::protocol::wl_registry::WL_REGISTRY_INTERFACE;
+use crate::protocol::wl_registry::{self, GlobalArgs, WL_REGISTRY_INTERFACE};
 
 use crate::object::{Object, ObjectId};
 use crate::protocol::wl_callback::WlCallback;
 use crate::protocol::wl_registry::WlRegistry;
+use crate::proxy::{make_callback, Dispatch, Dispatcher, EventCallback, Proxy};
 use crate::socket::{BufferedSocket, IoMode, SendMessageError};
-use crate::wire::{ArgValue, Message, MessageHeader};
+use crate::wire::{ArgType, ArgValue, Message, MessageHeader};
 use crate::ConnectError;
 
 #[cfg(feature = "tokio")]
 use tokio::io::unix::AsyncFd;
 
-pub struct Connection {
+pub struct Connection<D: Dispatcher> {
     socket: BufferedSocket,
-    objects: HashMap<ObjectId, Object>,
-    dead_objects: HashMap<ObjectId, Object>,
+
     reusable_ids: Vec<ObjectId>,
     last_id: ObjectId,
+
+    pub(crate) event_queue: VecDeque<Message>,
     requests_queue: VecDeque<Message>,
+    pub(crate) break_dispatch: bool,
+
+    registry: WlRegistry,
+    objects: HashMap<ObjectId, Object>,
+    dead_objects: HashMap<ObjectId, Object>,
+    pub(crate) callbacks: HashMap<&'static Interface, EventCallback<D>>,
 
     #[cfg(feature = "tokio")]
     pub(crate) async_fd: Option<AsyncFd<RawFd>>,
 }
 
-impl AsRawFd for Connection {
+impl<D: Dispatcher> AsRawFd for Connection<D> {
     fn as_raw_fd(&self) -> RawFd {
         self.socket.as_raw_fd()
     }
 }
 
-impl Connection {
-    pub fn connect() -> Result<Self, ConnectError> {
-        Ok(Self {
+impl<D: Dispatcher> Connection<D> {
+    pub fn connect() -> Result<Self, ConnectError>
+    where
+        D: Dispatch<WlRegistry>,
+    {
+        let mut this = Self {
             socket: BufferedSocket::connect()?,
-            objects: HashMap::new(),
-            dead_objects: HashMap::new(),
+
             reusable_ids: Vec::new(),
             last_id: ObjectId::DISPLAY,
+
+            event_queue: VecDeque::with_capacity(32),
             requests_queue: VecDeque::with_capacity(32),
+            break_dispatch: false,
+
+            registry: WlRegistry::null(),
+            objects: HashMap::new(),
+            dead_objects: HashMap::new(),
+            callbacks: HashMap::new(),
 
             #[cfg(feature = "tokio")]
             async_fd: None,
-        })
+        };
+
+        let registry = WlDisplay.get_registry(&mut this);
+        this.registry = registry;
+
+        this.set_callback::<WlRegistry>();
+
+        Ok(this)
     }
 
-    pub fn send_request(
-        &mut self,
-        iface: &'static Interface,
-        mut request: Message,
-    ) -> Option<Object> {
-        // Allocate object if necessary
-        let mut new_object = None;
-        for arg in &mut request.args {
-            if let ArgValue::NewId(new_obj) = arg {
-                new_obj.id = self.allocate_object_id();
-                self.objects.insert(new_obj.id, *new_obj);
-                assert!(new_object.is_none());
-                new_object = Some(*new_obj);
+    pub fn blocking_collect_initial_globals(&mut self) -> io::Result<Vec<GlobalArgs>> {
+        self.blocking_roundtrip()?;
+
+        let mut globals = Vec::new();
+
+        for event in self.event_queue.drain(..) {
+            assert_eq!(event.header.object_id, self.registry.id());
+            match self.registry.parse_event(event).unwrap() {
+                wl_registry::Event::Global(global) => globals.push(global),
+                wl_registry::Event::GlobalRemove(name) => {
+                    globals.retain(|g| g.name != name);
+                }
             }
         }
 
+        Ok(globals)
+    }
+
+    #[cfg(feature = "tokio")]
+    pub async fn async_collect_initial_globals(&mut self) -> io::Result<Vec<GlobalArgs>> {
+        self.async_roundtrip().await?;
+
+        let mut globals = Vec::new();
+
+        for event in self.event_queue.drain(..) {
+            assert_eq!(event.header.object_id, self.registry.id());
+            match self.registry.parse_event(event).unwrap() {
+                wl_registry::Event::Global(global) => globals.push(global),
+                wl_registry::Event::GlobalRemove(name) => {
+                    globals.retain(|g| g.name != name);
+                }
+            }
+        }
+
+        Ok(globals)
+    }
+
+    pub fn registry(&self) -> WlRegistry {
+        self.registry
+    }
+
+    pub fn set_callback<P: Proxy>(&mut self)
+    where
+        D: Dispatch<P>,
+    {
+        self.callbacks.insert(P::interface(), make_callback::<P, D>);
+    }
+
+    pub fn blocking_roundtrip(&mut self) -> io::Result<()> {
+        let sync_cb = WlDisplay.sync(self);
+        self.flush(IoMode::Blocking)?;
+
+        loop {
+            let event = self.recv_event(IoMode::Blocking)?;
+            match event.header.object_id {
+                id if id == sync_cb.id() => return Ok(()),
+                _ => self.event_queue.push_back(event),
+            }
+        }
+    }
+
+    #[cfg(feature = "tokio")]
+    pub async fn async_roundtrip(&mut self) -> io::Result<()> {
+        let sync_cb = WlDisplay.sync(self);
+        self.async_flush().await?;
+
+        loop {
+            let event = self.async_recv_event().await?;
+            match event.header.object_id {
+                id if id == sync_cb.id() => return Ok(()),
+                _ => self.event_queue.push_back(event),
+            }
+        }
+    }
+
+    pub fn send_request(&mut self, iface: &'static Interface, request: Message) {
         // Destroy object if request is destrctor
         if iface.requests[request.header.opcode as usize].is_destructor {
             let obj = self.objects.remove(&request.header.object_id).unwrap();
@@ -74,8 +159,6 @@ impl Connection {
 
         // Queue request
         self.requests_queue.push_back(request);
-
-        new_object
     }
 
     pub fn recv_event(&mut self, mode: IoMode) -> io::Result<Message> {
@@ -92,12 +175,42 @@ impl Connection {
             (object.interface, object.version)
         };
 
-        let event = self.socket.recv_message(header, interface, version, mode)?;
+        let event = self.socket.recv_message(header, interface, mode)?;
+
+        if event.header.object_id == ObjectId::DISPLAY {
+            let display_event = WlDisplay::parse_event(&event);
+            if let WlDisplayEvent::Error {
+                object_id,
+                code,
+                message,
+            } = display_event
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "Error in object {} (code({code})): {message:?}",
+                        object_id.0
+                    ),
+                ));
+            }
+        }
 
         // Allocate objects if necessary
-        for arg in &event.args {
-            if let ArgValue::NewId(new_obj) = arg {
-                self.objects.insert(new_obj.id, *new_obj);
+        for (arg, arg_ty) in event
+            .args
+            .iter()
+            .zip(interface.events[header.opcode as usize].signature)
+        {
+            if let ArgValue::NewId(id) = *arg {
+                let ArgType::NewId(interface) = arg_ty else { panic!() };
+                self.objects.insert(
+                    id,
+                    Object {
+                        id,
+                        interface,
+                        version,
+                    },
+                );
             }
         }
 
@@ -120,6 +233,35 @@ impl Connection {
                 }
                 Err(_would_block) => continue,
             }
+        }
+    }
+
+    pub fn recv_events(&mut self, mut mode: IoMode) -> io::Result<()> {
+        let mut at_least_one = false;
+
+        loop {
+            let msg = match self.recv_event(mode) {
+                Ok(msg) => msg,
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock && at_least_one => return Ok(()),
+                Err(e) => return Err(e),
+            };
+
+            at_least_one = true;
+            mode = IoMode::NonBlocking;
+            self.event_queue.push_back(msg);
+        }
+    }
+
+    #[cfg(feature = "tokio")]
+    pub async fn async_recv_events(&mut self) -> io::Result<()> {
+        let event = self.async_recv_event().await?;
+        self.event_queue.push_back(event);
+        loop {
+            match self.recv_event(IoMode::NonBlocking) {
+                Ok(msg) => self.event_queue.push_back(msg),
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(()),
+                Err(e) => return Err(e),
+            };
         }
     }
 
@@ -155,23 +297,64 @@ impl Connection {
         }
     }
 
+    pub fn dispatch_events(&mut self, state: &mut D) -> Result<(), D::Error> {
+        while let Some(event) = self.event_queue.pop_front() {
+            if event.header.object_id == ObjectId::DISPLAY {
+                self.process_dispay_event(&event).unwrap();
+                continue;
+            }
+
+            let Some(object) = self
+                .get_object(event.header.object_id)
+            else { continue };
+
+            let Some(cb) = self
+                .callbacks
+                .get(&object.interface)
+            else { panic!("dispatch callback for {:?} not found", object.interface.name) };
+
+            cb(self, state, object, event)?;
+
+            if self.break_dispatch {
+                self.break_dispatch = false;
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn break_dispatch_loop(&mut self) {
+        self.break_dispatch = true;
+    }
+
     pub fn get_object(&self, id: ObjectId) -> Option<Object> {
         self.objects.get(&id).copied()
     }
-}
 
-impl Connection {
-    pub(crate) fn process_dispay_event(&mut self, msg: Message) {
+    /// Allocate a new object. Returned object must be sent in a request as a "new_id" argument.
+    pub fn allocate_new_object<P: Proxy>(&mut self, version: u32) -> P {
+        let id = self.reusable_ids.pop().unwrap_or_else(|| {
+            let id = self.last_id.next();
+            assert!(!id.created_by_server());
+            self.last_id = id;
+            id
+        });
+
+        let obj = Object {
+            id,
+            interface: P::interface(),
+            version,
+        };
+
+        self.objects.insert(id, obj);
+
+        obj.try_into().unwrap()
+    }
+
+    pub(crate) fn process_dispay_event(&mut self, msg: &Message) -> io::Result<()> {
         match WlDisplay::parse_event(msg) {
-            WlDisplayEvent::Error {
-                object_id,
-                code,
-                message,
-            } => {
-                panic!(
-                    "Error in object {} (code {code}): {:#?}",
-                    object_id.0, message
-                );
+            WlDisplayEvent::Error { .. } => {
+                unreachable!()
             }
             WlDisplayEvent::DeleteId { id } => {
                 let id = ObjectId(id);
@@ -179,22 +362,14 @@ impl Connection {
                 self.objects.remove(&id);
                 self.dead_objects.remove(&id);
                 self.reusable_ids.push(id);
+                Ok(())
             }
         }
-    }
-
-    fn allocate_object_id(&mut self) -> ObjectId {
-        self.reusable_ids.pop().unwrap_or_else(|| {
-            let id = self.last_id.next();
-            assert!(!id.created_by_server());
-            self.last_id = id;
-            id
-        })
     }
 }
 
 #[cfg(feature = "tokio")]
-impl Drop for Connection {
+impl<D: Dispatcher> Drop for Connection<D> {
     fn drop(&mut self) {
         // Drop AsyncFd before BufferedSocket
         if let Some(async_fd) = self.async_fd.take() {
@@ -218,8 +393,9 @@ pub(crate) enum WlDisplayEvent {
 }
 
 impl WlDisplay {
-    pub(crate) fn sync(&self, conn: &mut Connection) -> WlCallback {
-        let new_object = conn.send_request(
+    pub(crate) fn sync(&self, conn: &mut Connection<impl Dispatcher>) -> WlCallback {
+        let new_object = conn.allocate_new_object::<WlCallback>(1);
+        conn.send_request(
             WL_DISPLAY_INTERFACE,
             Message {
                 header: MessageHeader {
@@ -227,19 +403,15 @@ impl WlDisplay {
                     size: 0,
                     opcode: 0,
                 },
-                args: vec![ArgValue::NewId(Object {
-                    id: ObjectId::NULL,
-                    interface: WL_CALLBACK_INTERFACE,
-                    version: 1,
-                })],
+                args: vec![ArgValue::NewId(new_object.id())],
             },
         );
-
-        new_object.unwrap().try_into().unwrap()
+        new_object
     }
 
-    pub(crate) fn get_registry(&self, conn: &mut Connection) -> WlRegistry {
-        let new_object = conn.send_request(
+    pub(crate) fn get_registry(&self, conn: &mut Connection<impl Dispatcher>) -> WlRegistry {
+        let new_object = conn.allocate_new_object::<WlRegistry>(1);
+        conn.send_request(
             WL_DISPLAY_INTERFACE,
             Message {
                 header: MessageHeader {
@@ -247,28 +419,23 @@ impl WlDisplay {
                     size: 0,
                     opcode: 1,
                 },
-                args: vec![ArgValue::NewId(Object {
-                    id: ObjectId::NULL,
-                    interface: WL_REGISTRY_INTERFACE,
-                    version: 1,
-                })],
+                args: vec![ArgValue::NewId(new_object.id())],
             },
         );
-
-        new_object.unwrap().try_into().unwrap()
+        new_object
     }
 
-    pub(crate) fn parse_event(msg: Message) -> WlDisplayEvent {
+    pub(crate) fn parse_event(msg: &Message) -> WlDisplayEvent {
         match msg.header.opcode {
             0 => {
-                let mut args = msg.args.into_iter();
+                let mut args = msg.args.iter();
                 let Some(ArgValue::Object(object_id)) = args.next() else { unreachable!() };
                 let Some(ArgValue::Uint(code)) = args.next() else { unreachable!() };
                 let Some(ArgValue::String(message)) = args.next() else { unreachable!() };
                 WlDisplayEvent::Error {
-                    object_id,
-                    code,
-                    message: message.into_owned(),
+                    object_id: *object_id,
+                    code: *code,
+                    message: message.clone(),
                 }
             }
             1 => {
@@ -309,7 +476,7 @@ pub(crate) static WL_DISPLAY_INTERFACE: &crate::interface::Interface =
             MessageDesc {
                 name: "get_registry",
                 is_destructor: false,
-                signature: &[crate::wire::ArgType::Uint],
+                signature: &[crate::wire::ArgType::NewId(WL_REGISTRY_INTERFACE)],
             },
         ],
     };

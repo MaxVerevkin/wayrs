@@ -1,11 +1,12 @@
 use std::convert::Infallible;
 
-use wayrs_client::event_queue::EventQueue;
+use wayrs_client::connection::Connection;
 use wayrs_client::protocol::wl_registry::WlRegistry;
 use wayrs_client::proxy::{Dispatch, Dispatcher};
 
 fn main() {
-    let (initial_globals, _event_queue) = EventQueue::<S>::blocking_init().unwrap();
+    let mut conn = Connection::<S>::connect().unwrap();
+    let initial_globals = conn.blocking_collect_initial_globals().unwrap();
 
     for global in initial_globals {
         println!(

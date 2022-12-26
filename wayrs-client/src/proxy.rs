@@ -1,4 +1,4 @@
-use crate::event_queue::EventQueue;
+use crate::connection::Connection;
 use crate::interface::Interface;
 use crate::object::{Object, ObjectId};
 use crate::wire::Message;
@@ -9,10 +9,14 @@ pub struct BadMessage;
 #[derive(Debug)]
 pub struct WrongObject;
 
-pub trait Proxy: TryFrom<Object, Error = WrongObject> {
-    type Event: TryFrom<Message, Error = BadMessage>;
+pub trait Proxy:
+    TryFrom<Object, Error = WrongObject> + Into<Object> + Into<ObjectId> + Copy
+{
+    type Event;
 
     fn interface() -> &'static Interface;
+    fn null() -> Self;
+    fn parse_event(&self, event: Message) -> Result<Self::Event, BadMessage>;
     fn id(&self) -> ObjectId;
     fn version(&self) -> u32;
 }
@@ -22,33 +26,31 @@ pub trait Dispatcher {
 }
 
 pub trait Dispatch<P: Proxy>: Dispatcher + Sized {
-    fn event(&mut self, event_queue: &mut EventQueue<Self>, proxy: P, event: P::Event) {
-        let _ = (event_queue, proxy, event);
+    fn event(&mut self, conn: &mut Connection<Self>, proxy: P, event: P::Event) {
+        let _ = (conn, proxy, event);
     }
 
     fn try_event(
         &mut self,
-        event_queue: &mut EventQueue<Self>,
+        conn: &mut Connection<Self>,
         proxy: P,
         event: P::Event,
     ) -> Result<(), Self::Error> {
-        self.event(event_queue, proxy, event);
+        self.event(conn, proxy, event);
         Ok(())
     }
 }
 
 pub type EventCallback<D> =
-    fn(&mut EventQueue<D>, &mut D, Object, Message) -> Result<(), <D as Dispatcher>::Error>;
+    fn(&mut Connection<D>, &mut D, Object, Message) -> Result<(), <D as Dispatcher>::Error>;
 
 pub(crate) fn make_callback<P: Proxy, D: Dispatch<P>>(
-    event_queue: &mut EventQueue<D>,
+    conn: &mut Connection<D>,
     state: &mut D,
     obj: Object,
     event: Message,
 ) -> Result<(), D::Error> {
-    state.try_event(
-        event_queue,
-        obj.try_into().unwrap(),
-        event.try_into().unwrap(),
-    )
+    let proxy: P = obj.try_into().unwrap();
+    let event = proxy.parse_event(event).unwrap();
+    state.try_event(conn, proxy, event)
 }

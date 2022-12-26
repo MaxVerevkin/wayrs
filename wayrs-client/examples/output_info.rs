@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::ffi::CString;
 
-use wayrs_client::event_queue::EventQueue;
+use wayrs_client::connection::Connection;
 use wayrs_client::global::GlobalExt;
 use wayrs_client::protocol::wl_output::{self, WlOutput};
 use wayrs_client::protocol::wl_registry::WlRegistry;
@@ -9,7 +9,8 @@ use wayrs_client::proxy::{Dispatch, Dispatcher, Proxy};
 use wayrs_client::socket::IoMode;
 
 fn main() {
-    let (initial_globals, mut event_queue) = EventQueue::blocking_init().unwrap();
+    let mut conn = Connection::connect().unwrap();
+    let initial_globals = conn.blocking_collect_initial_globals().unwrap();
 
     let mut state = State {
         outputs: Vec::new(),
@@ -18,16 +19,16 @@ fn main() {
     for output in initial_globals
         .iter()
         .filter(|g| g.is::<WlOutput>())
-        .map(|g| g.bind(&mut event_queue, 2..=4).unwrap())
+        .map(|g| g.bind(&mut conn, 2..=4).unwrap())
     {
         state.outputs.push((output, OutputInfo::default()));
     }
 
-    event_queue.connection().flush(IoMode::Blocking).unwrap();
+    conn.flush(IoMode::Blocking).unwrap();
 
     while !state.outputs.iter().all(|x| x.1.done) {
-        event_queue.recv_events(IoMode::Blocking).unwrap();
-        event_queue.dispatch_events(&mut state).unwrap();
+        conn.recv_events(IoMode::Blocking).unwrap();
+        conn.dispatch_events(&mut state).unwrap();
     }
 
     for (_, output) in state.outputs {
@@ -55,7 +56,7 @@ impl Dispatcher for State {
 impl Dispatch<WlRegistry> for State {}
 
 impl Dispatch<WlOutput> for State {
-    fn event(&mut self, _: &mut EventQueue<Self>, output: WlOutput, event: wl_output::Event) {
+    fn event(&mut self, _: &mut Connection<Self>, output: WlOutput, event: wl_output::Event) {
         let output = &mut self
             .outputs
             .iter_mut()

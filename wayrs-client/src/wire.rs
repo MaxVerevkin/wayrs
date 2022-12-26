@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-use std::ffi::CStr;
+use std::ffi::CString;
 use std::os::unix::io::OwnedFd;
 
 use crate::{
@@ -20,7 +19,7 @@ pub struct Message {
     pub args: Vec<ArgValue>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ArgType {
     Int,
     Uint,
@@ -31,7 +30,6 @@ pub enum ArgType {
     String,
     Array,
     Fd,
-    Enum,
 }
 
 #[derive(Debug)]
@@ -40,32 +38,27 @@ pub enum ArgValue {
     Uint(u32),
     Fixed(Fixed),
     Object(ObjectId),
-    NewId(Object),
-    String(Cow<'static, CStr>),
+    NewId(ObjectId),
+    AnyNewId(Object),
+    String(CString),
     Array(Vec<u8>),
     Fd(OwnedFd),
-    Enum(u32),
 }
 
 impl ArgValue {
     pub fn size(&self) -> u16 {
+        fn len_with_padding(len: usize) -> u16 {
+            let padding = (4 - (len % 4)) % 4;
+            (4 + len + padding) as u16
+        }
+
         match self {
-            Self::Int(_)
-            | Self::Uint(_)
-            | Self::Fixed(_)
-            | Self::Object(_)
-            | Self::NewId(_)
-            | Self::Enum(_) => 4,
-            Self::String(string) => {
-                let len = string.to_bytes_with_nul().len() as u16;
-                let padding = (4 - (len % 4)) % 4;
-                4 + len + padding
+            Self::Int(_) | Self::Uint(_) | Self::Fixed(_) | Self::Object(_) | Self::NewId(_) => 4,
+            Self::AnyNewId(object) => {
+                len_with_padding(object.interface.name.to_bytes_with_nul().len()) + 8
             }
-            Self::Array(array) => {
-                let len = array.len() as u16;
-                let padding = (4 - (len % 4)) % 4;
-                4 + len + padding
-            }
+            Self::String(string) => len_with_padding(string.to_bytes_with_nul().len()),
+            Self::Array(array) => len_with_padding(array.len()),
             Self::Fd(_) => 0,
         }
     }

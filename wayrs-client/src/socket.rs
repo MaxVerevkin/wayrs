@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::env;
 use std::ffi::CString;
 use std::io::{self, IoSlice, IoSliceMut};
@@ -9,7 +8,7 @@ use std::path::PathBuf;
 use nix::sys::socket::{self, ControlMessage, ControlMessageOwned};
 
 use crate::interface::Interface;
-use crate::object::{Object, ObjectId};
+use crate::object::ObjectId;
 use crate::wire::{ArgType, ArgValue, Fixed, Message, MessageHeader};
 use crate::ConnectError;
 
@@ -96,13 +95,17 @@ impl BufferedSocket {
             .write_uint((size as u32) << 16 | msg.header.opcode as u32);
 
         // Args
-        for arg in msg.args {
+        for arg in msg.args.into_iter() {
             match arg {
-                ArgValue::Uint(x) | ArgValue::Object(ObjectId(x)) | ArgValue::Enum(x) => {
-                    self.bytes_out.write_uint(x)
-                }
+                ArgValue::Uint(x)
+                | ArgValue::Object(ObjectId(x))
+                | ArgValue::NewId(ObjectId(x)) => self.bytes_out.write_uint(x),
                 ArgValue::Int(x) | ArgValue::Fixed(Fixed(x)) => self.bytes_out.write_int(x),
-                ArgValue::NewId(obj) => self.bytes_out.write_uint(obj.id.0),
+                ArgValue::AnyNewId(obj) => {
+                    self.send_array(obj.interface.name.to_bytes_with_nul());
+                    self.bytes_out.write_uint(obj.version);
+                    self.bytes_out.write_uint(obj.id.0);
+                }
                 ArgValue::String(string) => self.send_array(string.to_bytes_with_nul()),
                 ArgValue::Array(array) => self.send_array(&array),
                 ArgValue::Fd(fd) => self.fds_out.write_one(fd.into_raw_fd()),
@@ -133,7 +136,6 @@ impl BufferedSocket {
         &mut self,
         header: MessageHeader,
         iface: &'static Interface,
-        version: u32,
         mode: IoMode,
     ) -> io::Result<Message> {
         let signature = iface
@@ -165,23 +167,18 @@ impl BufferedSocket {
                 ArgType::Uint => ArgValue::Uint(self.bytes_in.read_uint()),
                 ArgType::Fixed => ArgValue::Fixed(Fixed(self.bytes_in.read_int())),
                 ArgType::Object => ArgValue::Object(ObjectId(self.bytes_in.read_uint())),
-                ArgType::NewId(interface) => ArgValue::NewId(Object {
-                    id: ObjectId(self.bytes_in.read_uint()),
-                    interface,
-                    version,
-                }),
+                ArgType::NewId(_) => ArgValue::NewId(ObjectId(self.bytes_in.read_uint())),
                 ArgType::AnyNewId => unimplemented!(),
-                ArgType::String => ArgValue::String(Cow::Owned(
+                ArgType::String => ArgValue::String(
                     CString::from_vec_with_nul(self.recv_array())
                         .expect("received string with internal null bytes"),
-                )),
+                ),
                 ArgType::Array => ArgValue::Array(self.recv_array()),
                 ArgType::Fd => {
                     let fd = self.fds_in.read_one();
                     assert_ne!(fd, -1);
                     ArgValue::Fd(unsafe { OwnedFd::from_raw_fd(fd) })
                 }
-                ArgType::Enum => ArgValue::Enum(self.bytes_in.read_uint()),
             })
             .collect();
 
@@ -258,10 +255,16 @@ impl BufferedSocket {
         }
 
         let read = msg.bytes;
-        assert!(read > 0);
         self.bytes_in.advance(read);
 
-        Ok(())
+        if read == 0 {
+            Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "server disconnected",
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     fn send_array(&mut self, array: &[u8]) {

@@ -3,7 +3,7 @@ use std::os::unix::io::{BorrowedFd, FromRawFd};
 
 use memmap2::MmapMut;
 
-use wayrs_client::event_queue::EventQueue;
+use wayrs_client::connection::Connection;
 use wayrs_client::protocol::{wl_buffer, wl_shm, wl_shm_pool};
 use wayrs_client::proxy::{Dispatch, Dispatcher};
 
@@ -35,10 +35,11 @@ struct Buffer {
 }
 
 impl ShmAlloc {
-    pub fn new<D>(event_queue: &mut EventQueue<D>, wl_shm: WlShm, initial_len: usize) -> Self
-    where
-        D: Dispatch<WlShmPool>,
-    {
+    pub fn new<D: Dispatch<WlShmPool>>(
+        conn: &mut Connection<D>,
+        wl_shm: WlShm,
+        initial_len: usize,
+    ) -> Self {
         let fd = shmemfdrs::create_shmem(wayrs_client::cstr!("/ramp-buffer"), initial_len);
         let file = unsafe { File::from_raw_fd(fd) };
         let mmap = unsafe { memmap2::MmapMut::map_mut(&file).expect("memory mapping failed") };
@@ -48,7 +49,7 @@ impl ShmAlloc {
                 .try_clone_to_owned()
                 .expect("could not duplicate fd")
         };
-        let pool = wl_shm.create_pool(event_queue, fd_dup, initial_len as i32);
+        let pool = wl_shm.create_pool(conn, fd_dup, initial_len as i32);
 
         Self {
             pool,
@@ -64,31 +65,23 @@ impl ShmAlloc {
         }
     }
 
-    pub fn alloc_buffer<D>(
+    pub fn alloc_buffer<D: Dispatch<WlBuffer>>(
         &mut self,
-        event_queue: &mut EventQueue<D>,
+        conn: &mut Connection<D>,
         width: i32,
         height: i32,
         stride: i32,
         format: Format,
-    ) -> (wl_buffer::WlBuffer, &mut [u8])
-    where
-        D: Dispatch<wl_shm_pool::WlShmPool> + Dispatch<wl_buffer::WlBuffer>,
-    {
+    ) -> (wl_buffer::WlBuffer, &mut [u8]) {
         let size = height * stride;
 
-        let segment_index = self.alloc_segment(event_queue, size as usize, format);
+        let segment_index = self.alloc_segment(conn, size as usize, format);
         let segment = &mut self.segments[segment_index];
 
         let buffer = segment.buffer.get_or_insert_with(|| Buffer {
-            wl: self.pool.create_buffer(
-                event_queue,
-                segment.offset as i32,
-                width,
-                height,
-                stride,
-                format,
-            ),
+            wl: self
+                .pool
+                .create_buffer(conn, segment.offset as i32, width, height, stride, format),
             format,
         });
 
@@ -108,15 +101,15 @@ impl ShmAlloc {
         }
     }
 
-    fn merge_segments<D: Dispatcher>(&mut self, event_queue: &mut EventQueue<D>) {
+    fn merge_segments<D: Dispatcher>(&mut self, conn: &mut Connection<D>) {
         let mut i = 0;
         while i + 1 < self.segments.len() {
             if self.segments[i].free && self.segments[i + 1].free {
                 if let Some(buffer) = self.segments[i].buffer.take() {
-                    buffer.wl.destroy(event_queue);
+                    buffer.wl.destroy(conn);
                 }
                 if let Some(buffer) = self.segments[i + 1].buffer.take() {
-                    buffer.wl.destroy(event_queue);
+                    buffer.wl.destroy(conn);
                 }
                 self.segments[i].len += self.segments[i + 1].len;
                 self.segments.remove(i + 1);
@@ -126,30 +119,27 @@ impl ShmAlloc {
         }
     }
 
-    fn resize<D: Dispatcher>(&mut self, event_queue: &mut EventQueue<D>, new_len: usize) {
+    fn resize<D: Dispatcher>(&mut self, conn: &mut Connection<D>, new_len: usize) {
         if new_len > self.len {
             self.len = new_len;
             self.file.set_len(new_len as u64).unwrap();
-            self.pool.resize(event_queue, new_len as i32);
+            self.pool.resize(conn, new_len as i32);
             self.mmap =
                 unsafe { memmap2::MmapMut::map_mut(&self.file).expect("memory mapping failed") };
         }
     }
 
     // Returns segment index, does not resize
-    fn try_alloc_in_place<D>(
+    fn try_alloc_in_place<D: Dispatcher>(
         &mut self,
-        event_queue: &mut EventQueue<D>,
+        conn: &mut Connection<D>,
         len: usize,
-    ) -> Option<usize>
-    where
-        D: Dispatch<wl_shm_pool::WlShmPool> + Dispatch<wl_buffer::WlBuffer>,
-    {
+    ) -> Option<usize> {
         // Find a segment with exact size
         for (i, segment) in self.segments.iter_mut().enumerate() {
             if segment.free && segment.len == len {
                 if let Some(buffer) = segment.buffer.take() {
-                    buffer.wl.destroy(event_queue);
+                    buffer.wl.destroy(conn);
                 }
                 segment.free = false;
                 return Some(i);
@@ -160,7 +150,7 @@ impl ShmAlloc {
             if segment.free && segment.len > len {
                 let offset = segment.offset;
                 if let Some(buffer) = segment.buffer.take() {
-                    buffer.wl.destroy(event_queue);
+                    buffer.wl.destroy(conn);
                 }
                 segment.offset += len;
                 segment.len -= len;
@@ -180,15 +170,12 @@ impl ShmAlloc {
     }
 
     // Returns segment index
-    fn alloc_segment<D>(
+    fn alloc_segment<D: Dispatcher>(
         &mut self,
-        event_queue: &mut EventQueue<D>,
+        conn: &mut Connection<D>,
         len: usize,
         format: wl_shm::Format,
-    ) -> usize
-    where
-        D: Dispatch<wl_shm_pool::WlShmPool> + Dispatch<wl_buffer::WlBuffer>,
-    {
+    ) -> usize {
         // Find a segment with exact size and a matching buffer
         for (i, segment) in self.segments.iter_mut().enumerate() {
             if segment.free && segment.len == len {
@@ -201,27 +188,27 @@ impl ShmAlloc {
             }
         }
 
-        if let Some(index) = self.try_alloc_in_place(event_queue, len) {
+        if let Some(index) = self.try_alloc_in_place(conn, len) {
             return index;
         }
-        self.merge_segments(event_queue);
-        if let Some(index) = self.try_alloc_in_place(event_queue, len) {
+        self.merge_segments(conn);
+        if let Some(index) = self.try_alloc_in_place(conn, len) {
             return index;
         }
 
         match self.segments.last_mut() {
             Some(segment) if segment.free => {
                 if let Some(buffer) = segment.buffer.take() {
-                    buffer.wl.destroy(event_queue);
+                    buffer.wl.destroy(conn);
                 }
                 let new_size = self.len + len - segment.len;
                 segment.len = len;
                 segment.free = false;
-                self.resize(event_queue, new_size);
+                self.resize(conn, new_size);
             }
             _ => {
                 let offset = self.len;
-                self.resize(event_queue, self.len + len);
+                self.resize(conn, self.len + len);
                 self.segments.push(Segment {
                     offset,
                     len,

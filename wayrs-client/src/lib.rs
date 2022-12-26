@@ -1,5 +1,4 @@
 pub mod connection;
-pub mod event_queue;
 pub mod global;
 pub mod interface;
 pub mod object;

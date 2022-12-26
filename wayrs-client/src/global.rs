@@ -1,7 +1,7 @@
 use std::ffi::CString;
 use std::{ffi::CStr, ops::RangeInclusive};
 
-use crate::event_queue::EventQueue;
+use crate::connection::Connection;
 use crate::proxy::{Dispatch, Proxy};
 
 pub type Global = crate::protocol::wl_registry::GlobalArgs;
@@ -12,7 +12,7 @@ pub trait GlobalExt {
 
     fn bind<P: Proxy, D: Dispatch<P>>(
         &self,
-        event_queue: &mut EventQueue<D>,
+        conn: &mut Connection<D>,
         version: RangeInclusive<u32>,
     ) -> Result<P, BindError>;
 }
@@ -20,7 +20,7 @@ pub trait GlobalExt {
 pub trait GlobalsExt {
     fn bind<P: Proxy, D: Dispatch<P>>(
         &self,
-        event_queue: &mut EventQueue<D>,
+        conn: &mut Connection<D>,
         version: RangeInclusive<u32>,
     ) -> Result<P, BindError>;
 }
@@ -32,7 +32,7 @@ impl GlobalExt for Global {
 
     fn bind<P: Proxy, D: Dispatch<P>>(
         &self,
-        event_queue: &mut EventQueue<D>,
+        conn: &mut Connection<D>,
         version: RangeInclusive<u32>,
     ) -> Result<P, BindError> {
         if !self.is::<P>() {
@@ -52,24 +52,24 @@ impl GlobalExt for Global {
             });
         }
 
-        let reg = event_queue.registry();
+        let reg = conn.registry();
         let version = u32::min(*version.end(), self.version);
 
-        Ok(reg.bind(event_queue, self.name, version))
+        Ok(reg.bind(conn, self.name, version))
     }
 }
 
 impl GlobalsExt for Globals {
     fn bind<P: Proxy, D: Dispatch<P>>(
         &self,
-        event_queue: &mut EventQueue<D>,
+        conn: &mut Connection<D>,
         version: RangeInclusive<u32>,
     ) -> Result<P, BindError> {
         let global = self
             .iter()
             .find(|g| g.is::<P>())
             .ok_or(BindError::GlobalNotFound(P::interface().name))?;
-        global.bind(event_queue, version)
+        global.bind(conn, version)
     }
 }
 

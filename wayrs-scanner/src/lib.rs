@@ -4,7 +4,7 @@ mod types;
 use std::path::PathBuf;
 
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{format_ident, quote};
 
 use crate::parser::Parser;
 use crate::types::*;
@@ -94,51 +94,43 @@ fn gen_interface(iface: &Interface) -> TokenStream {
     let raw_name = &iface.name;
     let version = iface.version;
 
-    let events_desc = iface.events.iter().map(|event| {
-        let args = event.args.iter().map(map_arg_to_argtype);
-        let name = &event.name;
-        let is_destructor = event.kind.as_deref() == Some("destructor");
+    let gen_msg_gesc = |msg: &Message| {
+        let args = msg.args.iter().map(map_arg_to_argtype);
+        let name = &msg.name;
+        let is_destructor = msg.kind.as_deref() == Some("destructor");
         quote! {
-            super::wayrs_client::interface::MessageDesc {
+            wayrs_client::interface::MessageDesc {
                 name: #name,
                 is_destructor: #is_destructor,
-                signature: &[ #( super::wayrs_client::wire::ArgType::#args, )* ]
+                signature: &[ #( wayrs_client::wire::ArgType::#args, )* ]
             }
         }
-    });
-    let requests_desc = iface.requests.iter().map(|request| {
-        let args = request.args.iter().map(map_arg_to_argtype);
-        let name = &request.name;
-        let is_destructor = request.kind.as_deref() == Some("destructor");
-        quote! {
-            super::wayrs_client::interface::MessageDesc {
-                name: #name,
-                is_destructor: #is_destructor,
-                signature: &[ #( super::wayrs_client::wire::ArgType::#args, )* ]
-            }
-        }
-    });
+    };
+    let events_desc = iface.events.iter().map(gen_msg_gesc);
+    let requests_desc = iface.requests.iter().map(gen_msg_gesc);
 
-    let event_args_structs = iface.events.iter().map(|event| {
-        let event_name = make_pascal_case_ident(&event.name);
-        let struct_name = quote::format_ident!("{event_name}Args");
-        let fields = event.args.iter().map(map_arg_to_sturt_field);
-        if event.args.len() > 1 {
+    let event_args_structs = iface
+        .events
+        .iter()
+        .filter(|event| event.args.len() > 1)
+        .map(|event| {
+            let struct_name = format_ident!("{}Args", make_pascal_case_ident(&event.name));
+            let arg_name = event.args.iter().map(|arg| make_ident(&arg.name));
+            let arg_ty = event.args.iter().map(map_arg_to_rs);
             quote! {
                 #[derive(Debug)]
-                pub struct #struct_name { #( pub #fields, )* }
+                pub struct #struct_name { #( pub #arg_name: #arg_ty, )* }
             }
-        } else {
-            quote!()
-        }
-    });
+        });
 
     let event_enum_options = iface.events.iter().map(|event| {
         let event_name = make_pascal_case_ident(&event.name);
-        let struct_name = quote::format_ident!("{event_name}Args");
         match event.args.as_slice() {
             [] => quote! { #event_name },
-            [_, _, ..] => quote! { #event_name(#struct_name) },
+            [_, _, ..] => {
+                let struct_name = format_ident!("{event_name}Args");
+                quote! { #event_name(#struct_name) }
+            }
             [arg] => {
                 let event_ty = map_arg_to_rs(arg);
                 quote! { #event_name(#event_ty) }
@@ -153,102 +145,96 @@ fn gen_interface(iface: &Interface) -> TokenStream {
         let arg_ty = event.args.iter().map(map_arg_to_argval);
         let arg_names = event.args.iter().map(|arg| make_ident(&arg.name));
         let arg_names2 = arg_names.clone();
-        match event.args.len() {
-            0 => quote! {
-                #opcode => {
-                    assert!(event.args.is_empty());
-                    Ok(Event::#event_name)
+        let arg_decode = event.args.iter().map(|arg| {
+            let arg_name = make_ident(&arg.name);
+            match arg.arg_type.as_str() {
+                "new_id" => {
+                    let iface = arg.interface.as_deref().unwrap();
+                    let iface_name = syn::Ident::new(iface, Span::call_site());
+                    let static_name =
+                        syn::Ident::new(&(iface.to_uppercase() + "_INTERFACE"), Span::call_site());
+                    quote! {
+                        {
+                            let obj = wayrs_client::object::Object {
+                                id: #arg_name,
+                                version: self.version(),
+                                interface: super::#iface_name::#static_name,
+                            };
+                            obj.try_into().unwrap()
+                        }
+                    }
                 }
-            },
-            1 => quote! {
-                #opcode => {
-                    assert_eq!(event.args.len(), 1);
-                    let mut args = event.args.into_iter();
-                    #( let Some(super::wayrs_client::wire::ArgValue::#arg_ty(arg)) = args.next() else { return Err(super::wayrs_client::proxy::BadMessage) }; )*
-                    Ok(Event::#event_name(arg.try_into().unwrap()))
+                _ => quote!(#arg_name.try_into().unwrap()),
+            }
+        });
+        let args_len = event.args.len();
+        let retval = match args_len {
+            0 => quote!(Event::#event_name),
+            1 => quote!(Event::#event_name(#( #arg_decode )*)),
+            _ => quote!(Event::#event_name(#struct_name { #( #arg_names2: #arg_decode, )* })),
+        };
+        quote! {
+            #opcode => {
+                if event.args.len() != #args_len {
+                    return Err(wayrs_client::proxy::BadMessage);
                 }
-            },
-            len => quote! {
-                #opcode => {
-                    assert_eq!(event.args.len(), #len);
-                    let mut args = event.args.into_iter();
-                    #( let Some(super::wayrs_client::wire::ArgValue::#arg_ty(#arg_names)) = args.next() else { return Err(super::wayrs_client::proxy::BadMessage) }; )*
-                    Ok(Event::#event_name(#struct_name {
-                        #( #arg_names2: #arg_names2.try_into().unwrap(), )*
-                    }))
-                }
+                let mut args = event.args.into_iter();
+                #( let Some(wayrs_client::wire::ArgValue::#arg_ty(#arg_names)) = args.next() else { return Err(wayrs_client::proxy::BadMessage) }; )*
+                Ok(#retval)
             }
         }
     });
 
     let requests = iface.requests.iter().enumerate().map(|(opcode, request)| {
+        assert!(
+            request
+                .args
+                .iter()
+                .filter(|x| x.arg_type == "new_id")
+                .count()
+                <= 1,
+            "{} has more than one new_id argument",
+            request.name,
+        );
         let opcode = opcode as u16;
-        let new_id_cnt = request
-            .args
-            .iter()
-            .filter(|x| x.arg_type == "new_id")
-            .count();
         let new_id_interface = request
             .args
             .iter()
             .find(|x| x.arg_type == "new_id")
-            .and_then(|x| x.interface.as_deref());
+            .map(|x| x.interface.as_deref());
         let request_name = make_ident(&request.name);
         let fn_args = request.args.iter().map(|arg| {
             let arg_name = make_ident(&arg.name);
             let arg_ty = map_arg_to_rs(arg);
             match (arg.arg_type.as_str(), arg.interface.as_deref()) {
-                ("int" | "uint" | "fixed" | "string" | "array" | "fd", None) => quote! { ,#arg_name: #arg_ty },
-                ("object", None) => quote! { ,#arg_name: super::wayrs_client::object::Object },
+                ("int" | "uint" | "fixed" | "string" | "array" | "fd", None) => {
+                    quote! { ,#arg_name: #arg_ty }
+                }
+                ("object", None) => quote! { ,#arg_name: wayrs_client::object::Object },
                 ("object", Some(i)) => {
                     let proxy_path = make_proxy_path(i);
                     quote! { ,#arg_name: #proxy_path }
                 }
-                ("new_id", None) => quote! { ,version: u32 },
-                ("new_id", Some(_)) => quote! {},
+                ("new_id", None) => quote!(,version: u32),
+                ("new_id", Some(_)) => quote!(),
                 _ => unreachable!(),
             }
         });
         let msg_args = request.args.iter().map(|arg| {
             let arg_name = make_ident(&arg.name);
-            match (arg.arg_type.as_str(), arg.interface.as_deref()) {
-                ("int", None) => quote! { super::wayrs_client::wire::ArgValue::Int(#arg_name) },
-                ("uint", None) => quote! { super::wayrs_client::wire::ArgValue::Uint(#arg_name.into()) },
-                ("fixed", None) => quote! { super::wayrs_client::wire::ArgValue::Fixed(#arg_name) },
-                ("object", _) => quote! { super::wayrs_client::wire::ArgValue::Object(super::wayrs_client::proxy::Proxy::id(&#arg_name)) },
-                ("new_id", None) => quote! { 
-                    super::wayrs_client::wire::ArgValue::String(::std::borrow::Cow::Borrowed(P::interface().name)),
-                    super::wayrs_client::wire::ArgValue::Uint(version),
-                    super::wayrs_client::wire::ArgValue::NewId(super::wayrs_client::object::Object {
-                        id: super::wayrs_client::object::ObjectId::NULL,
-                        interface: P::interface(),
-                        version,
-                    })
-                },
-                ("new_id", Some(i)) => {
-                    let proxy_path = make_proxy_path(i);
-                    quote! {
-                        super::wayrs_client::wire::ArgValue::NewId(super::wayrs_client::object::Object {
-                            id: super::wayrs_client::object::ObjectId::NULL,
-                            interface: <#proxy_path as super::wayrs_client::proxy::Proxy>::interface(),
-                            version: <#proxy_path as super::wayrs_client::proxy::Proxy>::interface().version,
-                       })
-                    }
-                },
-                ("string", None) => quote! { super::wayrs_client::wire::ArgValue::String(#arg_name.into()) },
-                ("array", None) => quote! { super::wayrs_client::wire::ArgValue::Array(#arg_name) },
-                ("fd", None) => quote! { super::wayrs_client::wire::ArgValue::Fd(#arg_name) },
-                ("enum", None) => todo!(),
-                _ => unreachable!(),
+            let arg_ty = map_arg_to_argval(arg);
+            match arg.arg_type.as_str() {
+                "new_id" => quote! { wayrs_client::wire::ArgValue::#arg_ty(new_object.into()) },
+                _ => quote! { wayrs_client::wire::ArgValue::#arg_ty(#arg_name.into()) },
             }
         });
 
         let send_message = quote! {
-            event_queue.connection().send_request(
+            conn.send_request(
                 &#static_name,
-                super::wayrs_client::wire::Message {
-                    header: super::wayrs_client::wire::MessageHeader {
-                        object_id: self.iner.id,
+                wayrs_client::wire::Message {
+                    header: wayrs_client::wire::MessageHeader {
+                        object_id: self.id(),
                         size: 0,
                         opcode: #opcode,
                     },
@@ -257,44 +243,41 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             );
         };
 
-        let (generics, ret_ty) = match (new_id_cnt, new_id_interface) {
-            (0, _) => (quote! { D: super::wayrs_client::proxy::Dispatcher }, quote! { () }),
-            (1, Some(i)) => {
+        let (generics, ret_ty, body) = match new_id_interface {
+            None => (
+                quote! { D: wayrs_client::proxy::Dispatcher },
+                quote! { () },
+                send_message,
+            ),
+            Some(None) => (
+                quote! { P: Proxy, D: wayrs_client::proxy::Dispatch<P> },
+                quote! { P },
+                quote! {
+                    conn.set_callback::<P>();
+                    let new_object = conn.allocate_new_object::<P>(version);
+                    #send_message
+                    new_object
+                },
+            ),
+            Some(Some(i)) => {
                 let proxy_path = make_proxy_path(i);
                 (
-                    quote! { D: super::wayrs_client::proxy::Dispatch<#proxy_path> },
-                    proxy_path
+                    quote! { D: wayrs_client::proxy::Dispatch<#proxy_path> },
+                    proxy_path.clone(),
+                    quote! {
+                        conn.set_callback::<#proxy_path>();
+                        let new_object = conn.allocate_new_object::<#proxy_path>(self.version());
+                        #send_message
+                        new_object
+                    },
                 )
             }
-            (1, None) => (
-                quote! { P: super::wayrs_client::proxy::Proxy, D: super::wayrs_client::proxy::Dispatch<P> },
-                quote! { P },
-            ),
-            _ => panic!("request with more than one new_id?"),
-        };
-
-        let body = match (new_id_cnt, new_id_interface) {
-            (0, _) => send_message,
-            (1, Some(_)) => {
-                quote! {
-                    event_queue.set_callback::<#ret_ty>();
-                    let new_object = #send_message
-                    new_object.unwrap().try_into().unwrap()
-                }
-            }
-            (1, None) => quote! {
-                assert!(version <= <P as super::wayrs_client::proxy::Proxy>::interface().version);
-                event_queue.set_callback::<P>();
-                let new_object = #send_message
-                new_object.unwrap().try_into().unwrap()
-            },
-            _ => panic!("request with more than one new_id?"),
         };
 
         quote! {
             #[allow(clippy::too_many_arguments)]
             pub fn #request_name<#generics>(
-                &self, event_queue: &mut super::wayrs_client::event_queue::EventQueue<D> #( #fn_args )*
+                &self, conn: &mut wayrs_client::connection::Connection<D> #( #fn_args )*
             ) -> #ret_ty {
                 #body
             }
@@ -360,8 +343,11 @@ fn gen_interface(iface: &Interface) -> TokenStream {
     });
 
     quote! {
-        pub static #static_name: &super::wayrs_client::interface::Interface = &super::wayrs_client::interface::Interface {
-            name: super::wayrs_client::cstr!(#raw_name),
+        use super::wayrs_client;
+        use super::wayrs_client::proxy::Proxy;
+
+        pub static #static_name: &wayrs_client::interface::Interface = &wayrs_client::interface::Interface {
+            name: wayrs_client::cstr!(#raw_name),
             version: #version,
             events: &[ #(#events_desc,)* ],
             requests: &[ #(#requests_desc,)* ],
@@ -369,17 +355,34 @@ fn gen_interface(iface: &Interface) -> TokenStream {
 
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub struct #proxy_name {
-            iner: super::wayrs_client::object::Object,
+            iner: wayrs_client::object::Object,
         }
 
-        impl super::wayrs_client::proxy::Proxy for #proxy_name {
+        impl Proxy for #proxy_name {
             type Event = Event;
 
-            fn interface() -> &'static super::wayrs_client::interface::Interface {
+            fn interface() -> &'static wayrs_client::interface::Interface {
                 #static_name
             }
 
-            fn id(&self) -> super::wayrs_client::object::ObjectId {
+            fn null() -> Self {
+                Self {
+                    iner: wayrs_client::object::Object {
+                        id: wayrs_client::object::ObjectId::NULL,
+                        version: 0,
+                        interface: #static_name,
+                    }
+                }
+            }
+
+            fn parse_event(&self, event: wayrs_client::wire::Message) -> Result<Event, wayrs_client::proxy::BadMessage> {
+                match event.header.opcode {
+                    #( #event_decoding )*
+                    _ => Err(wayrs_client::proxy::BadMessage),
+                }
+            }
+
+            fn id(&self) -> wayrs_client::object::ObjectId {
                 self.iner.id
             }
 
@@ -388,15 +391,28 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             }
         }
 
-        impl TryFrom<super::wayrs_client::object::Object> for #proxy_name {
-            type Error = super::wayrs_client::proxy::WrongObject;
+        impl TryFrom<wayrs_client::object::Object> for #proxy_name {
+            type Error = wayrs_client::proxy::WrongObject;
 
-            fn try_from(object: super::wayrs_client::object::Object) -> Result<Self, Self::Error> {
+            fn try_from(object: wayrs_client::object::Object) -> Result<Self, Self::Error> {
                 if object.interface == #static_name {
                     Ok(Self { iner: object })
                 } else {
-                    Err(super::wayrs_client::proxy::WrongObject)
+                    Err(wayrs_client::proxy::WrongObject)
                 }
+            }
+        }
+
+        impl From<#proxy_name> for wayrs_client::object::Object {
+            fn from(proxy: #proxy_name) -> Self {
+                proxy.iner
+            }
+        }
+
+        impl From<#proxy_name> for wayrs_client::object::ObjectId {
+            fn from(proxy: #proxy_name) -> Self {
+                todo!()
+                //proxy.iner.id
             }
         }
 
@@ -408,27 +424,10 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             #( #event_enum_options, )*
         }
 
-        impl TryFrom<super::wayrs_client::wire::Message> for Event {
-            type Error = super::wayrs_client::proxy::BadMessage;
-
-            fn try_from(event: super::wayrs_client::wire::Message) -> Result<Self, Self::Error> {
-                match event.header.opcode {
-                    #( #event_decoding )*
-                    _ => Err(super::wayrs_client::proxy::BadMessage),
-                }
-            }
-        }
-
         impl #proxy_name {
             #( #requests )*
         }
     }
-}
-
-fn map_arg_to_sturt_field(arg: &Argument) -> TokenStream {
-    let name = make_ident(&arg.name);
-    let ty = map_arg_to_rs(arg);
-    quote! { #name: #ty }
 }
 
 fn map_arg_to_argtype(arg: &Argument) -> TokenStream {
@@ -442,14 +441,13 @@ fn map_arg_to_argtype(arg: &Argument) -> TokenStream {
                 let iface_name = syn::Ident::new(iface, Span::call_site());
                 let static_name =
                     syn::Ident::new(&(iface.to_uppercase() + "_INTERFACE"), Span::call_site());
-                quote! { NewId(super::#iface_name::#static_name) }
+                quote!(NewId(super::#iface_name::#static_name))
             }
             None => quote!(AnyNewId),
         },
         "string" => quote!(String),
         "array" => quote!(Array),
         "fd" => quote!(Fd),
-        "enum" => quote!(Enum),
         _ => unreachable!(),
     }
 }
@@ -464,7 +462,6 @@ fn map_arg_to_argval(arg: &Argument) -> TokenStream {
         "string" => quote!(String),
         "array" => quote!(Array),
         "fd" => quote!(Fd),
-        "enum" => quote!(Enum),
         _ => unreachable!(),
     }
 }
@@ -486,13 +483,13 @@ fn map_arg_to_rs(arg: &Argument) -> TokenStream {
                 quote!(u32)
             }
         }
-        "fixed" => quote!(super::wayrs_client::wire::Fixed),
-        "object" => quote!(super::wayrs_client::object::ObjectId),
+        "fixed" => quote!(wayrs_client::wire::Fixed),
+        "object" => quote!(wayrs_client::object::ObjectId),
         "new_id" => {
             if let Some(iface) = &arg.interface {
                 make_proxy_path(iface)
             } else {
-                quote!(super::wayrs_client::object::Object)
+                quote!(wayrs_client::object::Object)
             }
         }
         "string" => quote!(::std::ffi::CString),
