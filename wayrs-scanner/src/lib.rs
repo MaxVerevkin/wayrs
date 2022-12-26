@@ -455,7 +455,10 @@ fn map_arg_to_argval(arg: &Argument) -> TokenStream {
         "uint" => quote!(Uint),
         "fixed" => quote!(Fixed),
         "object" => quote!(Object),
-        "new_id" => quote!(NewId),
+        "new_id" => match arg.interface.as_deref() {
+            Some(_) => quote!(NewId),
+            None => quote!(AnyNewId),
+        },
         "string" => quote!(String),
         "array" => quote!(Array),
         "fd" => quote!(Fd),
