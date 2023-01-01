@@ -13,6 +13,12 @@ pub struct MessageHeader {
     pub opcode: u16,
 }
 
+impl MessageHeader {
+    pub fn size() -> u16 {
+        8
+    }
+}
+
 #[derive(Debug)]
 pub struct Message {
     pub header: MessageHeader,

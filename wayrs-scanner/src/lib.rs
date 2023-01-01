@@ -66,17 +66,11 @@ fn make_pascal_case_ident(name: impl AsRef<str>) -> syn::Ident {
 }
 
 fn make_proxy_path(iface: impl AsRef<str>) -> TokenStream {
-    let iface_name = syn::Ident::new(iface.as_ref(), Span::call_site());
     let proxy_name = make_pascal_case_ident(iface);
-    quote! { super::#iface_name::#proxy_name }
+    quote! { super::#proxy_name }
 }
 
 fn gen_interface(iface: &Interface) -> TokenStream {
-    let static_name = syn::Ident::new(
-        &(iface.name.to_uppercase() + "_INTERFACE"),
-        Span::call_site(),
-    );
-
     let mod_doc = gen_doc(&iface.description, None);
     let mod_name = syn::Ident::new(&iface.name, Span::call_site());
 
@@ -143,14 +137,12 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 "new_id" => {
                     let iface = arg.interface.as_deref().unwrap();
                     let iface_name = syn::Ident::new(iface, Span::call_site());
-                    let static_name =
-                        syn::Ident::new(&(iface.to_uppercase() + "_INTERFACE"), Span::call_site());
                     quote! {
                         {
                             let obj = wayrs_client::object::Object {
                                 id: #arg_name,
                                 version: self.version(),
-                                interface: super::#iface_name::#static_name,
+                                interface: super::#iface_name::INTERFACE,
                             };
                             obj.try_into().unwrap()
                         }
@@ -224,7 +216,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
 
         let send_message = quote! {
             conn.send_request(
-                &#static_name,
+                &INTERFACE,
                 wayrs_client::wire::Message {
                     header: wayrs_client::wire::MessageHeader {
                         object_id: self.id(),
@@ -342,7 +334,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             use super::wayrs_client;
             use super::wayrs_client::proxy::Proxy;
 
-            pub static #static_name: &wayrs_client::interface::Interface = &wayrs_client::interface::Interface {
+            pub static INTERFACE: &wayrs_client::interface::Interface = &wayrs_client::interface::Interface {
                 name: wayrs_client::cstr!(#raw_name),
                 version: #version,
                 events: &[ #(#events_desc,)* ],
@@ -359,7 +351,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 type Event = Event;
 
                 fn interface() -> &'static wayrs_client::interface::Interface {
-                    #static_name
+                    INTERFACE
                 }
 
                 fn null() -> Self {
@@ -367,7 +359,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                         iner: wayrs_client::object::Object {
                             id: wayrs_client::object::ObjectId::NULL,
                             version: 0,
-                            interface: #static_name,
+                            interface: INTERFACE,
                         }
                     }
                 }
@@ -392,7 +384,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 type Error = wayrs_client::proxy::WrongObject;
 
                 fn try_from(object: wayrs_client::object::Object) -> Result<Self, Self::Error> {
-                    if object.interface == #static_name {
+                    if object.interface == INTERFACE {
                         Ok(Self { iner: object })
                     } else {
                         Err(wayrs_client::proxy::WrongObject)
@@ -424,6 +416,8 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 #( #requests )*
             }
         }
+
+        pub use #mod_name::#proxy_name;
     }
 }
 
@@ -436,9 +430,7 @@ fn map_arg_to_argtype(arg: &Argument) -> TokenStream {
         "new_id" => match &arg.interface {
             Some(iface) => {
                 let iface_name = syn::Ident::new(iface, Span::call_site());
-                let static_name =
-                    syn::Ident::new(&(iface.to_uppercase() + "_INTERFACE"), Span::call_site());
-                quote!(NewId(super::#iface_name::#static_name))
+                quote!(NewId(super::#iface_name::INTERFACE))
             }
             None => quote!(AnyNewId),
         },

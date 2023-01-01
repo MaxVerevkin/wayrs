@@ -4,10 +4,9 @@ use std::os::unix::io::{BorrowedFd, FromRawFd};
 use memmap2::MmapMut;
 
 use wayrs_client::connection::Connection;
-use wayrs_client::protocol::{wl_buffer, wl_shm, wl_shm_pool};
+use wayrs_client::protocol::*;
 use wayrs_client::proxy::{Dispatch, Dispatcher};
 
-use wl_buffer::WlBuffer;
 use wl_shm::{Format, WlShm};
 use wl_shm_pool::WlShmPool;
 
@@ -42,7 +41,7 @@ impl ShmAlloc {
     ) -> Self {
         let fd = shmemfdrs::create_shmem(wayrs_client::cstr!("/ramp-buffer"), initial_len);
         let file = unsafe { File::from_raw_fd(fd) };
-        let mmap = unsafe { memmap2::MmapMut::map_mut(&file).expect("memory mapping failed") };
+        let mmap = unsafe { MmapMut::map_mut(&file).expect("memory mapping failed") };
 
         let fd_dup = unsafe {
             BorrowedFd::borrow_raw(fd)
@@ -72,7 +71,7 @@ impl ShmAlloc {
         height: i32,
         stride: i32,
         format: Format,
-    ) -> (wl_buffer::WlBuffer, &mut [u8]) {
+    ) -> (WlBuffer, &mut [u8]) {
         let size = height * stride;
 
         let segment_index = self.alloc_segment(conn, size as usize, format);
@@ -124,8 +123,7 @@ impl ShmAlloc {
             self.len = new_len;
             self.file.set_len(new_len as u64).unwrap();
             self.pool.resize(conn, new_len as i32);
-            self.mmap =
-                unsafe { memmap2::MmapMut::map_mut(&self.file).expect("memory mapping failed") };
+            self.mmap = unsafe { MmapMut::map_mut(&self.file).expect("memory mapping failed") };
         }
     }
 
@@ -174,7 +172,7 @@ impl ShmAlloc {
         &mut self,
         conn: &mut Connection<D>,
         len: usize,
-        format: wl_shm::Format,
+        format: Format,
     ) -> usize {
         // Find a segment with exact size and a matching buffer
         for (i, segment) in self.segments.iter_mut().enumerate() {

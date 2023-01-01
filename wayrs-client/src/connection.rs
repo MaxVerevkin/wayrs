@@ -4,12 +4,9 @@ use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use crate::interface::{Interface, MessageDesc};
-use crate::protocol::wl_callback::WL_CALLBACK_INTERFACE;
-use crate::protocol::wl_registry::{self, GlobalArgs, WL_REGISTRY_INTERFACE};
-
 use crate::object::{Object, ObjectId};
-use crate::protocol::wl_callback::WlCallback;
-use crate::protocol::wl_registry::WlRegistry;
+use crate::protocol::wl_registry::GlobalArgs;
+use crate::protocol::*;
 use crate::proxy::{make_callback, Dispatch, Dispatcher, EventCallback, Proxy};
 use crate::socket::{BufferedSocket, IoMode, SendMessageError};
 use crate::wire::{ArgType, ArgValue, Message, MessageHeader};
@@ -333,6 +330,9 @@ impl<D: Dispatcher> Connection<D> {
 
     /// Allocate a new object. Returned object must be sent in a request as a "new_id" argument.
     pub fn allocate_new_object<P: Proxy>(&mut self, version: u32) -> P {
+        let interface = P::interface();
+        assert!(version <= interface.version);
+
         let id = self.reusable_ids.pop().unwrap_or_else(|| {
             let id = self.last_id.next();
             assert!(!id.created_by_server());
@@ -342,7 +342,7 @@ impl<D: Dispatcher> Connection<D> {
 
         let obj = Object {
             id,
-            interface: P::interface(),
+            interface,
             version,
         };
 
@@ -471,12 +471,12 @@ pub(crate) static WL_DISPLAY_INTERFACE: &crate::interface::Interface =
             MessageDesc {
                 name: "sync",
                 is_destructor: false,
-                signature: &[crate::wire::ArgType::NewId(WL_CALLBACK_INTERFACE)],
+                signature: &[crate::wire::ArgType::NewId(wl_callback::INTERFACE)],
             },
             MessageDesc {
                 name: "get_registry",
                 is_destructor: false,
-                signature: &[crate::wire::ArgType::NewId(WL_REGISTRY_INTERFACE)],
+                signature: &[crate::wire::ArgType::NewId(wl_registry::INTERFACE)],
             },
         ],
     };

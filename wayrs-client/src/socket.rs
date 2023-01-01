@@ -70,7 +70,7 @@ impl BufferedSocket {
     /// than `FDS_OUT_LEN` file descriptors.
     pub fn write_message(&mut self, msg: Message, mode: IoMode) -> Result<(), SendMessageError> {
         // Calc size
-        let size = 8 + msg.args.iter().map(ArgValue::size).sum::<u16>();
+        let size = MessageHeader::size() + msg.args.iter().map(ArgValue::size).sum::<u16>();
         let fds_cnt = msg
             .args
             .iter()
@@ -116,8 +116,7 @@ impl BufferedSocket {
     }
 
     pub fn peek_message_header(&mut self, mode: IoMode) -> io::Result<MessageHeader> {
-        // Header is 8 bytes long
-        while self.bytes_in.get_readable().len() < 8 {
+        while self.bytes_in.get_readable().len() < MessageHeader::size() as usize {
             self.fill_incoming_buf(mode)?;
         }
 
