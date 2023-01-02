@@ -330,9 +330,6 @@ impl<D: Dispatcher> Connection<D> {
 
     /// Allocate a new object. Returned object must be sent in a request as a "new_id" argument.
     pub fn allocate_new_object<P: Proxy>(&mut self, version: u32) -> P {
-        let interface = P::interface();
-        assert!(version <= interface.version);
-
         let id = self.reusable_ids.pop().unwrap_or_else(|| {
             let id = self.last_id.next();
             assert!(!id.created_by_server());
@@ -342,7 +339,7 @@ impl<D: Dispatcher> Connection<D> {
 
         let obj = Object {
             id,
-            interface,
+            interface: P::interface(),
             version,
         };
 
