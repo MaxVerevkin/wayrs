@@ -7,6 +7,7 @@ A simple Rust implementation of Wayland client library.
 - Single event queue
 - No interior mutability
 - No `libwayland` compatibility
+- Support blocking, non-blocking and async IO
 
 ## Project structure
 

@@ -3,7 +3,7 @@ name = "wayrs-scanner"
 description = "Generates code for wayrs-client from xml files"
 repository = "https://github.com/MaxVerevkin/wayrs"
 readme = "../README.md"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
@@ -13,7 +13,7 @@ keywords = ["wayland", "client", "scanner"]
 proc-macro = true
 
 [dependencies]
-quick-xml = "0.26"
+quick-xml = "0.27"
 quote = "1.0"
 proc-macro2 = "1.0"
 convert_case = "0.6"

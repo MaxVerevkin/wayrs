@@ -10,7 +10,7 @@ use nix::sys::socket::{self, ControlMessage, ControlMessageOwned};
 use crate::interface::Interface;
 use crate::object::ObjectId;
 use crate::wire::{ArgType, ArgValue, Fixed, Message, MessageHeader};
-use crate::ConnectError;
+use crate::{ConnectError, IoMode};
 
 pub const BYTES_OUT_LEN: usize = 4096;
 pub const BYTES_IN_LEN: usize = BYTES_OUT_LEN * 2;
@@ -23,12 +23,6 @@ pub struct BufferedSocket {
     bytes_out: ArrayBuffer<u8, BYTES_OUT_LEN>,
     fds_in: ArrayBuffer<RawFd, FDS_IN_LEN>,
     fds_out: ArrayBuffer<RawFd, FDS_OUT_LEN>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IoMode {
-    Blocking,
-    NonBlocking,
 }
 
 impl AsRawFd for BufferedSocket {
@@ -143,7 +137,7 @@ impl BufferedSocket {
             .expect("incorrect opcode")
             .signature;
 
-        // Check size and fill buffer if neccessary
+        // Check size and fill buffer if necessary
         let fds_cnt = signature
             .iter()
             .filter(|arg| matches!(arg, ArgType::Fd))
@@ -156,7 +150,7 @@ impl BufferedSocket {
             self.fill_incoming_buf(mode)?;
         }
 
-        // Consum header
+        // Consume header
         self.bytes_in.consume(8);
 
         let args = signature

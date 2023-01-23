@@ -1,5 +1,6 @@
 use std::ffi::CString;
-use std::os::unix::io::OwnedFd;
+use std::fmt::{self, Debug, Formatter};
+use std::os::unix::io::{AsRawFd, OwnedFd};
 
 use crate::{
     interface::Interface,
@@ -80,5 +81,63 @@ impl Fixed {
 
     pub fn from_i32(val: i32) -> Self {
         Self(val * 256)
+    }
+}
+
+pub(crate) struct DebugMessage<'a> {
+    message: &'a Message,
+    is_event: bool,
+    object: Object,
+}
+
+impl<'a> DebugMessage<'a> {
+    pub(crate) fn new(message: &'a Message, is_event: bool, object: Object) -> Self {
+        Self {
+            message,
+            is_event,
+            object,
+        }
+    }
+}
+
+impl Debug for DebugMessage<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let msg_desc = if self.is_event {
+            self.object.interface.events[self.message.header.opcode as usize]
+        } else {
+            self.object.interface.requests[self.message.header.opcode as usize]
+        };
+
+        write!(
+            f,
+            "{}@{}.{}(",
+            String::from_utf8_lossy(self.object.interface.name.to_bytes()),
+            self.object.id.0,
+            msg_desc.name,
+        )?;
+
+        for (arg_i, arg) in self.message.args.iter().enumerate() {
+            if arg_i != 0 {
+                write!(f, ",")?;
+            }
+            match arg {
+                ArgValue::Int(x) => write!(f, "{x}")?,
+                ArgValue::Uint(x) | ArgValue::Object(ObjectId(x)) => write!(f, "{x}")?,
+                ArgValue::Fixed(x) => write!(f, "{}", x.as_f64())?,
+                ArgValue::NewId(ObjectId(id)) => {
+                    let ArgType::NewId(new_id_iface) = &msg_desc.signature[arg_i]
+                    else { panic!("signature mismatch") };
+                    write!(f, "{}@{id}", new_id_iface.name.to_string_lossy())?
+                }
+                ArgValue::AnyNewId(x) => {
+                    write!(f, "{}@{}", x.interface.name.to_string_lossy(), x.id.0)?
+                }
+                ArgValue::String(x) => write!(f, "{x:?}")?,
+                ArgValue::Array(_) => write!(f, "<array>")?,
+                ArgValue::Fd(x) => write!(f, "{}", x.as_raw_fd())?,
+            }
+        }
+
+        write!(f, ")")
     }
 }

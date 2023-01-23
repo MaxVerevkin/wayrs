@@ -26,11 +26,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let parser = Parser::new(&file);
     let protocol = parser.get_grotocol();
 
-    let modules = protocol
-        .interfaces
-        .iter()
-        .filter(|iface| iface.name != "wl_display")
-        .map(gen_interface);
+    let modules = protocol.interfaces.iter().map(gen_interface);
     let expanded = quote! { #(#modules)* };
 
     // let mut rustfmt = std::process::Command::new("rustfmt")
@@ -169,106 +165,11 @@ fn gen_interface(iface: &Interface) -> TokenStream {
         }
     });
 
-    let requests = iface.requests.iter().enumerate().map(|(opcode, request)| {
-        assert!(
-            request
-                .args
-                .iter()
-                .filter(|x| x.arg_type == "new_id")
-                .count()
-                <= 1,
-            "{} has more than one new_id argument",
-            request.name,
-        );
-        let opcode = opcode as u16;
-        let doc = gen_doc(&request.description, Some(request.since));
-        let new_id_interface = request
-            .args
-            .iter()
-            .find(|x| x.arg_type == "new_id")
-            .map(|x| x.interface.as_deref());
-        let request_name = make_ident(&request.name);
-        let fn_args = request.args.iter().map(|arg| {
-            let arg_name = make_ident(&arg.name);
-            let arg_ty = map_arg_to_rs(arg);
-            match (arg.arg_type.as_str(), arg.interface.as_deref()) {
-                ("int" | "uint" | "fixed" | "string" | "array" | "fd", None) => {
-                    quote! { ,#arg_name: #arg_ty }
-                }
-                ("object", None) => quote! { ,#arg_name: wayrs_client::object::Object },
-                ("object", Some(i)) => {
-                    let proxy_path = make_proxy_path(i);
-                    quote! { ,#arg_name: #proxy_path }
-                }
-                ("new_id", None) => quote!(,version: u32),
-                ("new_id", Some(_)) => quote!(),
-                _ => unreachable!(),
-            }
-        });
-        let msg_args = request.args.iter().map(|arg| {
-            let arg_name = make_ident(&arg.name);
-            let arg_ty = map_arg_to_argval(arg);
-            match arg.arg_type.as_str() {
-                "new_id" => quote! { wayrs_client::wire::ArgValue::#arg_ty(new_object.into()) },
-                _ => quote! { wayrs_client::wire::ArgValue::#arg_ty(#arg_name.into()) },
-            }
-        });
-
-        let send_message = quote! {
-            conn.send_request(
-                &INTERFACE,
-                wayrs_client::wire::Message {
-                    header: wayrs_client::wire::MessageHeader {
-                        object_id: self.id(),
-                        size: 0,
-                        opcode: #opcode,
-                    },
-                    args: vec![ #( #msg_args, )* ],
-                }
-            );
-        };
-
-        let (generics, ret_ty, body) = match new_id_interface {
-            None => (
-                quote! { D: wayrs_client::proxy::Dispatcher },
-                quote! { () },
-                send_message,
-            ),
-            Some(None) => (
-                quote! { P: Proxy, D: wayrs_client::proxy::Dispatch<P> },
-                quote! { P },
-                quote! {
-                    conn.set_callback::<P>();
-                    let new_object = conn.allocate_new_object::<P>(version);
-                    #send_message
-                    new_object
-                },
-            ),
-            Some(Some(i)) => {
-                let proxy_path = make_proxy_path(i);
-                (
-                    quote! { D: wayrs_client::proxy::Dispatch<#proxy_path> },
-                    proxy_path.clone(),
-                    quote! {
-                        conn.set_callback::<#proxy_path>();
-                        let new_object = conn.allocate_new_object::<#proxy_path>(self.version());
-                        #send_message
-                        new_object
-                    },
-                )
-            }
-        };
-
-        quote! {
-            #doc
-            #[allow(clippy::too_many_arguments)]
-            pub fn #request_name<#generics>(
-                &self, conn: &mut wayrs_client::connection::Connection<D> #( #fn_args )*
-            ) -> #ret_ty {
-                #body
-            }
-        }
-    });
+    let requests = iface
+        .requests
+        .iter()
+        .enumerate()
+        .map(|(opcode, request)| gen_request_fn(opcode as u16, request));
 
     let enums = iface.enums.iter().map(|en| {
         let name = make_pascal_case_ident(&en.name);
@@ -333,6 +234,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
         pub mod #mod_name {
             use super::wayrs_client;
             use super::wayrs_client::proxy::Proxy;
+            use super::wayrs_client::connection::Connection;
 
             pub static INTERFACE: &wayrs_client::interface::Interface = &wayrs_client::interface::Interface {
                 name: wayrs_client::cstr!(#raw_name),
@@ -418,6 +320,168 @@ fn gen_interface(iface: &Interface) -> TokenStream {
         }
 
         pub use #mod_name::#proxy_name;
+    }
+}
+
+fn gen_pub_fn(
+    attrs: &TokenStream,
+    name: &str,
+    generics: &[TokenStream],
+    args: &[TokenStream],
+    ret_ty: TokenStream,
+    body: TokenStream,
+) -> TokenStream {
+    let name = make_ident(name);
+    quote! {
+        #attrs
+        #[allow(clippy::too_many_arguments)]
+        pub fn #name<#(#generics),*>(#(#args),*) -> #ret_ty {
+            #body
+        }
+    }
+}
+
+fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
+    assert!(
+        request
+            .args
+            .iter()
+            .filter(|x| x.arg_type == "new_id")
+            .count()
+            <= 1,
+        "{} has more than one new_id argument",
+        request.name,
+    );
+
+    let new_id_interface = request
+        .args
+        .iter()
+        .find(|x| x.arg_type == "new_id")
+        .map(|x| x.interface.as_deref());
+
+    let mut fn_args = vec![quote!(&self), quote!(conn: &mut Connection<D>)];
+    for arg in &request.args {
+        let arg_name = make_ident(&arg.name);
+        let arg_ty = map_arg_to_rs(arg);
+        match (arg.arg_type.as_str(), arg.interface.as_deref()) {
+            ("int" | "uint" | "fixed" | "string" | "array" | "fd", None) => {
+                fn_args.push(quote!(#arg_name: #arg_ty));
+            }
+            ("object", None) => fn_args.push(quote!(#arg_name: wayrs_client::object::Object)),
+            ("object", Some(i)) => {
+                let proxy_path = make_proxy_path(i);
+                fn_args.push(quote!(#arg_name: #proxy_path));
+            }
+            ("new_id", None) => fn_args.push(quote!(version: u32)),
+            ("new_id", Some(_)) => (),
+            _ => unreachable!(),
+        }
+    }
+
+    let msg_args = request.args.iter().map(|arg| {
+        let arg_name = make_ident(&arg.name);
+        let arg_ty = map_arg_to_argval(arg);
+        match arg.arg_type.as_str() {
+            "new_id" => quote! { wayrs_client::wire::ArgValue::#arg_ty(new_object.into()) },
+            _ => quote! { wayrs_client::wire::ArgValue::#arg_ty(#arg_name.into()) },
+        }
+    });
+
+    let send_message = quote! {
+        conn.send_request(
+            &INTERFACE,
+            wayrs_client::wire::Message {
+                header: wayrs_client::wire::MessageHeader {
+                    object_id: self.id(),
+                    size: 0,
+                    opcode: #opcode,
+                },
+                args: vec![ #( #msg_args, )* ],
+            }
+        );
+    };
+
+    let doc = gen_doc(&request.description, Some(request.since));
+
+    match new_id_interface {
+        None => gen_pub_fn(
+            &doc,
+            &request.name,
+            &[quote!(D)],
+            &fn_args,
+            quote!(()),
+            send_message,
+        ),
+        Some(None) => {
+            let no_cb = gen_pub_fn(
+                &doc,
+                &request.name,
+                &[quote!(P: Proxy), quote!(D)],
+                &fn_args,
+                quote!(P),
+                quote! {
+                    let new_object = conn.allocate_new_object::<P>(version);
+                    #send_message
+                    new_object
+                },
+            );
+            fn_args.push(quote!(cb: F));
+            let cb = gen_pub_fn(
+                &doc,
+                &format!("{}_with_cb", request.name),
+                &[
+                    quote!(P: Proxy),
+                    quote!(D),
+                    quote!(F: FnMut(&mut Connection<D>, &mut D, P, <P as Proxy>::Event) + Send + 'static),
+                ],
+                &fn_args,
+                quote!(P),
+                quote! {
+                    let new_object = conn.allocate_new_object_with_cb::<P, F>(version, cb);
+                    #send_message
+                    new_object
+                },
+            );
+            quote! {
+                #no_cb
+                #cb
+            }
+        }
+        Some(Some(i)) => {
+            let proxy_path = make_proxy_path(i);
+            let no_cb = gen_pub_fn(
+                &doc,
+                &request.name,
+                &[quote!(D)],
+                &fn_args,
+                proxy_path.clone(),
+                quote! {
+                    let new_object = conn.allocate_new_object::<#proxy_path>(self.version());
+                    #send_message
+                    new_object
+                },
+            );
+            fn_args.push(quote!(cb: F));
+            let cb = gen_pub_fn(
+                &doc,
+                &format!("{}_with_cb", request.name),
+                &[
+                    quote!(D),
+                    quote!(F: FnMut(&mut Connection<D>, &mut D, #proxy_path, <#proxy_path as Proxy>::Event) + Send + 'static),
+                ],
+                &fn_args,
+                proxy_path.clone(),
+                quote! {
+                    let new_object = conn.allocate_new_object_with_cb::<#proxy_path, F>(self.version(), cb);
+                    #send_message
+                    new_object
+                },
+            );
+            quote! {
+                #no_cb
+                #cb
+            }
+        }
     }
 }
 

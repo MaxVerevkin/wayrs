@@ -1,21 +1,21 @@
-use std::convert::Infallible;
 use std::ffi::CString;
 
 use wayrs_client::connection::Connection;
 use wayrs_client::global::GlobalExt;
 use wayrs_client::protocol::wl_output::{self, WlOutput};
 use wayrs_client::protocol::wl_registry::{self, GlobalArgs, WlRegistry};
-use wayrs_client::proxy::{Dispatch, Dispatcher};
-use wayrs_client::socket::IoMode;
+use wayrs_client::IoMode;
 
 fn main() {
     let mut conn = Connection::connect().unwrap();
     let mut state = State::default();
 
+    conn.set_callback_for(conn.registry(), wl_registry_cb);
+
     loop {
         conn.flush(IoMode::Blocking).unwrap();
         conn.recv_events(IoMode::Blocking).unwrap();
-        conn.dispatch_events(&mut state).unwrap();
+        conn.dispatch_events(&mut state);
     }
 }
 
@@ -38,7 +38,7 @@ impl Output {
     fn bind(conn: &mut Connection<State>, global: &GlobalArgs) -> Self {
         Self {
             registry_name: global.name,
-            wl_output: global.bind(conn, 3..=4).unwrap(),
+            wl_output: global.bind_with_cb(conn, 3..=4, wl_output_cb).unwrap(),
             name: None,
             desc: None,
             scale: None,
@@ -47,51 +47,53 @@ impl Output {
     }
 }
 
-impl Dispatcher for State {
-    type Error = Infallible;
-}
-
-impl Dispatch<WlRegistry> for State {
-    fn event(&mut self, conn: &mut Connection<Self>, _: WlRegistry, event: wl_registry::Event) {
-        match event {
-            wl_registry::Event::Global(global) if global.is::<WlOutput>() => {
-                self.outputs.push(Output::bind(conn, &global));
-            }
-            wl_registry::Event::GlobalRemove(name) => {
-                if let Some(i) = self.outputs.iter().position(|o| o.registry_name == name) {
-                    let output = self.outputs.swap_remove(i);
-                    eprintln!("removed output: {}", output.name.unwrap().to_str().unwrap());
-                    output.wl_output.release(conn);
-                }
-            }
-            _ => (),
+fn wl_registry_cb(
+    conn: &mut Connection<State>,
+    state: &mut State,
+    _: WlRegistry,
+    event: wl_registry::Event,
+) {
+    match event {
+        wl_registry::Event::Global(global) if global.is::<WlOutput>() => {
+            state.outputs.push(Output::bind(conn, &global));
         }
+        wl_registry::Event::GlobalRemove(name) => {
+            if let Some(i) = state.outputs.iter().position(|o| o.registry_name == name) {
+                let output = state.outputs.swap_remove(i);
+                eprintln!("removed output: {}", output.name.unwrap().to_str().unwrap());
+                output.wl_output.release(conn);
+            }
+        }
+        _ => (),
     }
 }
 
-impl Dispatch<WlOutput> for State {
-    fn event(&mut self, _: &mut Connection<Self>, output: WlOutput, event: wl_output::Event) {
-        let output = &mut self
-            .outputs
-            .iter_mut()
-            .find(|o| o.wl_output == output)
-            .unwrap();
-        match event {
-            wl_output::Event::Geometry(_) => (),
-            wl_output::Event::Mode(mode) => {
-                output.mode = Some(format!(
-                    "{}x{} @ {}Hz",
-                    mode.width,
-                    mode.height,
-                    mode.refresh as f64 * 1e-3
-                ))
-            }
-            wl_output::Event::Done => {
-                dbg!(output);
-            }
-            wl_output::Event::Scale(scale) => output.scale = Some(scale),
-            wl_output::Event::Name(name) => output.name = Some(name),
-            wl_output::Event::Description(desc) => output.desc = Some(desc),
+fn wl_output_cb(
+    _: &mut Connection<State>,
+    state: &mut State,
+    output: WlOutput,
+    event: wl_output::Event,
+) {
+    let output = &mut state
+        .outputs
+        .iter_mut()
+        .find(|o| o.wl_output == output)
+        .unwrap();
+    match event {
+        wl_output::Event::Geometry(_) => (),
+        wl_output::Event::Mode(mode) => {
+            output.mode = Some(format!(
+                "{}x{} @ {}Hz",
+                mode.width,
+                mode.height,
+                mode.refresh as f64 * 1e-3
+            ))
         }
+        wl_output::Event::Done => {
+            dbg!(output);
+        }
+        wl_output::Event::Scale(scale) => output.scale = Some(scale),
+        wl_output::Event::Name(name) => output.name = Some(name),
+        wl_output::Event::Description(desc) => output.desc = Some(desc),
     }
 }
