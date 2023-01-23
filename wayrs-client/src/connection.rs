@@ -109,7 +109,7 @@ impl<D> Connection<D> {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
     /// # use wayrs_client::connection::Connection;
     /// struct MyState;
     /// let mut conn = Connection::<MyState>::connect().unwrap();
@@ -176,7 +176,7 @@ impl<D> Connection<D> {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
     /// # use wayrs_client::connection::Connection;
     /// struct MyState;
     /// let mut conn = Connection::<MyState>::connect().unwrap();
