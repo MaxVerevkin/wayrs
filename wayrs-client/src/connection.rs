@@ -20,6 +20,8 @@ use tokio::io::unix::AsyncFd;
 ///
 /// This struct manages a buffered Wayland socket, keeps track of objects and request/event queues
 /// and dispatches object events.
+///
+/// Set `WAYRS_DEBUG=1` environment variable to get debug messages.
 pub struct Connection<D> {
     socket: BufferedSocket,
 
