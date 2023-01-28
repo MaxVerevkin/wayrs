@@ -14,5 +14,6 @@ A simple Rust implementation of Wayland client library.
 The project is split into multiple crates:
 
 - `wayrs-client`: The main crate with implements Wayland wire protocol. Provides `Connection` type which represents open Wayland socket.
-- `wayrs-scanner`: Provides `generate!` macro that generates glue code from `.xml` files. Generated code for the core protocol is already included in `wayrs-client`.
+- `wayrs-scanner`: Provides `generate!` macro that generates glue code from `.xml` files. Generated code for the core protocol is already included in `wayrs-client`. Reexported as `wayrs_client::scanner`.
 - `wayrs-shm-alloc`: A simple "free list" shared memory allocator.
+- `wayrs-protocols`: A collection of Wayland protocols to use with `wayrs-client`.
