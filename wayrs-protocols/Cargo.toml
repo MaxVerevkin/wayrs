@@ -3,7 +3,7 @@ name = "wayrs-protocols"
 description = "A collection of Wayland protocols to use with wayrs-client"
 repository = "https://github.com/MaxVerevkin/wayrs"
 readme = "../README.md"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
@@ -61,3 +61,9 @@ wlr-virtual-pointer-unstable-v1 = []
 
 [dependencies]
 wayrs-client = { version = "0.3", path = "../wayrs-client" }
+
+[package.metadata.docs.rs]
+# To build locally:
+# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
