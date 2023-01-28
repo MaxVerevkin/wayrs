@@ -1,3 +1,9 @@
+//! A collection of Wayland protocols to use with `wayrs_client`.
+//!
+//! All protocols are behind feature gates and none of them are enabeled by default. Check out
+//! [Cargo.toml](https://github.com/MaxVerevkin/wayrs/blob/main/wayrs-protocols/Cargo.toml) for a
+//! list of available features.
+
 #[cfg(feature = "xdg-shell")]
 pub mod xdg_shell {
     use wayrs_client;
