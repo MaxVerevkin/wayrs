@@ -2,10 +2,8 @@ use std::ffi::CString;
 use std::fmt::{self, Debug, Formatter};
 use std::os::unix::io::{AsRawFd, OwnedFd};
 
-use crate::{
-    interface::Interface,
-    object::{Object, ObjectId},
-};
+use crate::interface::Interface;
+use crate::object::{Object, ObjectId};
 
 #[derive(Debug, Clone, Copy)]
 pub struct MessageHeader {
@@ -74,13 +72,21 @@ impl ArgValue {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Fixed(pub i32);
 
+impl From<i32> for Fixed {
+    fn from(value: i32) -> Self {
+        Self(value * 256)
+    }
+}
+
+impl From<u32> for Fixed {
+    fn from(value: u32) -> Self {
+        Self(value as i32 * 256)
+    }
+}
+
 impl Fixed {
     pub fn as_f64(self) -> f64 {
         self.0 as f64 / 256.0
-    }
-
-    pub fn from_i32(val: i32) -> Self {
-        Self(val * 256)
     }
 }
 
@@ -108,13 +114,7 @@ impl Debug for DebugMessage<'_> {
             self.object.interface.requests[self.message.header.opcode as usize]
         };
 
-        write!(
-            f,
-            "{}@{}.{}(",
-            String::from_utf8_lossy(self.object.interface.name.to_bytes()),
-            self.object.id.0,
-            msg_desc.name,
-        )?;
+        write!(f, "{:?}.{}(", self.object, msg_desc.name,)?;
 
         for (arg_i, arg) in self.message.args.iter().enumerate() {
             if arg_i != 0 {
@@ -129,9 +129,7 @@ impl Debug for DebugMessage<'_> {
                     else { panic!("signature mismatch") };
                     write!(f, "{}@{id}", new_id_iface.name.to_string_lossy())?
                 }
-                ArgValue::AnyNewId(x) => {
-                    write!(f, "{}@{}", x.interface.name.to_string_lossy(), x.id.0)?
-                }
+                ArgValue::AnyNewId(x) => write!(f, "{x:?}")?,
                 ArgValue::String(x) => write!(f, "{x:?}")?,
                 ArgValue::Array(_) => write!(f, "<array>")?,
                 ArgValue::Fd(x) => write!(f, "{}", x.as_raw_fd())?,

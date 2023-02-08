@@ -1,8 +1,12 @@
+use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
 
 use crate::interface::Interface;
 
-#[derive(Debug, Clone, Copy)]
+/// A Wayland object.
+///
+/// The [`Debug`] representation is `<interface>@<id>v<version>`.
+#[derive(Clone, Copy)]
 pub struct Object {
     pub id: ObjectId,
     pub interface: &'static Interface,
@@ -20,6 +24,18 @@ impl Eq for Object {}
 impl Hash for Object {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
+    }
+}
+
+impl Debug for Object {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}@{}v{}",
+            self.interface.name.to_string_lossy(),
+            self.id.0,
+            self.version
+        )
     }
 }
 

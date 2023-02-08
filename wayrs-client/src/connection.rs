@@ -251,12 +251,7 @@ impl<D> Connection<D> {
 
         // Destroy object if request is destrctor
         if iface.requests[request.header.opcode as usize].is_destructor {
-            let obj = self
-                .objects
-                .remove(&request.header.object_id)
-                .expect("attempt to send request for non-existing or dead object")
-                .object;
-            self.dead_objects.insert(obj.id, obj);
+            self.destroy_object(request.header.object_id);
         }
 
         // Queue request
@@ -429,29 +424,33 @@ impl<D> Connection<D> {
                 QueuedEvent::Message(event) => {
                     let Some(object) = self.objects.get_mut(&event.header.object_id)
                     else { continue };
+
                     // Removing the callback from the object to make borrow checker happy
                     let mut object_cb = object.cb.take();
                     let object = object.object;
+                    let opcode = event.header.opcode;
 
                     match &mut object_cb {
                         Some(cb) => cb(self, state, object, event),
                         None => {
                             if self.debug {
-                                eprintln!(
-                                    "[wayrs] no callback for {}@{}",
-                                    object.interface.name.to_string_lossy(),
-                                    object.id.0,
-                                );
+                                eprintln!("[wayrs] no callback for {object:?}");
                             }
                             continue;
                         }
                     }
 
-                    // The object might have been destroyed
-                    if let Some(object) = self.objects.get_mut(&object.id) {
-                        // Callback might have been set again
-                        if object.cb.is_none() {
-                            object.cb = object_cb;
+                    // Destroy object if event is destrctor
+                    if object.interface.events[opcode as usize].is_destructor {
+                        self.destroy_object(object.id);
+                    } else {
+                        // Re-add callback
+                        // The object might have been destroyed in the callback
+                        if let Some(object) = self.objects.get_mut(&object.id) {
+                            // Callback might have been set again
+                            if object.cb.is_none() {
+                                object.cb = object_cb;
+                            }
                         }
                     }
 
@@ -523,6 +522,12 @@ impl<D> Connection<D> {
         );
 
         object.try_into().unwrap()
+    }
+
+    fn destroy_object(&mut self, id: ObjectId) {
+        if let Some(object) = self.objects.remove(&id) {
+            self.dead_objects.insert(id, object.object);
+        }
     }
 
     fn make_generic_cb<

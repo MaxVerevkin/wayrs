@@ -1,10 +1,11 @@
-use std::ffi::CString;
-use std::{ffi::CStr, ops::RangeInclusive};
+use std::ffi::{CStr, CString};
+use std::ops::RangeInclusive;
 
 use crate::connection::Connection;
+use crate::protocol::wl_registry::GlobalArgs;
 use crate::proxy::Proxy;
 
-pub type Global = crate::protocol::wl_registry::GlobalArgs;
+pub type Global = GlobalArgs;
 pub type Globals = [Global];
 
 pub trait GlobalExt {
