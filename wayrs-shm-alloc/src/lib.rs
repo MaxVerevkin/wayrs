@@ -17,11 +17,11 @@ use wl_shm_pool::WlShmPool;
 #[derive(Debug)]
 pub struct ShmAlloc {
     wl_shm: WlShm,
-    pool: Option<InitShmPoll>,
+    pool: Option<InitShmPool>,
 }
 
 #[derive(Debug)]
-struct InitShmPoll {
+struct InitShmPool {
     pool: WlShmPool,
     len: usize,
     file: File,
@@ -79,7 +79,7 @@ impl ShmAlloc {
         spec: BufferSpec,
     ) -> (Buffer, &mut [u8]) {
         self.pool
-            .get_or_insert_with(|| InitShmPoll::new(conn, self.wl_shm, spec.size()))
+            .get_or_insert_with(|| InitShmPool::new(conn, self.wl_shm, spec.size()))
             .alloc_buffer(conn, spec)
     }
 }
@@ -134,8 +134,8 @@ impl Drop for Buffer {
     }
 }
 
-impl InitShmPoll {
-    fn new<D>(conn: &mut Connection<D>, wl_shm: WlShm, size: usize) -> InitShmPoll {
+impl InitShmPool {
+    fn new<D>(conn: &mut Connection<D>, wl_shm: WlShm, size: usize) -> InitShmPool {
         let fd = shmemfdrs::create_shmem(wayrs_client::cstr!("/wayrs_shm_pool"), size);
         let file = unsafe { File::from_raw_fd(fd) };
         let mmap = unsafe { MmapMut::map_mut(&file).expect("memory mapping failed") };
