@@ -17,3 +17,4 @@ The project is split into multiple crates:
 - `wayrs-scanner`: Provides `generate!` macro that generates glue code from `.xml` files. Generated code for the core protocol is already included in `wayrs-client`. Reexported as `wayrs_client::scanner`.
 - `wayrs-shm-alloc`: A simple "free list" shared memory allocator.
 - `wayrs-protocols`: A collection of Wayland protocols to use with `wayrs-client`.
+- `wayrs-cursor`: Easy to use xcursor library.

@@ -1,0 +1,16 @@
+[package]
+name = "wayrs-cursor"
+description = "Easy to use xcursor library"
+repository = "https://github.com/MaxVerevkin/wayrs"
+readme = "../README.md"
+version = "0.4.0-beta.0"
+edition = "2021"
+license = "MIT"
+authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
+keywords = ["wayland", "cursor"]
+
+[dependencies]
+thiserror = "1.0"
+wayrs-client = { version = "0.3.0", path = "../wayrs-client" }
+wayrs-shm-alloc = { version = "0.4.0-beta.0", path = "../wayrs-shm-alloc" }
+xcursor = "0.3"
