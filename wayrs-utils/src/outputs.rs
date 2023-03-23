@@ -10,10 +10,13 @@ use wayrs_client::proxy::Proxy;
 pub trait OutputHandler: Sized + 'static {
     fn get_outputs(&mut self) -> &mut Outputs;
 
+    /// Called when output is added and initial info is received.
     fn output_added(&mut self, _: &mut Connection<Self>, _: WlOutput) {}
 
+    /// Called when output is removed.
     fn output_removed(&mut self, _: &mut Connection<Self>, _: WlOutput) {}
 
+    /// Called when output info is updated after the initial info in sent.
     fn info_updated(&mut self, _: &mut Connection<Self>, _: WlOutput, _: UpdatesMask) {}
 }
 
@@ -34,6 +37,7 @@ pub struct Output {
     pub description: Option<CString>,
 
     pending_update_mask: UpdatesMask,
+    initial_info_received: bool,
 }
 
 #[derive(Debug, Default)]
@@ -76,6 +80,7 @@ impl Output {
             description: None,
 
             pending_update_mask: UpdatesMask::default(),
+            initial_info_received: false,
         }
     }
 }
@@ -124,6 +129,9 @@ fn wl_output_cb<D: OutputHandler>(
         .find(|o| o.wl_output == wl_output)
         .unwrap();
 
+    // "done" event is since version 2
+    let mut is_done = wl_output.version() < 2;
+
     match event {
         wl_output::Event::Geometry(args) => {
             output.geometry = Some(args);
@@ -151,15 +159,17 @@ fn wl_output_cb<D: OutputHandler>(
             output.pending_update_mask.description = true;
         }
         wl_output::Event::Done => {
-            let mask = std::mem::take(&mut output.pending_update_mask);
-            state.info_updated(conn, wl_output, mask);
-            return;
+            is_done = true;
         }
     }
 
-    // "done" event is since version 2
-    if wl_output.version() < 2 {
-        let mask = std::mem::take(&mut output.pending_update_mask);
-        state.info_updated(conn, wl_output, mask);
+    if is_done {
+        if output.initial_info_received {
+            let mask = std::mem::take(&mut output.pending_update_mask);
+            state.info_updated(conn, wl_output, mask);
+        } else {
+            output.initial_info_received = true;
+            state.output_added(conn, wl_output);
+        }
     }
 }
