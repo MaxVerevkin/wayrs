@@ -3,14 +3,13 @@ name = "wayrs-utils"
 description = "A collection of utils and abstractions for wayrs-client"
 repository = "https://github.com/MaxVerevkin/wayrs"
 readme = "../README.md"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "client"]
 
 [features]
-outputs = []
 seats = []
 shm_alloc = ["memmap2", "shmemfdrs"]
 cursor = ["shm_alloc", "xcursor", "thiserror"]

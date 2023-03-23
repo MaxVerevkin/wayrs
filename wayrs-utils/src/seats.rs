@@ -11,25 +11,39 @@ use wayrs_client::proxy::Proxy;
 pub trait SeatHandler: Sized + 'static {
     fn get_seats(&mut self) -> &mut Seats;
 
+    /// A new seat is added.
+    ///
+    /// This is _not_ called for seats that where advertised during the initial roundtrip.
     fn seat_added(&mut self, _: &mut Connection<Self>, _: WlSeat) {}
 
+    /// A seat is removed.
     fn seat_removed(&mut self, _: &mut Connection<Self>, _: WlSeat) {}
 
+    /// Seat name was advertised.
     fn seat_name(&mut self, _: &mut Connection<Self>, _: WlSeat, _name: CString) {}
 
+    /// Pointer capability was added.
     fn pointer_added(&mut self, _: &mut Connection<Self>, _: WlSeat) {}
 
+    /// Pointer capability or seat was removed
     fn pointer_removed(&mut self, _: &mut Connection<Self>, _: WlSeat) {}
 
+    /// Keyboard capability was added.
     fn keyboard_added(&mut self, _: &mut Connection<Self>, _: WlSeat) {}
 
+    /// Keyboard capability or seat was removed
     fn keyboard_removed(&mut self, _: &mut Connection<Self>, _: WlSeat) {}
 
+    /// Touch capability was added.
     fn touch_added(&mut self, _: &mut Connection<Self>, _: WlSeat) {}
 
+    /// Touch capability or seat was removed
     fn touch_removed(&mut self, _: &mut Connection<Self>, _: WlSeat) {}
 }
 
+/// The state of `wl_seat`s.
+///
+/// This struct keeps track of currently available `wl_seat`s and their capabilities.
 #[derive(Debug)]
 pub struct Seats {
     seats: Vec<Seat>,

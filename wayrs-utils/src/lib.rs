@@ -2,10 +2,6 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-#[cfg(feature = "outputs")]
-#[cfg_attr(docsrs, doc(cfg(feature = "outputs")))]
-pub mod outputs;
-
 #[cfg(feature = "seats")]
 #[cfg_attr(docsrs, doc(cfg(feature = "seats")))]
 pub mod seats;
