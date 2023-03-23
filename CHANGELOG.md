@@ -1,3 +1,10 @@
+## 0.4.0
+
+- `wl_registry` can now have any number of callbacks.
+- `Connection::set_callback_for` now panics if called for `wl_registry`. Use `Connection::add_registry_cb` instead.
+- Introduce `wayrs_utils`: a collection of small and modular utils and abstractions.
+- `wayrs_shm_alloc` and `wayrs_cursor` were moved to `wayrs_utils`.
+
 ## 0.3.0
 
 - Add debug messages (set `WAYRS_DEBUG=1` env variable to enable).
