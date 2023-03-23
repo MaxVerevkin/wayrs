@@ -142,9 +142,8 @@ impl<D> Connection<D> {
         let mut globals = Vec::new();
 
         for event in self.event_queue.drain(..) {
-            let QueuedEvent::Message(event) = event else { panic!() };
-            assert_eq!(event.header.object_id, self.registry.id());
-            match self.registry.parse_event(event).unwrap() {
+            let QueuedEvent::RegistryEvent(event) = event else { panic!() };
+            match event {
                 wl_registry::Event::Global(global) => globals.push(global),
                 wl_registry::Event::GlobalRemove(name) => {
                     globals.retain(|g| g.name != name);
