@@ -37,6 +37,7 @@ pub struct Output {
 }
 
 #[derive(Debug, Default)]
+#[non_exhaustive]
 pub struct UpdatesMask {
     pub geometry: bool,
     pub mode: bool,
