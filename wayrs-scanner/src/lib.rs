@@ -196,6 +196,9 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 }
                 impl #name {
                     #( pub const #items: Self = Self(#values); )*
+                    pub fn empty() -> Self {
+                        Self(0)
+                    }
                     pub fn contains(self, item: Self) -> bool {
                         self.0 & item.0 != 0
                     }

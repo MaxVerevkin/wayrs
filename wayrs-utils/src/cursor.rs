@@ -3,7 +3,8 @@ use std::io;
 
 use wayrs_client::connection::Connection;
 use wayrs_client::protocol::*;
-use wayrs_shm_alloc::{BufferSpec, ShmAlloc};
+
+use crate::shm_alloc::{BufferSpec, ShmAlloc};
 
 use xcursor::parser::Image;
 

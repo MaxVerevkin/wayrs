@@ -3,14 +3,14 @@ use std::ffi::CString;
 use wayrs_client::connection::Connection;
 use wayrs_client::global::GlobalExt;
 use wayrs_client::protocol::wl_output::{self, WlOutput};
-use wayrs_client::protocol::wl_registry::{self, GlobalArgs, WlRegistry};
+use wayrs_client::protocol::wl_registry::{self, GlobalArgs};
 use wayrs_client::IoMode;
 
 fn main() {
     let mut conn = Connection::connect().unwrap();
     let mut state = State::default();
 
-    conn.set_callback_for(conn.registry(), wl_registry_cb);
+    conn.add_registry_cb(wl_registry_cb);
 
     loop {
         conn.flush(IoMode::Blocking).unwrap();
@@ -47,18 +47,13 @@ impl Output {
     }
 }
 
-fn wl_registry_cb(
-    conn: &mut Connection<State>,
-    state: &mut State,
-    _: WlRegistry,
-    event: wl_registry::Event,
-) {
+fn wl_registry_cb(conn: &mut Connection<State>, state: &mut State, event: &wl_registry::Event) {
     match event {
         wl_registry::Event::Global(global) if global.is::<WlOutput>() => {
             state.outputs.push(Output::bind(conn, &global));
         }
         wl_registry::Event::GlobalRemove(name) => {
-            if let Some(i) = state.outputs.iter().position(|o| o.registry_name == name) {
+            if let Some(i) = state.outputs.iter().position(|o| o.registry_name == *name) {
                 let output = state.outputs.swap_remove(i);
                 eprintln!("removed output: {}", output.name.unwrap().to_str().unwrap());
                 output.wl_output.release(conn);
