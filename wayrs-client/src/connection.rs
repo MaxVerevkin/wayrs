@@ -33,9 +33,11 @@ pub struct Connection<D> {
     break_dispatch: bool,
 
     display: WlDisplay,
-    registry: WlRegistry,
     objects: HashMap<ObjectId, ObjectState<D>>,
     dead_objects: HashMap<ObjectId, Object>,
+
+    registry: WlRegistry,
+    registry_cbs: Vec<RegistryCb<D>>,
 
     #[cfg(feature = "tokio")]
     async_fd: Option<AsyncFd<RawFd>>,
@@ -45,19 +47,13 @@ pub struct Connection<D> {
 
 enum QueuedEvent {
     DeleteId(ObjectId),
+    RegistryEvent(wl_registry::Event),
     Message(Message),
 }
 
-impl QueuedEvent {
-    fn sender_id(&self) -> ObjectId {
-        match self {
-            Self::DeleteId(_) => ObjectId::DISPLAY,
-            Self::Message(msg) => msg.header.object_id,
-        }
-    }
-}
-
 type GenericCallback<D> = Box<dyn FnMut(&mut Connection<D>, &mut D, Object, Message) + Send>;
+
+type RegistryCb<D> = Box<dyn FnMut(&mut Connection<D>, &mut D, &wl_registry::Event)>;
 
 struct ObjectState<D> {
     object: Object,
@@ -87,9 +83,11 @@ impl<D> Connection<D> {
             break_dispatch: false,
 
             display: WlDisplay::null(),
-            registry: WlRegistry::null(),
             objects: HashMap::new(),
             dead_objects: HashMap::new(),
+
+            registry: WlRegistry::null(),
+            registry_cbs: Vec::new(),
 
             #[cfg(feature = "tokio")]
             async_fd: None,
@@ -123,9 +121,8 @@ impl<D> Connection<D> {
         let mut globals = Vec::new();
 
         for event in self.event_queue.drain(..) {
-            let QueuedEvent::Message(event) = event else { panic!() };
-            assert_eq!(event.header.object_id, self.registry.id());
-            match self.registry.parse_event(event).unwrap() {
+            let QueuedEvent::RegistryEvent(event) = event else { panic!() };
+            match event {
                 wl_registry::Event::Global(global) => globals.push(global),
                 wl_registry::Event::GlobalRemove(name) => {
                     globals.retain(|g| g.name != name);
@@ -166,6 +163,18 @@ impl<D> Connection<D> {
         self.registry
     }
 
+    /// Register a registry event callback.
+    ///
+    /// In this library, `wl_registry` is the only object which can have any number of callbacks.
+    pub fn add_registry_cb<
+        F: FnMut(&mut Connection<D>, &mut D, &wl_registry::Event) + Send + 'static,
+    >(
+        &mut self,
+        cb: F,
+    ) {
+        self.registry_cbs.push(Box::new(cb));
+    }
+
     /// Set a callback for a given object.
     ///
     /// # Panics
@@ -173,17 +182,11 @@ impl<D> Connection<D> {
     /// This method panics if current set of objects does not contain an object with id identical
     /// to `proxy.id()` or if internally stored object differs from `proxy`.
     ///
+    /// It also panics if `proxy` is a `wl_registry`. Use [`add_registry_cb`](Self::add_registry_cb) to listen to
+    /// registry events.
+    ///
     /// Calling this function on a destroyed object will most likely panic, but this is not
     /// guarantied due to id-reuse.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use wayrs_client::connection::Connection;
-    /// struct MyState;
-    /// let mut conn = Connection::<MyState>::connect().unwrap();
-    /// conn.set_callback_for(conn.registry(), |conn, state, registry, event| todo!());
-    /// ```
     pub fn set_callback_for<
         P: Proxy,
         F: FnMut(&mut Connection<D>, &mut D, P, P::Event) + Send + 'static,
@@ -192,11 +195,18 @@ impl<D> Connection<D> {
         proxy: P,
         cb: F,
     ) {
+        assert_ne!(
+            P::interface(),
+            wl_registry::INTERFACE,
+            "attempt to set a callback for wl_registry"
+        );
+
         let object = self
             .objects
             .get_mut(&proxy.id())
             .expect("attempt to set a callback for non-existing or dead object");
         assert_eq!(object.object, proxy.into(), "object mismatch");
+
         object.cb = Some(Self::make_generic_cb(cb));
     }
 
@@ -210,10 +220,9 @@ impl<D> Connection<D> {
         self.flush(IoMode::Blocking)?;
 
         loop {
-            let event = self.recv_event(IoMode::Blocking)?;
-            match event.sender_id() {
-                id if id == sync_cb.id() => return Ok(()),
-                _ => self.event_queue.push_back(event),
+            match self.recv_event(IoMode::Blocking)? {
+                QueuedEvent::Message(m) if m.header.object_id == sync_cb.id() => return Ok(()),
+                other => self.event_queue.push_back(other),
             }
         }
     }
@@ -227,10 +236,9 @@ impl<D> Connection<D> {
         self.async_flush().await?;
 
         loop {
-            let event = self.async_recv_event().await?;
-            match event.sender_id() {
-                id if id == sync_cb.id() => return Ok(()),
-                _ => self.event_queue.push_back(event),
+            match self.async_recv_event().await? {
+                QueuedEvent::Message(m) if m.header.object_id == sync_cb.id() => return Ok(()),
+                other => self.event_queue.push_back(other),
             }
         }
     }
@@ -287,6 +295,12 @@ impl<D> Connection<D> {
                 )),
                 wl_display::Event::DeleteId(id) => Ok(QueuedEvent::DeleteId(ObjectId(id))),
             };
+        }
+
+        if event.header.object_id == self.registry.id() {
+            return Ok(QueuedEvent::RegistryEvent(
+                self.registry.parse_event(event).unwrap(),
+            ));
         }
 
         // Allocate objects if necessary
@@ -420,6 +434,15 @@ impl<D> Connection<D> {
                     self.objects.remove(&id);
                     self.dead_objects.remove(&id);
                     self.reusable_ids.push(id);
+                }
+                QueuedEvent::RegistryEvent(event) => {
+                    let hooks_cnt = self.registry_cbs.len();
+                    for i in 0..hooks_cnt {
+                        let mut hook = self.registry_cbs.swap_remove(i);
+                        hook(self, state, &event);
+                        self.registry_cbs.push(hook);
+                        self.registry_cbs.swap(i, hooks_cnt - 1);
+                    }
                 }
                 QueuedEvent::Message(event) => {
                     let Some(object) = self.objects.get_mut(&event.header.object_id)
