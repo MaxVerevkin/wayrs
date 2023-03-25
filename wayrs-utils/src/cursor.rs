@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use std::io;
 
-use wayrs_client::connection::Connection;
 use wayrs_client::protocol::*;
+use wayrs_client::{connection::Connection, proxy::Proxy};
 
 use crate::shm_alloc::{BufferSpec, ShmAlloc};
 
@@ -22,11 +21,23 @@ pub enum CursorError {
 pub struct CursorTheme {
     cursor_size: u32,
     theme: xcursor::CursorTheme,
-    cursors: HashMap<String, Vec<Image>>,
+}
+
+/// A cursor image.
+pub struct CursorImage {
+    cursor_size: u32,
+    imgs: Vec<Image>,
+}
+
+/// A wrapper around [`WlPointer`] with convenient [`set_cursor`](Self::set_cursor) and
+/// [`hide_cursor`](Self::hide_cursor) methods.
+pub struct ThemedPointer {
+    pointer: WlPointer,
+    surface: WlSurface,
 }
 
 impl CursorTheme {
-    /// Load a new cursor theme.
+    /// Load a cursor theme.
     ///
     /// `theme_name` defaults to `XCURSOR_THEME` env variable or `default`.
     ///
@@ -51,41 +62,78 @@ impl CursorTheme {
 
         let theme = xcursor::CursorTheme::load(theme_name);
 
-        CursorTheme {
-            cursor_size,
-            theme,
-            cursors: HashMap::new(),
+        CursorTheme { cursor_size, theme }
+    }
+
+    /// Find and parse a cursor image.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use wayrs_utils::cursor::CursorTheme;
+    /// let theme = CursorTheme::new(None, None);
+    /// let default_cursor = theme.get_image("default");
+    /// let move_cursor = theme.get_image("move");
+    /// ```
+    pub fn get_image(&self, cursor: &str) -> Result<CursorImage, CursorError> {
+        let theme_path = self
+            .theme
+            .load_icon(cursor)
+            .ok_or(CursorError::CursorNotFound)?;
+
+        let raw_theme = std::fs::read(theme_path)?;
+
+        let mut imgs =
+            xcursor::parser::parse_xcursor(&raw_theme).ok_or(CursorError::ThemeParseError)?;
+        if imgs.is_empty() {
+            return Err(CursorError::CursorNotFound);
+        }
+
+        imgs.sort_unstable_by_key(|img| img.size);
+
+        Ok(CursorImage {
+            cursor_size: self.cursor_size,
+            imgs,
+        })
+    }
+}
+
+impl ThemedPointer {
+    /// Create new pointer wrapper.
+    pub fn new<D>(
+        conn: &mut Connection<D>,
+        pointer: WlPointer,
+        wl_compositor: WlCompositor,
+    ) -> Self {
+        Self {
+            pointer,
+            surface: wl_compositor.create_surface(conn),
         }
     }
 
-    /// Use this to handle errors ahead of time.
-    pub fn ensure_cursor_is_loaded(&mut self, cursor: &str) -> Result<(), CursorError> {
-        let _ = self.get_images(cursor)?;
-        Ok(())
-    }
-
-    #[allow(clippy::too_many_arguments)]
+    /// Set cursor image.
+    ///
+    /// Refer to [`WlPointer::set_cursor`] for more info.
     pub fn set_cursor<D>(
-        &mut self,
+        &self,
         conn: &mut Connection<D>,
         shm: &mut ShmAlloc,
-        cursor: &str,
+        image: &CursorImage,
         scale: u32,
         serial: u32,
-        surface: WlSurface,
-        pointer: WlPointer,
-    ) -> Result<(), CursorError> {
-        let target_size = self.cursor_size * scale;
+    ) {
+        let target_size = image.cursor_size * scale;
 
-        let images = self.get_images(cursor)?;
-
-        let image = match images.binary_search_by_key(&target_size, |img| img.size) {
-            Ok(indx) => &images[indx],
-            Err(indx) if indx == 0 => images.first().unwrap(),
-            Err(indx) if indx >= images.len() => images.last().unwrap(),
+        let image = match image
+            .imgs
+            .binary_search_by_key(&target_size, |img| img.size)
+        {
+            Ok(indx) => &image.imgs[indx],
+            Err(indx) if indx == 0 => image.imgs.first().unwrap(),
+            Err(indx) if indx >= image.imgs.len() => image.imgs.last().unwrap(),
             Err(indx) => {
-                let a = &images[indx - 1];
-                let b = &images[indx];
+                let a = &image.imgs[indx - 1];
+                let b = &image.imgs[indx];
                 if target_size - a.size < b.size - target_size {
                     a
                 } else {
@@ -107,39 +155,30 @@ impl CursorTheme {
         assert_eq!(image.pixels_rgba.len(), canvas.len());
         canvas.copy_from_slice(&image.pixels_rgba);
 
-        surface.attach(conn, buffer.into_wl_buffer(), 0, 0);
-        surface.damage(conn, 0, 0, i32::MAX, i32::MAX);
-        surface.set_buffer_scale(conn, scale as i32);
-        surface.commit(conn);
+        self.surface.attach(conn, buffer.into_wl_buffer(), 0, 0);
+        self.surface.damage(conn, 0, 0, i32::MAX, i32::MAX);
+        self.surface.set_buffer_scale(conn, scale as i32);
+        self.surface.commit(conn);
 
-        pointer.set_cursor(
+        self.pointer.set_cursor(
             conn,
             serial,
-            surface,
+            self.surface,
             (image.xhot / scale) as i32,
             (image.yhot / scale) as i32,
         );
-
-        Ok(())
     }
 
-    fn get_images(&mut self, cursor: &'_ str) -> Result<&[Image], CursorError> {
-        // Borrow checker does't allow `if let Some(...) = ...` here for some reason :(
-        if self.cursors.get(cursor).is_some() {
-            return Ok(self.cursors.get(cursor).unwrap());
-        }
+    /// Hide cursor.
+    ///
+    /// Sets surface to NULL.
+    pub fn hide_cursor<D>(&self, conn: &mut Connection<D>, serial: u32) {
+        self.pointer
+            .set_cursor(conn, serial, WlSurface::null(), 0, 0);
+    }
 
-        let theme_path = self
-            .theme
-            .load_icon(cursor)
-            .ok_or(CursorError::CursorNotFound)?;
-
-        let raw_theme = std::fs::read(theme_path)?;
-
-        let mut images =
-            xcursor::parser::parse_xcursor(&raw_theme).ok_or(CursorError::ThemeParseError)?;
-        images.sort_unstable_by_key(|img| img.size);
-
-        Ok(self.cursors.entry(cursor.to_owned()).or_insert(images))
+    /// Destroy cursor's surface.
+    pub fn destroy<D>(self, conn: &mut Connection<D>) {
+        self.surface.destroy(conn);
     }
 }
