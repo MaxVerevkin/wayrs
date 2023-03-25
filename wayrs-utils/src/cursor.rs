@@ -1,3 +1,30 @@
+//! A simple but opinionated xcursor helper.
+//!
+//! # Example
+//!
+//! ```no_run
+//! # use wayrs_utils::cursor::*;
+//! # use wayrs_client::connection::Connection;
+//! # let mut conn = Connection::<()>::connect().unwrap();
+//! # let conn = &mut conn;
+//! # let shm = todo!();
+//! # let surface_scale = todo!();
+//! # let enter_serial = todo!();
+//! # let pointer = todo!();
+//! # let wl_compositor = todo!();
+//! #
+//! // Do this once
+//! let cursor_theme = CursorTheme::new(None, None);
+//! let default_cursor = cursor_theme.get_image("default").unwrap();
+//!
+//! // Do this when you bind a pointer
+//! let themed_pointer = ThemedPointer::new(conn, pointer, wl_compositor);
+//!
+//! // Set cursor (on `wl_pointer.enter` or whenever you need to)
+//! themed_pointer.set_cursor(conn, shm, &default_cursor, surface_scale, enter_serial);
+//!
+//! ```
+
 use std::io;
 
 use wayrs_client::protocol::*;
@@ -69,7 +96,7 @@ impl CursorTheme {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
     /// # use wayrs_utils::cursor::CursorTheme;
     /// let theme = CursorTheme::new(None, None);
     /// let default_cursor = theme.get_image("default");
