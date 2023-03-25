@@ -53,7 +53,7 @@ enum QueuedEvent {
 
 type GenericCallback<D> = Box<dyn FnMut(&mut Connection<D>, &mut D, Object, Message) + Send>;
 
-type RegistryCb<D> = Box<dyn FnMut(&mut Connection<D>, &mut D, &wl_registry::Event)>;
+type RegistryCb<D> = Box<dyn FnMut(&mut Connection<D>, &mut D, &wl_registry::Event) + Send>;
 
 struct ObjectState<D> {
     object: Object,
@@ -574,5 +574,17 @@ impl<D> Drop for Connection<D> {
         if let Some(async_fd) = self.async_fd.take() {
             let _ = async_fd.into_inner();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_send<T: Send>() {}
+
+    #[test]
+    fn send() {
+        assert_send::<Connection<()>>();
     }
 }
