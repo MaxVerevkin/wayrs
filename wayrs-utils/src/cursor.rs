@@ -45,12 +45,14 @@ pub enum CursorError {
 }
 
 /// An easy to use xcursor theme wrapper.
+#[derive(Debug, Clone)]
 pub struct CursorTheme {
     cursor_size: u32,
     theme: xcursor::CursorTheme,
 }
 
 /// A cursor image.
+#[derive(Debug, Clone)]
 pub struct CursorImage {
     cursor_size: u32,
     imgs: Vec<Image>,
@@ -58,6 +60,7 @@ pub struct CursorImage {
 
 /// A wrapper around [`WlPointer`] with convenient [`set_cursor`](Self::set_cursor) and
 /// [`hide_cursor`](Self::hide_cursor) methods.
+#[derive(Debug, Clone, Copy)]
 pub struct ThemedPointer {
     pointer: WlPointer,
     surface: WlSurface,
