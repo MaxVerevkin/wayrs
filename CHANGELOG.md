@@ -1,3 +1,7 @@
+## 0.5.0
+
+- Make `Connection` `Send` by requiring registry callbacks to be `Send`.
+
 ## 0.4.0
 
 - `wl_registry` can now have any number of callbacks.
