@@ -324,13 +324,8 @@ impl<T: Default + Clone + Copy, const N: usize> ArrayBuffer<T, N> {
 
     fn relocate(&mut self) {
         if self.len > 0 && self.offset > 0 {
-            unsafe {
-                std::ptr::copy(
-                    self.bytes[self.offset..].as_ptr(),
-                    self.bytes.as_mut_ptr(),
-                    self.len,
-                );
-            }
+            self.bytes
+                .copy_within(self.offset..(self.offset + self.len), 0);
         }
         self.offset = 0;
     }
@@ -351,24 +346,14 @@ impl<T: Default + Clone + Copy, const N: usize> ArrayBuffer<T, N> {
     }
 
     fn write_exact(&mut self, src: &[T]) {
-        let writable = self.get_writable();
-        assert!(writable.len() >= src.len());
-
-        unsafe {
-            std::ptr::copy_nonoverlapping(src.as_ptr(), writable.as_mut_ptr(), src.len());
-        }
-
+        let writable = &mut self.get_writable()[..src.len()];
+        writable.copy_from_slice(src);
         self.advance(src.len());
     }
 
     fn read_exact(&mut self, dst: &mut [T]) {
-        let readable = self.get_readable();
-        assert!(readable.len() >= dst.len());
-
-        unsafe {
-            std::ptr::copy_nonoverlapping(readable.as_ptr(), dst.as_mut_ptr(), dst.len());
-        }
-
+        let readable = &self.get_readable()[..dst.len()];
+        dst.copy_from_slice(readable);
         self.consume(dst.len());
     }
 }
