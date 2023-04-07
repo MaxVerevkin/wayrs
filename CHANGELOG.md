@@ -1,3 +1,8 @@
+## 0.6.0
+
+- Mark events as `non_exhaustive`.
+- Update protocols.
+
 ## 0.5.0
 
 - Make `Connection` `Send` by requiring registry callbacks to be `Send`.
