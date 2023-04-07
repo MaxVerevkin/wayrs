@@ -313,6 +313,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             #( #enums )*
 
             #[derive(Debug)]
+            #[non_exhaustive]
             pub enum Event {
                 #( #event_enum_options, )*
             }
