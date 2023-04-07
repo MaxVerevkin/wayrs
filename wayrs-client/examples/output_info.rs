@@ -70,5 +70,6 @@ fn wl_output_cb(
         wl_output::Event::Scale(scale) => output.scale = Some(scale),
         wl_output::Event::Name(name) => output.name = Some(name),
         wl_output::Event::Description(desc) => output.desc = Some(desc),
+        _ => (),
     }
 }

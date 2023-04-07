@@ -170,5 +170,6 @@ fn wl_seat_cb<D: SeatHandler>(
         wl_seat::Event::Name(name) => {
             state.seat_name(conn, wl_seat, name);
         }
+        _ => (),
     }
 }
