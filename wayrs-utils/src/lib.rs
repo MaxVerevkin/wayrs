@@ -13,3 +13,7 @@ pub mod shm_alloc;
 #[cfg(feature = "cursor")]
 #[cfg_attr(docsrs, doc(cfg(feature = "cursor")))]
 pub mod cursor;
+
+#[cfg(feature = "keyboard")]
+#[cfg_attr(docsrs, doc(cfg(feature = "keyboard")))]
+pub mod keyboard;

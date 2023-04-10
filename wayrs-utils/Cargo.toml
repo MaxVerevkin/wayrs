@@ -3,7 +3,7 @@ name = "wayrs-utils"
 description = "A collection of utils and abstractions for wayrs-client"
 repository = "https://github.com/MaxVerevkin/wayrs"
 readme = "../README.md"
-version = "0.4.0-beta.2"
+version = "0.4.0-beta.3"
 edition = "2021"
 license = "MIT"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
@@ -12,14 +12,16 @@ keywords = ["wayland", "client"]
 [features]
 seats = []
 shm_alloc = ["memmap2", "shmemfdrs"]
-cursor = ["shm_alloc", "xcursor", "thiserror"]
+cursor = ["shm_alloc", "xcursor"]
+keyboard = ["xkbcommon"]
 
 [dependencies]
 wayrs-client = { version = "0.6", path = "../wayrs-client" }
+thiserror = "1.0"
 memmap2 = { version = "0.5", optional = true }
 shmemfdrs = { version = "0.1", optional = true }
 xcursor = { version = "0.3", optional = true }
-thiserror = { version = "1.0", optional = true }
+xkbcommon = { version = "0.5", optional = true }
 
 [package.metadata.docs.rs]
 # To build locally:
