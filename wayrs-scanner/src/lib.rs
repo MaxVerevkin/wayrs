@@ -360,7 +360,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
         .find(|x| x.arg_type == "new_id")
         .map(|x| x.interface.as_deref());
 
-    let mut fn_args = vec![quote!(&self), quote!(conn: &mut Connection<D>)];
+    let mut fn_args = vec![quote!(self), quote!(conn: &mut Connection<D>)];
     for arg in &request.args {
         let arg_name = make_ident(&arg.name);
         let arg_ty = map_arg_to_rs(arg);

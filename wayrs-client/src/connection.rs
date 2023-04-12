@@ -1,11 +1,11 @@
 //! Wayland connection
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use crate::interface::Interface;
-use crate::object::{Object, ObjectId};
+use crate::object::{Object, ObjectId, ObjectManager};
 use crate::protocol::wl_registry::GlobalArgs;
 use crate::protocol::*;
 use crate::proxy::Proxy;
@@ -25,16 +25,11 @@ use tokio::io::unix::AsyncFd;
 pub struct Connection<D> {
     socket: BufferedSocket,
 
-    reusable_ids: Vec<ObjectId>,
-    last_id: ObjectId,
+    object_mgr: ObjectManager<D>,
 
     event_queue: VecDeque<QueuedEvent>,
     requests_queue: VecDeque<Message>,
     break_dispatch: bool,
-
-    display: WlDisplay,
-    objects: HashMap<ObjectId, ObjectState<D>>,
-    dead_objects: HashMap<ObjectId, Object>,
 
     registry: WlRegistry,
 
@@ -53,14 +48,10 @@ enum QueuedEvent {
     Message(Message),
 }
 
-type GenericCallback<D> = Box<dyn FnMut(&mut Connection<D>, &mut D, Object, Message) + Send>;
+pub(crate) type GenericCallback<D> =
+    Box<dyn FnMut(&mut Connection<D>, &mut D, Object, Message) + Send>;
 
 type RegistryCb<D> = Box<dyn FnMut(&mut Connection<D>, &mut D, &wl_registry::Event) + Send>;
-
-struct ObjectState<D> {
-    object: Object,
-    cb: Option<GenericCallback<D>>,
-}
 
 impl<D> AsRawFd for Connection<D> {
     fn as_raw_fd(&self) -> RawFd {
@@ -77,16 +68,11 @@ impl<D> Connection<D> {
         let mut this = Self {
             socket: BufferedSocket::connect()?,
 
-            reusable_ids: Vec::new(),
-            last_id: ObjectId::NULL,
+            object_mgr: ObjectManager::new(),
 
             event_queue: VecDeque::with_capacity(32),
             requests_queue: VecDeque::with_capacity(32),
             break_dispatch: false,
-
-            display: WlDisplay::null(),
-            objects: HashMap::new(),
-            dead_objects: HashMap::new(),
 
             registry: WlRegistry::null(),
             registry_cbs: Some(Vec::new()),
@@ -97,11 +83,7 @@ impl<D> Connection<D> {
             debug: std::env::var("WAYRS_DEBUG").as_deref() == Ok("1"),
         };
 
-        let display: WlDisplay = this.allocate_new_object(1);
-        assert_eq!(display.id(), ObjectId::DISPLAY);
-        this.display = display;
-
-        this.registry = display.get_registry(&mut this);
+        this.registry = this.object_mgr.display.get_registry(&mut this);
 
         Ok(this)
     }
@@ -211,8 +193,8 @@ impl<D> Connection<D> {
         );
 
         let object = self
-            .objects
-            .get_mut(&proxy.id())
+            .object_mgr
+            .get_object_state_mut(proxy.id())
             .expect("attempt to set a callback for non-existing or dead object");
         assert_eq!(object.object, proxy.into(), "object mismatch");
 
@@ -224,8 +206,7 @@ impl<D> Connection<D> {
     /// This function flushes the buffer of pending requests. All received events during the
     /// roundtrip are queued.
     pub fn blocking_roundtrip(&mut self) -> io::Result<()> {
-        let display = self.display;
-        let sync_cb = display.sync(self);
+        let sync_cb = self.object_mgr.display.sync(self);
         self.flush(IoMode::Blocking)?;
 
         loop {
@@ -240,8 +221,7 @@ impl<D> Connection<D> {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn async_roundtrip(&mut self) -> io::Result<()> {
-        let display = self.display;
-        let sync_cb = display.sync(self);
+        let sync_cb = self.object_mgr.display.sync(self);
         self.async_flush().await?;
 
         loop {
@@ -256,10 +236,9 @@ impl<D> Connection<D> {
     pub fn send_request(&mut self, iface: &'static Interface, request: Message) {
         if self.debug {
             let object = self
-                .objects
-                .get(&request.header.object_id)
-                .expect("attempt to send request for non-existing or dead object")
-                .object;
+                .object_mgr
+                .get_object(request.header.object_id)
+                .expect("attempt to send request for non-existing or dead object");
             eprintln!(
                 "[wayrs]  -> {:?}",
                 DebugMessage::new(&request, false, object)
@@ -268,7 +247,7 @@ impl<D> Connection<D> {
 
         // Destroy object if request is destrctor
         if iface.requests[request.header.opcode as usize].is_destructor {
-            self.destroy_object(request.header.object_id);
+            self.object_mgr.destroy(request.header.object_id);
         }
 
         // Queue request
@@ -278,11 +257,9 @@ impl<D> Connection<D> {
     fn recv_event(&mut self, mode: IoMode) -> io::Result<QueuedEvent> {
         let header = self.socket.peek_message_header(mode)?;
 
-        let object = *self
-            .objects
-            .get(&header.object_id)
-            .map(|o| &o.object)
-            .or_else(|| self.dead_objects.get(&header.object_id))
+        let object = self
+            .object_mgr
+            .get_object_live_or_dead(header.object_id)
             .expect("received event for non-existing object");
 
         let event = self.socket.recv_message(header, object.interface, mode)?;
@@ -291,7 +268,7 @@ impl<D> Connection<D> {
         }
 
         if event.header.object_id == ObjectId::DISPLAY {
-            return match self.display.parse_event(event).unwrap() {
+            return match self.object_mgr.display.parse_event(event).unwrap() {
                 // Catch protocol error as early as possible
                 wl_display::Event::Error(err) => Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -320,17 +297,7 @@ impl<D> Connection<D> {
         {
             if let ArgValue::NewId(id) = *arg {
                 let ArgType::NewId(interface) = arg_ty else { panic!() };
-                self.objects.insert(
-                    id,
-                    ObjectState {
-                        object: Object {
-                            id,
-                            interface,
-                            version: object.version,
-                        },
-                        cb: None,
-                    },
-                );
+                self.object_mgr.alloc_with_id(id, interface, object.version);
             }
         }
 
@@ -442,12 +409,7 @@ impl<D> Connection<D> {
 
         while let Some(event) = self.event_queue.pop_front() {
             match event {
-                QueuedEvent::DeleteId(id) => {
-                    assert!(!id.created_by_server());
-                    self.objects.remove(&id);
-                    self.dead_objects.remove(&id);
-                    self.reusable_ids.push(id);
-                }
+                QueuedEvent::DeleteId(id) => self.object_mgr.delete(id),
                 QueuedEvent::RegistryEvent(event) => {
                     let mut registry_cbs = self
                         .registry_cbs
@@ -465,7 +427,7 @@ impl<D> Connection<D> {
                     }
                 }
                 QueuedEvent::Message(event) => {
-                    let Some(object) = self.objects.get_mut(&event.header.object_id)
+                    let Some(object) = self.object_mgr.get_object_state_mut(event.header.object_id)
                     else {
                         // Ignore unknown/dead objects
                         continue;
@@ -486,13 +448,13 @@ impl<D> Connection<D> {
                         }
                     }
 
-                    // Destroy object if event is destructor
                     if object.interface.events[opcode as usize].is_destructor {
-                        self.destroy_object(object.id);
+                        // Destroy object if event is destructor.
+                        self.object_mgr.destroy(object.id);
                     } else {
                         // Re-add callback
                         // The object might have been destroyed in the callback
-                        if let Some(object) = self.objects.get_mut(&object.id) {
+                        if let Some(object) = self.object_mgr.get_object_state_mut(object.id) {
                             // Callback might have been set again
                             if object.cb.is_none() {
                                 object.cb = object_cb;
@@ -518,17 +480,8 @@ impl<D> Connection<D> {
 
     /// Allocate a new object. Returned object must be sent in a request as a "new_id" argument.
     pub fn allocate_new_object<P: Proxy>(&mut self, version: u32) -> P {
-        let proxy = P::new(self.allocate_object_id(), version);
-
-        self.objects.insert(
-            proxy.id(),
-            ObjectState {
-                object: proxy.into(),
-                cb: None,
-            },
-        );
-
-        proxy
+        let id = self.object_mgr.alloc(P::INTERFACE, version).object.id;
+        P::new(id, version)
     }
 
     /// Allocate a new object and set callback. Returned object must be sent in a request as a
@@ -541,32 +494,9 @@ impl<D> Connection<D> {
         version: u32,
         cb: F,
     ) -> P {
-        let proxy = P::new(self.allocate_object_id(), version);
-
-        self.objects.insert(
-            proxy.id(),
-            ObjectState {
-                object: proxy.into(),
-                cb: Some(Self::make_generic_cb(cb)),
-            },
-        );
-
-        proxy
-    }
-
-    fn allocate_object_id(&mut self) -> ObjectId {
-        self.reusable_ids.pop().unwrap_or_else(|| {
-            let id = self.last_id.next();
-            assert!(!id.created_by_server());
-            self.last_id = id;
-            id
-        })
-    }
-
-    fn destroy_object(&mut self, id: ObjectId) {
-        if let Some(object) = self.objects.remove(&id) {
-            self.dead_objects.insert(id, object.object);
-        }
+        let state = self.object_mgr.alloc(P::INTERFACE, version);
+        state.cb = Some(Self::make_generic_cb(cb));
+        P::new(state.object.id, version)
     }
 
     fn make_generic_cb<
