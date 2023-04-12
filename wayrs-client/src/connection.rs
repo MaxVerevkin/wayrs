@@ -195,8 +195,8 @@ impl<D> Connection<D> {
         cb: F,
     ) {
         assert_ne!(
-            P::interface(),
-            wl_registry::INTERFACE,
+            P::INTERFACE,
+            WlRegistry::INTERFACE,
             "attempt to set a callback for wl_registry"
         );
 

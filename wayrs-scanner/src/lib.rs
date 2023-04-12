@@ -132,13 +132,13 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             match arg.arg_type.as_str() {
                 "new_id" => {
                     let iface = arg.interface.as_deref().unwrap();
-                    let iface_name = syn::Ident::new(iface, Span::call_site());
+                    let proxy_name = make_proxy_path(iface);
                     quote! {
                         {
                             let obj = wayrs_client::object::Object {
                                 id: #arg_name,
                                 version: self.version(),
-                                interface: super::#iface_name::INTERFACE,
+                                interface: #proxy_name::INTERFACE,
                             };
                             obj.try_into().unwrap()
                         }
@@ -239,13 +239,6 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             use super::wayrs_client::proxy::Proxy;
             use super::wayrs_client::connection::Connection;
 
-            pub static INTERFACE: &wayrs_client::interface::Interface = &wayrs_client::interface::Interface {
-                name: wayrs_client::cstr!(#raw_name),
-                version: #version,
-                events: &[ #(#events_desc,)* ],
-                requests: &[ #(#requests_desc,)* ],
-            };
-
             #mod_doc
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct #proxy_name {
@@ -255,16 +248,20 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             impl Proxy for #proxy_name {
                 type Event = Event;
 
-                fn interface() -> &'static wayrs_client::interface::Interface {
-                    INTERFACE
-                }
+                const INTERFACE: &'static wayrs_client::interface::Interface
+                    = &wayrs_client::interface::Interface {
+                        name: wayrs_client::cstr!(#raw_name),
+                        version: #version,
+                        events: &[ #(#events_desc,)* ],
+                        requests: &[ #(#requests_desc,)* ],
+                    };
 
-                fn null() -> Self {
+                fn new(id: wayrs_client::object::ObjectId, version: u32) -> Self {
                     Self {
                         iner: wayrs_client::object::Object {
-                            id: wayrs_client::object::ObjectId::NULL,
-                            version: 0,
-                            interface: INTERFACE,
+                            id,
+                            version,
+                            interface: Self::INTERFACE,
                         }
                     }
                 }
@@ -289,7 +286,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 type Error = wayrs_client::proxy::WrongObject;
 
                 fn try_from(object: wayrs_client::object::Object) -> Result<Self, Self::Error> {
-                    if object.interface == INTERFACE {
+                    if object.interface == Self::INTERFACE {
                         Ok(Self { iner: object })
                     } else {
                         Err(wayrs_client::proxy::WrongObject)
@@ -393,7 +390,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
 
     let send_message = quote! {
         conn.send_request(
-            &INTERFACE,
+            Self::INTERFACE,
             wayrs_client::wire::Message {
                 header: wayrs_client::wire::MessageHeader {
                     object_id: self.id(),
@@ -497,8 +494,8 @@ fn map_arg_to_argtype(arg: &Argument) -> TokenStream {
         "object" => quote!(Object),
         "new_id" => match &arg.interface {
             Some(iface) => {
-                let iface_name = syn::Ident::new(iface, Span::call_site());
-                quote!(NewId(super::#iface_name::INTERFACE))
+                let proxy_name = make_proxy_path(iface);
+                quote!(NewId(#proxy_name::INTERFACE))
             }
             None => quote!(AnyNewId),
         },

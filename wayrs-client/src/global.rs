@@ -50,7 +50,7 @@ pub trait GlobalsExt {
 
 impl GlobalExt for Global {
     fn is<P: Proxy>(&self) -> bool {
-        P::interface().name == self.interface.as_c_str()
+        P::INTERFACE.name == self.interface.as_c_str()
     }
 
     fn bind<P: Proxy, D>(
@@ -61,11 +61,11 @@ impl GlobalExt for Global {
         if !self.is::<P>() {
             return Err(BindError::IncorrectInterface {
                 actual: self.interface.to_owned(),
-                requested: P::interface().name,
+                requested: P::INTERFACE.name,
             });
         }
 
-        assert!(*version.end() <= P::interface().version);
+        assert!(*version.end() <= P::INTERFACE.version);
 
         if self.version < *version.start() {
             return Err(BindError::UnsupportedVersion {
@@ -94,11 +94,11 @@ impl GlobalExt for Global {
         if !self.is::<P>() {
             return Err(BindError::IncorrectInterface {
                 actual: self.interface.to_owned(),
-                requested: P::interface().name,
+                requested: P::INTERFACE.name,
             });
         }
 
-        assert!(*version.end() <= P::interface().version);
+        assert!(*version.end() <= P::INTERFACE.version);
 
         if self.version < *version.start() {
             return Err(BindError::UnsupportedVersion {
@@ -124,7 +124,7 @@ impl GlobalsExt for Globals {
         let global = self
             .iter()
             .find(|g| g.is::<P>())
-            .ok_or(BindError::GlobalNotFound(P::interface().name))?;
+            .ok_or(BindError::GlobalNotFound(P::INTERFACE.name))?;
         global.bind(conn, version)
     }
 
@@ -141,7 +141,7 @@ impl GlobalsExt for Globals {
         let global = self
             .iter()
             .find(|g| g.is::<P>())
-            .ok_or(BindError::GlobalNotFound(P::interface().name))?;
+            .ok_or(BindError::GlobalNotFound(P::INTERFACE.name))?;
         global.bind_with_cb(conn, version, cb)
     }
 }
