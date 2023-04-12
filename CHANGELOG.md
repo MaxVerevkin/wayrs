@@ -1,3 +1,8 @@
+## 0.7.0
+
+- Support NULL-able strings in arguments and events.
+- Added `Proxy::is_null()` method.
+
 ## 0.6.0
 
 - Mark events as `non_exhaustive`.

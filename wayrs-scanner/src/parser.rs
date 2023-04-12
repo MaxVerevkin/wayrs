@@ -234,6 +234,7 @@ impl<'a> Parser<'a> {
     fn parse_arg(arg: BytesStart<'a>) -> Argument {
         let mut name = None;
         let mut arg_type = None;
+        let mut allow_null = false;
         let mut enum_type = None;
         let mut interface = None;
         let mut summary = None;
@@ -246,6 +247,7 @@ impl<'a> Parser<'a> {
                 b"enum" => enum_type = Some(attr.unescape_value().unwrap().into_owned()),
                 b"interface" => interface = Some(attr.unescape_value().unwrap().into_owned()),
                 b"summary" => summary = Some(attr.unescape_value().unwrap().into_owned()),
+                b"allow-null" => allow_null = attr.unescape_value().unwrap() == "true",
                 _ => (),
             }
         }
@@ -253,6 +255,7 @@ impl<'a> Parser<'a> {
         Argument {
             name: name.unwrap(),
             arg_type: arg_type.unwrap(),
+            allow_null,
             enum_type,
             interface,
             summary,

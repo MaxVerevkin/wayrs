@@ -33,6 +33,7 @@ pub enum ArgType {
     NewId(&'static Interface),
     AnyNewId,
     String,
+    OptString,
     Array,
     Fd,
 }
@@ -46,6 +47,7 @@ pub enum ArgValue {
     NewId(ObjectId),
     AnyNewId(Object),
     String(CString),
+    OptString(Option<CString>),
     Array(Vec<u8>),
     Fd(OwnedFd),
 }
@@ -58,11 +60,18 @@ impl ArgValue {
         }
 
         match self {
-            Self::Int(_) | Self::Uint(_) | Self::Fixed(_) | Self::Object(_) | Self::NewId(_) => 4,
+            Self::Int(_)
+            | Self::Uint(_)
+            | Self::Fixed(_)
+            | Self::Object(_)
+            | Self::NewId(_)
+            | Self::OptString(None) => 4,
             Self::AnyNewId(object) => {
                 len_with_padding(object.interface.name.to_bytes_with_nul().len()) + 8
             }
-            Self::String(string) => len_with_padding(string.to_bytes_with_nul().len()),
+            Self::String(string) | Self::OptString(Some(string)) => {
+                len_with_padding(string.to_bytes_with_nul().len())
+            }
             Self::Array(array) => len_with_padding(array.len()),
             Self::Fd(_) => 0,
         }
@@ -130,7 +139,8 @@ impl Debug for DebugMessage<'_> {
                     write!(f, "{}@{id}", new_id_iface.name.to_string_lossy())?
                 }
                 ArgValue::AnyNewId(x) => write!(f, "{x:?}")?,
-                ArgValue::String(x) => write!(f, "{x:?}")?,
+                ArgValue::String(x) | ArgValue::OptString(Some(x)) => write!(f, "{x:?}")?,
+                ArgValue::OptString(None) => write!(f, "null")?,
                 ArgValue::Array(_) => write!(f, "<array>")?,
                 ArgValue::Fd(x) => write!(f, "{}", x.as_raw_fd())?,
             }

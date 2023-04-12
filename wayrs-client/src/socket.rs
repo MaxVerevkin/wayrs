@@ -100,7 +100,10 @@ impl BufferedSocket {
                     self.bytes_out.write_uint(obj.version);
                     self.bytes_out.write_uint(obj.id.0);
                 }
-                ArgValue::String(string) => self.send_array(string.to_bytes_with_nul()),
+                ArgValue::String(string) | ArgValue::OptString(Some(string)) => {
+                    self.send_array(string.to_bytes_with_nul())
+                }
+                ArgValue::OptString(None) => self.bytes_out.write_uint(0),
                 ArgValue::Array(array) => self.send_array(&array),
                 ArgValue::Fd(fd) => self.fds_out.write_one(fd.into_raw_fd()),
             }
@@ -162,10 +165,11 @@ impl BufferedSocket {
                 ArgType::Object => ArgValue::Object(ObjectId(self.bytes_in.read_uint())),
                 ArgType::NewId(_) => ArgValue::NewId(ObjectId(self.bytes_in.read_uint())),
                 ArgType::AnyNewId => unimplemented!(),
-                ArgType::String => ArgValue::String(
-                    CString::from_vec_with_nul(self.recv_array())
-                        .expect("received string with internal null bytes"),
-                ),
+                ArgType::String => ArgValue::String(self.recv_string()),
+                ArgType::OptString => ArgValue::OptString(match self.bytes_in.read_uint() {
+                    0 => None,
+                    len => Some(self.recv_string_with_len(len)),
+                }),
                 ArgType::Array => ArgValue::Array(self.recv_array()),
                 ArgType::Fd => {
                     let fd = self.fds_in.read_one();
@@ -280,6 +284,21 @@ impl BufferedSocket {
         self.bytes_in.consume(padding);
 
         buf
+    }
+
+    fn recv_string_with_len(&mut self, len: u32) -> CString {
+        let mut buf = vec![0; len as usize];
+        self.bytes_in.read_exact(&mut buf);
+
+        let padding = (4 - (len % 4)) % 4;
+        self.bytes_in.consume(padding as usize);
+
+        CString::from_vec_with_nul(buf).expect("received string with internal null bytes")
+    }
+
+    fn recv_string(&mut self) -> CString {
+        let len = self.bytes_in.read_uint();
+        self.recv_string_with_len(len)
     }
 }
 

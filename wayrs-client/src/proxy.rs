@@ -18,4 +18,8 @@ pub trait Proxy:
     fn parse_event(&self, event: Message) -> Result<Self::Event, BadMessage>;
     fn id(&self) -> ObjectId;
     fn version(&self) -> u32;
+
+    fn is_null(&self) -> bool {
+        self.id() == ObjectId::NULL
+    }
 }

@@ -502,7 +502,10 @@ fn map_arg_to_argtype(arg: &Argument) -> TokenStream {
             }
             None => quote!(AnyNewId),
         },
-        "string" => quote!(String),
+        "string" => match arg.allow_null {
+            false => quote!(String),
+            true => quote!(OptString),
+        },
         "array" => quote!(Array),
         "fd" => quote!(Fd),
         _ => unreachable!(),
@@ -519,7 +522,10 @@ fn map_arg_to_argval(arg: &Argument) -> TokenStream {
             Some(_) => quote!(NewId),
             None => quote!(AnyNewId),
         },
-        "string" => quote!(String),
+        "string" => match arg.allow_null {
+            false => quote!(String),
+            true => quote!(OptString),
+        },
         "array" => quote!(Array),
         "fd" => quote!(Fd),
         _ => unreachable!(),
@@ -552,7 +558,10 @@ fn map_arg_to_rs(arg: &Argument) -> TokenStream {
                 quote!(wayrs_client::object::Object)
             }
         }
-        "string" => quote!(::std::ffi::CString),
+        "string" => match arg.allow_null {
+            false => quote!(::std::ffi::CString),
+            true => quote!(::std::option::Option<::std::ffi::CString>),
+        },
         "array" => quote!(::std::vec::Vec<u8>),
         "fd" => quote!(::std::os::unix::io::OwnedFd),
         _ => unreachable!(),

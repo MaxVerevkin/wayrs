@@ -44,6 +44,7 @@ pub struct Description<'a> {
 pub struct Argument {
     pub name: String,
     pub arg_type: String,
+    pub allow_null: bool,
     pub enum_type: Option<String>,
     pub interface: Option<String>,
     pub summary: Option<String>,
