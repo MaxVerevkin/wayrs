@@ -37,7 +37,9 @@ pub struct Connection<D> {
     dead_objects: HashMap<ObjectId, Object>,
 
     registry: WlRegistry,
-    registry_cbs: Vec<RegistryCb<D>>,
+
+    // This is `None` while dispatching registry events, to prevent mutation from registry callbacks.
+    registry_cbs: Option<Vec<RegistryCb<D>>>,
 
     #[cfg(feature = "tokio")]
     async_fd: Option<AsyncFd<RawFd>>,
@@ -87,7 +89,7 @@ impl<D> Connection<D> {
             dead_objects: HashMap::new(),
 
             registry: WlRegistry::null(),
-            registry_cbs: Vec::new(),
+            registry_cbs: Some(Vec::new()),
 
             #[cfg(feature = "tokio")]
             async_fd: None,
@@ -164,14 +166,22 @@ impl<D> Connection<D> {
 
     /// Register a registry event callback.
     ///
-    /// In this library, `wl_registry` is the only object which can have any number of callbacks.
+    /// In this library, `wl_registry` is the only object which can have any number of callbacks,
+    /// which are triggered in the order in which they were added.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if called from the context of a registry callback.
     pub fn add_registry_cb<
         F: FnMut(&mut Connection<D>, &mut D, &wl_registry::Event) + Send + 'static,
     >(
         &mut self,
         cb: F,
     ) {
-        self.registry_cbs.push(Box::new(cb));
+        self.registry_cbs
+            .as_mut()
+            .expect("add_registry_cb called from registry callback")
+            .push(Box::new(cb));
     }
 
     /// Set a callback for a given object.
@@ -423,6 +433,10 @@ impl<D> Connection<D> {
     }
 
     /// Empty the queue of pending events, calling a callback (if set) for each event.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if called from the context of a callback.
     pub fn dispatch_events(&mut self, state: &mut D) {
         self.break_dispatch = false;
 
@@ -435,17 +449,27 @@ impl<D> Connection<D> {
                     self.reusable_ids.push(id);
                 }
                 QueuedEvent::RegistryEvent(event) => {
-                    let hooks_cnt = self.registry_cbs.len();
-                    for i in 0..hooks_cnt {
-                        let mut hook = self.registry_cbs.swap_remove(i);
-                        hook(self, state, &event);
-                        self.registry_cbs.push(hook);
-                        self.registry_cbs.swap(i, hooks_cnt - 1);
+                    let mut registry_cbs = self
+                        .registry_cbs
+                        .take()
+                        .expect("dispatch_events called from registry callback");
+
+                    for cb in &mut registry_cbs {
+                        cb(self, state, &event);
+                    }
+
+                    self.registry_cbs = Some(registry_cbs);
+
+                    if self.break_dispatch {
+                        break;
                     }
                 }
                 QueuedEvent::Message(event) => {
                     let Some(object) = self.objects.get_mut(&event.header.object_id)
-                    else { continue };
+                    else {
+                        // Ignore unknown/dead objects
+                        continue;
+                    };
 
                     // Removing the callback from the object to make borrow checker happy
                     let mut object_cb = object.cb.take();
@@ -462,7 +486,7 @@ impl<D> Connection<D> {
                         }
                     }
 
-                    // Destroy object if event is destrctor
+                    // Destroy object if event is destructor
                     if object.interface.events[opcode as usize].is_destructor {
                         self.destroy_object(object.id);
                     } else {
@@ -494,22 +518,17 @@ impl<D> Connection<D> {
 
     /// Allocate a new object. Returned object must be sent in a request as a "new_id" argument.
     pub fn allocate_new_object<P: Proxy>(&mut self, version: u32) -> P {
-        let id = self.reusable_ids.pop().unwrap_or_else(|| {
-            let id = self.last_id.next();
-            assert!(!id.created_by_server());
-            self.last_id = id;
-            id
-        });
+        let proxy = P::new(self.allocate_object_id(), version);
 
-        let object = Object {
-            id,
-            interface: P::interface(),
-            version,
-        };
+        self.objects.insert(
+            proxy.id(),
+            ObjectState {
+                object: proxy.into(),
+                cb: None,
+            },
+        );
 
-        self.objects.insert(id, ObjectState { object, cb: None });
-
-        object.try_into().unwrap()
+        proxy
     }
 
     /// Allocate a new object and set callback. Returned object must be sent in a request as a
@@ -522,28 +541,26 @@ impl<D> Connection<D> {
         version: u32,
         cb: F,
     ) -> P {
-        let id = self.reusable_ids.pop().unwrap_or_else(|| {
-            let id = self.last_id.next();
-            assert!(!id.created_by_server());
-            self.last_id = id;
-            id
-        });
-
-        let object = Object {
-            id,
-            interface: P::interface(),
-            version,
-        };
+        let proxy = P::new(self.allocate_object_id(), version);
 
         self.objects.insert(
-            id,
+            proxy.id(),
             ObjectState {
-                object,
+                object: proxy.into(),
                 cb: Some(Self::make_generic_cb(cb)),
             },
         );
 
-        object.try_into().unwrap()
+        proxy
+    }
+
+    fn allocate_object_id(&mut self) -> ObjectId {
+        self.reusable_ids.pop().unwrap_or_else(|| {
+            let id = self.last_id.next();
+            assert!(!id.created_by_server());
+            self.last_id = id;
+            id
+        })
     }
 
     fn destroy_object(&mut self, id: ObjectId) {
