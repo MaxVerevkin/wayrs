@@ -7,6 +7,8 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
+      - name: Get required packages
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev
       - uses: actions/checkout@v2
         with:
           submodules: recursive
@@ -24,6 +26,8 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-latest
     steps:
+      - name: Get required packages
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev
       - uses: actions/checkout@v2
         with:
           submodules: recursive
@@ -42,6 +46,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev
+      - name: Get required packages
         run: sudo apt-get install fd-find
       - uses: actions/checkout@v2
         with:
@@ -59,6 +65,8 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
+      - name: Get required packages
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev
       - uses: actions/checkout@v2
         with:
           submodules: recursive
