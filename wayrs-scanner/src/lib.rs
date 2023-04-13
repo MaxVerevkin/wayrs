@@ -242,7 +242,8 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             #mod_doc
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct #proxy_name {
-                iner: wayrs_client::object::Object,
+                id: wayrs_client::object::ObjectId,
+                version: u32,
             }
 
             impl Proxy for #proxy_name {
@@ -257,13 +258,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                     };
 
                 fn new(id: wayrs_client::object::ObjectId, version: u32) -> Self {
-                    Self {
-                        iner: wayrs_client::object::Object {
-                            id,
-                            version,
-                            interface: Self::INTERFACE,
-                        }
-                    }
+                    Self { id, version }
                 }
 
                 fn parse_event(&self, event: wayrs_client::wire::Message) -> Result<Event, wayrs_client::proxy::BadMessage> {
@@ -274,11 +269,11 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 }
 
                 fn id(&self) -> wayrs_client::object::ObjectId {
-                    self.iner.id
+                    self.id
                 }
 
                 fn version(&self) -> u32 {
-                    self.iner.version
+                    self.version
                 }
             }
 
@@ -287,7 +282,10 @@ fn gen_interface(iface: &Interface) -> TokenStream {
 
                 fn try_from(object: wayrs_client::object::Object) -> Result<Self, Self::Error> {
                     if object.interface == Self::INTERFACE {
-                        Ok(Self { iner: object })
+                        Ok(Self {
+                            id: object.id,
+                            version: object.version,
+                        })
                     } else {
                         Err(wayrs_client::proxy::WrongObject)
                     }
@@ -296,13 +294,17 @@ fn gen_interface(iface: &Interface) -> TokenStream {
 
             impl From<#proxy_name> for wayrs_client::object::Object {
                 fn from(proxy: #proxy_name) -> Self {
-                    proxy.iner
+                    Self {
+                        id: proxy.id,
+                        version: proxy.version,
+                        interface: #proxy_name::INTERFACE,
+                    }
                 }
             }
 
             impl From<#proxy_name> for wayrs_client::object::ObjectId {
                 fn from(proxy: #proxy_name) -> Self {
-                    proxy.iner.id
+                    proxy.id
                 }
             }
 
