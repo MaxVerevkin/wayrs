@@ -133,18 +133,9 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 "new_id" => {
                     let iface = arg.interface.as_deref().unwrap();
                     let proxy_name = make_proxy_path(iface);
-                    quote! {
-                        {
-                            let obj = wayrs_client::object::Object {
-                                id: #arg_name,
-                                version: self.version(),
-                                interface: #proxy_name::INTERFACE,
-                            };
-                            obj.try_into().unwrap()
-                        }
-                    }
+                    quote!(#proxy_name::new(#arg_name, self.version))
                 }
-                _ => quote!(#arg_name.try_into().unwrap()),
+                _ => quote!(#arg_name.into()),
             }
         });
         let args_len = event.args.len();
