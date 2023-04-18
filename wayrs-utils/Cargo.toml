@@ -3,7 +3,7 @@ name = "wayrs-utils"
 description = "A collection of utils and abstractions for wayrs-client"
 repository = "https://github.com/MaxVerevkin/wayrs"
 readme = "../README.md"
-version = "0.4.0-beta.5"
+version = "0.4.0-beta.6"
 edition = "2021"
 license = "MIT"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
@@ -16,7 +16,7 @@ cursor = ["shm_alloc", "xcursor"]
 keyboard = ["xkbcommon"]
 
 [dependencies]
-wayrs-client = { version = "0.8", path = "../wayrs-client" }
+wayrs-client = { version = "0.9", path = "../wayrs-client" }
 thiserror = "1.0"
 memmap2 = { version = "0.5", optional = true }
 shmemfdrs = { version = "0.1", optional = true }
