@@ -129,6 +129,7 @@ fn wl_keyboard_cb<D: KeyboardHandler>(
             match args.state {
                 wl_keyboard::KeyState::Released => state.key_released(conn, event),
                 wl_keyboard::KeyState::Pressed => state.key_presed(conn, event),
+                _ => (),
             }
         }
         wl_keyboard::Event::Modifiers(args) => {
