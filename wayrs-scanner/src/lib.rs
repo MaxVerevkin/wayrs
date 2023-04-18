@@ -133,7 +133,13 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                     let proxy_name = make_proxy_path(iface);
                     quote!(#proxy_name::new(#arg_name, self.version))
                 }
-                _ => quote!(#arg_name.into()),
+                "int" | "uint" if arg.enum_type.is_some() => quote! {
+                    match #arg_name.try_into() {
+                        Ok(val) => val,
+                        Err(_) => return Err(wayrs_client::proxy::BadMessage),
+                    }
+                },
+                _ => quote!(#arg_name),
             }
         });
         let args_len = event.args.len();
@@ -225,11 +231,12 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                         val as u32
                     }
                 }
-                impl From<u32> for #name {
-                    fn from(val: u32) -> Self {
+                impl TryFrom<u32> for #name {
+                    type Error = ();
+                    fn try_from(val: u32) -> Result<Self, ()> {
                         match val {
-                            #( #values2 => Self::#items2, )*
-                            _ => unreachable!()
+                            #( #values2 => Ok(Self::#items2), )*
+                            _ => Err(()),
                         }
                     }
                 }
