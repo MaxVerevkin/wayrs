@@ -207,6 +207,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             quote! {
                 #[repr(u32)]
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+                #[non_exhaustive]
                 pub enum #name { #( #items = #values, )* }
                 impl From<#name> for u32 {
                     fn from(val: #name) -> u32 {
