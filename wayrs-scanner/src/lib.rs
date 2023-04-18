@@ -123,10 +123,8 @@ fn gen_interface(iface: &Interface) -> TokenStream {
     let event_decoding = iface.events.iter().enumerate().map(|(opcode, event)| {
         let event_name = make_pascal_case_ident(&event.name);
         let opcode = opcode as u16;
-        let struct_name = quote::format_ident!("{event_name}Args");
         let arg_ty = event.args.iter().map(map_arg_to_argval);
         let arg_names = event.args.iter().map(|arg| make_ident(&arg.name));
-        let arg_names2 = arg_names.clone();
         let arg_decode = event.args.iter().map(|arg| {
             let arg_name = make_ident(&arg.name);
             match arg.arg_type.as_str() {
@@ -142,7 +140,11 @@ fn gen_interface(iface: &Interface) -> TokenStream {
         let retval = match args_len {
             0 => quote!(Event::#event_name),
             1 => quote!(Event::#event_name(#( #arg_decode )*)),
-            _ => quote!(Event::#event_name(#struct_name { #( #arg_names2: #arg_decode, )* })),
+            _ => {
+                let struct_name = format_ident!("{event_name}Args");
+                let arg_names = arg_names.clone();
+                quote!(Event::#event_name(#struct_name { #( #arg_names: #arg_decode, )* }))
+            }
         };
         quote! {
             #opcode => {
