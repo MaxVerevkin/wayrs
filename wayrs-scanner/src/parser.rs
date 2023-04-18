@@ -266,12 +266,14 @@ impl<'a> Parser<'a> {
         let mut name = None;
         let mut value = None;
         let mut summary = None;
+        let mut since = 1;
 
         for attr in arg.attributes().with_checks(false) {
             let attr = attr.unwrap();
             match attr.key.as_ref() {
                 b"name" => name = Some(attr.unescape_value().unwrap().into_owned()),
                 b"value" => value = Some(attr.unescape_value().unwrap().into_owned()),
+                b"since" => since = attr.unescape_value().unwrap().parse().unwrap(),
                 b"summary" => summary = Some(attr.unescape_value().unwrap().into_owned()),
                 _ => (),
             }
@@ -300,7 +302,11 @@ impl<'a> Parser<'a> {
         EnumItem {
             name: name.unwrap(),
             value: value.unwrap(),
-            summary,
+            since,
+            description: summary.map(|summary| Description {
+                summary: Some(summary),
+                text: None,
+            }),
         }
     }
 }

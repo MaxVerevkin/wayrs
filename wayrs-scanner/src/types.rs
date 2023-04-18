@@ -54,5 +54,6 @@ pub struct Argument {
 pub struct EnumItem {
     pub name: String,
     pub value: u32,
-    pub summary: Option<String>,
+    pub since: u32,
+    pub description: Option<Description<'static>>,
 }

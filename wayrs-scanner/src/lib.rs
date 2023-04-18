@@ -173,8 +173,14 @@ fn gen_interface(iface: &Interface) -> TokenStream {
         let values = en.items.iter().map(|item| item.value);
         let items2 = items.clone();
         let values2 = values.clone();
+        let doc = gen_doc(&en.description, None);
+        let item_docs = en
+            .items
+            .iter()
+            .map(|i| gen_doc(&i.description, Some(i.since)));
         if en.is_bitfield {
             quote! {
+                #doc
                 #[derive(Debug, Clone, Copy)]
                 pub struct #name(u32);
                 impl From<#name> for u32 {
@@ -188,7 +194,11 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                     }
                 }
                 impl #name {
-                    #( pub const #items: Self = Self(#values); )*
+                    #(
+                        #item_docs
+                        pub const #items: Self = Self(#values);
+                    )*
+
                     pub fn empty() -> Self {
                         Self(0)
                     }
@@ -205,10 +215,11 @@ fn gen_interface(iface: &Interface) -> TokenStream {
             }
         } else {
             quote! {
+                #doc
                 #[repr(u32)]
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[non_exhaustive]
-                pub enum #name { #( #items = #values, )* }
+                pub enum #name { #( #item_docs #items = #values, )* }
                 impl From<#name> for u32 {
                     fn from(val: #name) -> u32 {
                         val as u32
