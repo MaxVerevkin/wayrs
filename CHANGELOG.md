@@ -3,6 +3,7 @@
 - Generate documentation for protocol enums.
 - Implement `Hash` for enums.
 - Remove `From<u32>` implementation for non-bitfield enums.
+- Mark enums as `non_exhaustive`.
 
 ## 0.8.0
 
