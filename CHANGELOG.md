@@ -1,3 +1,14 @@
+## 0.9.0
+
+- Generate documentation for protocol enums.
+- Implement `Hash` for enums.
+- Remove `From<u32>` implementation for non-bitfield enums.
+
+## 0.8.0
+
+- `Proxy` trait: remove `fn interface() -> &Interface` in favor of associated `const INTERFACE`.
+-  Prohibit calling `Connection::add_registry_cb` and `Connection::dispatch_events` from callback context.
+
 ## 0.7.0
 
 - Support NULL-able strings in arguments and events.
