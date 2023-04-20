@@ -1,3 +1,9 @@
+## 0.10.0
+
+- Make `ObjectId` non-null.
+- Requests that allow null-able objects now take `Option<T>`. Same for events.
+- Treat "int enums" as "uint enums". For example, `wl_output::GeometryArgs.subpixel` was `i32` but now it is `Subpixel`. **NOTE:** enums with negative values are not supported. This is because Wayland enums are basically `#define`s and do not specify their type. Enum representation is specified at use-time, i.e. in arguments. Fortunately, none of the protocols I've seen so far use negative values in enums.
+
 ## 0.9.0
 
 - Generate documentation for protocol enums.
