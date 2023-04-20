@@ -27,8 +27,8 @@
 
 use std::io;
 
+use wayrs_client::connection::Connection;
 use wayrs_client::protocol::*;
-use wayrs_client::{connection::Connection, proxy::Proxy};
 
 use crate::shm_alloc::{BufferSpec, ShmAlloc};
 
@@ -185,7 +185,8 @@ impl ThemedPointer {
         assert_eq!(image.pixels_rgba.len(), canvas.len());
         canvas.copy_from_slice(&image.pixels_rgba);
 
-        self.surface.attach(conn, buffer.into_wl_buffer(), 0, 0);
+        self.surface
+            .attach(conn, Some(buffer.into_wl_buffer()), 0, 0);
         self.surface.damage(conn, 0, 0, i32::MAX, i32::MAX);
         self.surface.set_buffer_scale(conn, scale as i32);
         self.surface.commit(conn);
@@ -193,7 +194,7 @@ impl ThemedPointer {
         self.pointer.set_cursor(
             conn,
             serial,
-            self.surface,
+            Some(self.surface),
             (image.xhot / scale) as i32,
             (image.yhot / scale) as i32,
         );
@@ -203,8 +204,7 @@ impl ThemedPointer {
     ///
     /// Sets surface to NULL.
     pub fn hide_cursor<D>(&self, conn: &mut Connection<D>, serial: u32) {
-        self.pointer
-            .set_cursor(conn, serial, WlSurface::null(), 0, 0);
+        self.pointer.set_cursor(conn, serial, None, 0, 0);
     }
 
     /// Destroy cursor's surface.

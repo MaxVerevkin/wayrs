@@ -21,15 +21,10 @@ pub trait Proxy:
     #[doc(hidden)]
     fn new(id: ObjectId, version: u32) -> Self;
 
+    #[doc(hidden)]
     fn parse_event(&self, event: Message) -> Result<Self::Event, BadMessage>;
+
     fn id(&self) -> ObjectId;
+
     fn version(&self) -> u32;
-
-    fn null() -> Self {
-        Self::new(ObjectId::NULL, 0)
-    }
-
-    fn is_null(&self) -> bool {
-        self.id() == ObjectId::NULL
-    }
 }

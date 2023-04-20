@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
+use std::num::NonZeroU32;
 
 use crate::connection::GenericCallback;
 use crate::interface::Interface;
@@ -43,19 +44,20 @@ impl Debug for Object {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ObjectId(pub u32);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ObjectId(pub NonZeroU32);
 
 impl ObjectId {
-    pub const NULL: Self = Self(0);
-    pub const DISPLAY: Self = Self(1);
+    pub const DISPLAY: Self = Self(unsafe { NonZeroU32::new_unchecked(1) });
+
+    pub const MAX_CLIENT: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFEFFFFFF) });
 
     pub fn next(self) -> Self {
-        Self(self.0 + 1)
+        Self(self.0.checked_add(1).expect("ObjectId overflow"))
     }
 
     pub fn created_by_server(self) -> bool {
-        self.0 >= 0xFF000000
+        self > Self::MAX_CLIENT
     }
 }
 

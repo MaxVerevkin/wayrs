@@ -2,6 +2,7 @@
 
 use std::collections::VecDeque;
 use std::io;
+use std::num::NonZeroU32;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use crate::interface::Interface;
@@ -74,7 +75,7 @@ impl<D> Connection<D> {
             requests_queue: VecDeque::with_capacity(32),
             break_dispatch: false,
 
-            registry: WlRegistry::null(),
+            registry: WlRegistry::new(ObjectId::MAX_CLIENT, 1), // Temp dummy object
             registry_cbs: Some(Vec::new()),
 
             #[cfg(feature = "tokio")]
@@ -279,7 +280,9 @@ impl<D> Connection<D> {
                         err.message.to_string_lossy(),
                     ),
                 )),
-                wl_display::Event::DeleteId(id) => Ok(QueuedEvent::DeleteId(ObjectId(id))),
+                wl_display::Event::DeleteId(id) => Ok(QueuedEvent::DeleteId(ObjectId(
+                    NonZeroU32::new(id).expect("wl_display.delete_id with null id"),
+                ))),
             };
         }
 

@@ -30,6 +30,7 @@ pub enum ArgType {
     Uint,
     Fixed,
     Object,
+    OptObject,
     NewId(&'static Interface),
     AnyNewId,
     String,
@@ -44,6 +45,7 @@ pub enum ArgValue {
     Uint(u32),
     Fixed(Fixed),
     Object(ObjectId),
+    OptObject(Option<ObjectId>),
     NewId(ObjectId),
     AnyNewId(Object),
     String(CString),
@@ -64,6 +66,7 @@ impl ArgValue {
             | Self::Uint(_)
             | Self::Fixed(_)
             | Self::Object(_)
+            | Self::OptObject(_)
             | Self::NewId(_)
             | Self::OptString(None) => 4,
             Self::AnyNewId(object) => {
@@ -131,7 +134,11 @@ impl Debug for DebugMessage<'_> {
             }
             match arg {
                 ArgValue::Int(x) => write!(f, "{x}")?,
-                ArgValue::Uint(x) | ArgValue::Object(ObjectId(x)) => write!(f, "{x}")?,
+                ArgValue::Uint(x) => write!(f, "{x}")?,
+                ArgValue::Object(ObjectId(x)) | ArgValue::OptObject(Some(ObjectId(x))) => {
+                    write!(f, "{x}")?
+                }
+                ArgValue::OptObject(None) | ArgValue::OptString(None) => write!(f, "null")?,
                 ArgValue::Fixed(x) => write!(f, "{}", x.as_f64())?,
                 ArgValue::NewId(ObjectId(id)) => {
                     let ArgType::NewId(new_id_iface) = &msg_desc.signature[arg_i]
@@ -140,7 +147,6 @@ impl Debug for DebugMessage<'_> {
                 }
                 ArgValue::AnyNewId(x) => write!(f, "{x:?}")?,
                 ArgValue::String(x) | ArgValue::OptString(Some(x)) => write!(f, "{x:?}")?,
-                ArgValue::OptString(None) => write!(f, "null")?,
                 ArgValue::Array(_) => write!(f, "<array>")?,
                 ArgValue::Fd(x) => write!(f, "{}", x.as_raw_fd())?,
             }

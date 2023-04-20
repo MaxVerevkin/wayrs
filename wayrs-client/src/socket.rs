@@ -1,6 +1,7 @@
 use std::env;
 use std::ffi::CString;
 use std::io::{self, IoSlice, IoSliceMut};
+use std::num::NonZeroU32;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
@@ -84,26 +85,29 @@ impl BufferedSocket {
         }
 
         // Header
-        self.bytes_out.write_uint(msg.header.object_id.0);
+        self.bytes_out.write_uint(msg.header.object_id.0.get());
         self.bytes_out
             .write_uint((size as u32) << 16 | msg.header.opcode as u32);
 
         // Args
         for arg in msg.args.into_iter() {
             match arg {
-                ArgValue::Uint(x)
-                | ArgValue::Object(ObjectId(x))
-                | ArgValue::NewId(ObjectId(x)) => self.bytes_out.write_uint(x),
+                ArgValue::Uint(x) => self.bytes_out.write_uint(x),
                 ArgValue::Int(x) | ArgValue::Fixed(Fixed(x)) => self.bytes_out.write_int(x),
+                ArgValue::Object(ObjectId(x))
+                | ArgValue::OptObject(Some(ObjectId(x)))
+                | ArgValue::NewId(ObjectId(x)) => self.bytes_out.write_uint(x.get()),
+                ArgValue::OptObject(None) | ArgValue::OptString(None) => {
+                    self.bytes_out.write_uint(0)
+                }
                 ArgValue::AnyNewId(obj) => {
                     self.send_array(obj.interface.name.to_bytes_with_nul());
                     self.bytes_out.write_uint(obj.version);
-                    self.bytes_out.write_uint(obj.id.0);
+                    self.bytes_out.write_uint(obj.id.0.get());
                 }
                 ArgValue::String(string) | ArgValue::OptString(Some(string)) => {
                     self.send_array(string.to_bytes_with_nul())
                 }
-                ArgValue::OptString(None) => self.bytes_out.write_uint(0),
                 ArgValue::Array(array) => self.send_array(&array),
                 ArgValue::Fd(fd) => self.fds_out.write_one(fd.into_raw_fd()),
             }
@@ -122,7 +126,7 @@ impl BufferedSocket {
         let size_and_opcode = u32::from_ne_bytes(raw[4..8].try_into().unwrap());
 
         Ok(MessageHeader {
-            object_id: ObjectId(object_id),
+            object_id: ObjectId(NonZeroU32::new(object_id).expect("received event for null id")),
             size: ((size_and_opcode & 0xFFFF_0000) >> 16) as u16,
             opcode: (size_and_opcode & 0x0000_FFFF) as u16,
         })
@@ -162,8 +166,16 @@ impl BufferedSocket {
                 ArgType::Int => ArgValue::Int(self.bytes_in.read_int()),
                 ArgType::Uint => ArgValue::Uint(self.bytes_in.read_uint()),
                 ArgType::Fixed => ArgValue::Fixed(Fixed(self.bytes_in.read_int())),
-                ArgType::Object => ArgValue::Object(ObjectId(self.bytes_in.read_uint())),
-                ArgType::NewId(_) => ArgValue::NewId(ObjectId(self.bytes_in.read_uint())),
+                ArgType::Object => ArgValue::Object(ObjectId(
+                    NonZeroU32::new(self.bytes_in.read_uint())
+                        .expect("received unexpected null object id"),
+                )),
+                ArgType::OptObject => {
+                    ArgValue::OptObject(NonZeroU32::new(self.bytes_in.read_uint()).map(ObjectId))
+                }
+                ArgType::NewId(_) => ArgValue::NewId(ObjectId(
+                    NonZeroU32::new(self.bytes_in.read_uint()).expect("received null new_id"),
+                )),
                 ArgType::AnyNewId => unimplemented!(),
                 ArgType::String => ArgValue::String(self.recv_string()),
                 ArgType::OptString => ArgValue::OptString(match self.bytes_in.read_uint() {

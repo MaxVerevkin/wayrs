@@ -335,6 +335,7 @@ pub mod wlr_layer_shell_unstable_v1 {
 #[cfg(feature = "wlr-output-management-unstable-v1")]
 pub mod wlr_output_management_unstable_v1 {
     use wayrs_client;
+    use wayrs_client::protocol::*;
     wayrs_client::scanner::generate!(
         "wlr-protocols/unstable/wlr-output-management-unstable-v1.xml"
     );
