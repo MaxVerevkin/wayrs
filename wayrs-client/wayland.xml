@@ -847,6 +847,7 @@
 
     <enum name="error">
       <entry name="role" value="0" summary="given wl_surface has another role"/>
+      <entry name="used_source" value="1" summary="source has already been used"/>
     </enum>
 
     <request name="start_drag">
@@ -876,6 +877,10 @@
 
 	The input region is ignored for wl_surfaces with the role of a
 	drag-and-drop icon.
+
+	The given source may not be used in any further set_selection or
+	start_drag requests. Attempting to reuse a previously-used source
+	may send a used_source error.
       </description>
       <arg name="source" type="object" interface="wl_data_source" allow-null="true" summary="data source for the eventual transfer"/>
       <arg name="origin" type="object" interface="wl_surface" summary="surface where the drag originates"/>
@@ -889,6 +894,10 @@
 	to the data from the source on behalf of the client.
 
 	To unset the selection, set the source to NULL.
+
+	The given source may not be used in any further set_selection or
+	start_drag requests. Attempting to reuse a previously-used source
+	may send a used_source error.
       </description>
       <arg name="source" type="object" interface="wl_data_source" allow-null="true" summary="data source for the selection"/>
       <arg name="serial" type="uint" summary="serial number of the event that triggered this request"/>
@@ -2422,8 +2431,10 @@
 	The leave notification is sent before the enter notification
 	for the new focus.
 
-	After this event client must assume that all keys, including modifiers,
-	are lifted and also it must stop key repeating if there's some going on.
+	After this event client must assume that no keys are pressed,
+	it must stop key repeating if there's some going on and until
+	it receives the next wl_keyboard.modifiers event, the client
+	must also assume no modifiers are active.
       </description>
       <arg name="serial" type="uint" summary="serial number of the leave event"/>
       <arg name="surface" type="object" interface="wl_surface" summary="surface that lost keyboard focus"/>
@@ -2448,6 +2459,9 @@
 
 	If this event produces a change in modifiers, then the resulting
 	wl_keyboard.modifiers event must be sent after this event.
+
+	The compositor must not send this event without a surface of the client
+	having keyboard focus.
       </description>
       <arg name="serial" type="uint" summary="serial number of the key event"/>
       <arg name="time" type="uint" summary="timestamp with millisecond granularity"/>
@@ -2459,6 +2473,14 @@
       <description summary="modifier and group state">
 	Notifies clients that the modifier and/or group state has
 	changed, and it should update its local state.
+
+	The compositor may send this event without a surface of the client
+	having keyboard focus, for example to tie modifier information to
+	pointer focus instead. If a modifier event with pressed modifiers is sent
+	without a prior enter event, the client can assume the modifier state is
+	valid until it receives the next wl_keyboard.modifiers event. In order to
+	reset the modifier state again, the compositor can send a
+	wl_keyboard.modifiers event with no pressed modifiers.
       </description>
       <arg name="serial" type="uint" summary="serial number of the modifiers event"/>
       <arg name="mods_depressed" type="uint" summary="depressed modifiers"/>
