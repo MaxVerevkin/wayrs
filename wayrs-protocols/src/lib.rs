@@ -40,6 +40,14 @@ pub mod drm_lease_v1 {
     wayrs_client::scanner::generate!("wayland-protocols/staging/drm-lease/drm-lease-v1.xml");
 }
 
+#[cfg(feature = "ext-foreign-toplevel-list-v1")]
+pub mod ext_foreign_toplevel_list {
+    use wayrs_client;
+    wayrs_client::scanner::generate!(
+        "wayland-protocols/staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1.xml"
+    );
+}
+
 #[cfg(feature = "ext-idle-notify-v1")]
 pub mod ext_idle_notify_v1 {
     use wayrs_client;
