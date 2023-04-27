@@ -394,7 +394,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             Self::INTERFACE,
             wayrs_client::wire::Message {
                 header: wayrs_client::wire::MessageHeader {
-                    object_id: self.id(),
+                    object_id: self.id,
                     size: 0,
                     opcode: #opcode,
                 },
@@ -458,7 +458,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                 &fn_args,
                 proxy_path.clone(),
                 quote! {
-                    let new_object = conn.allocate_new_object::<#proxy_path>(self.version());
+                    let new_object = conn.allocate_new_object::<#proxy_path>(self.version);
                     #send_message
                     new_object
                 },
@@ -474,7 +474,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                 &fn_args,
                 proxy_path.clone(),
                 quote! {
-                    let new_object = conn.allocate_new_object_with_cb::<#proxy_path, F>(self.version(), cb);
+                    let new_object = conn.allocate_new_object_with_cb::<#proxy_path, F>(self.version, cb);
                     #send_message
                     new_object
                 },
