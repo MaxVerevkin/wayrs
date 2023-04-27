@@ -1,7 +1,7 @@
 //! wl_keyboard helper
 
 use std::fmt::{self, Debug};
-use std::os::fd::AsRawFd;
+use std::os::unix::io::AsRawFd;
 use std::time::Duration;
 
 use wayrs_client::connection::Connection;
