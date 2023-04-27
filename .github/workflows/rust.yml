@@ -12,15 +12,9 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all --all-features
+      - uses: dtolnay/rust-toolchain@1.60.0
+      - name: Check
+        run: cargo check --all --all-features
 
   test:
     name: Test Suite
@@ -31,15 +25,9 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all --all-features
+      - uses: dtolnay/rust-toolchain@1.60.0
+      - name: Tests
+        run: cargo test --all --all-features
 
   fmt:
     name: Rustfmt
@@ -52,12 +40,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add rustfmt
+      - uses: dtolnay/rust-toolchain@1.60.0
       - name: Fmt check
         run: rustfmt --check --edition 2021 $(fdfind -e rs)
 
@@ -70,13 +53,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add clippy
+      - uses: dtolnay/rust-toolchain@1.60.0
       - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all --all-features -- -D warnings -A unknown-lints
+      - name: Clippy check
+        run: cargo clippy --all --all-features -- -D warnings -A unknown-lints
