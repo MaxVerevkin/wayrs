@@ -172,7 +172,7 @@ impl<D> Connection<D> {
     /// # Panics
     ///
     /// This method panics if current set of objects does not contain an object with id identical
-    /// to `proxy.id()` or if internally stored object differs from `proxy`.
+    /// to `proxy.id()`, internally stored object differs from `proxy` or object is dead.
     ///
     /// It also panics if `proxy` is a `wl_registry`. Use [`add_registry_cb`](Self::add_registry_cb) to listen to
     /// registry events.
@@ -193,13 +193,15 @@ impl<D> Connection<D> {
             "attempt to set a callback for wl_registry"
         );
 
-        let object = self
+        let obj = self
             .object_mgr
-            .get_object_state_mut(proxy.id())
-            .expect("attempt to set a callback for non-existing or dead object");
-        assert_eq!(object.object, proxy.into(), "object mismatch");
+            .get_object_mut(proxy.id())
+            .expect("attempt to set a callback for non-existing object");
 
-        object.cb = Some(Self::make_generic_cb(cb));
+        assert_eq!(obj.object, proxy.into(), "object mismatch");
+        assert!(obj.is_alive, "attempt to set a callback for dead object");
+
+        obj.cb = Some(Self::make_generic_cb(cb));
     }
 
     /// Perform a blocking roundtrip.
@@ -212,8 +214,11 @@ impl<D> Connection<D> {
 
         loop {
             match self.recv_event(IoMode::Blocking)? {
-                QueuedEvent::Message(m) if m.header.object_id == sync_cb.id() => return Ok(()),
-                other => self.event_queue.push_back(other),
+                None => (),
+                Some(QueuedEvent::Message(m)) if m.header.object_id == sync_cb.id() => {
+                    return Ok(());
+                }
+                Some(other) => self.event_queue.push_back(other),
             }
         }
     }
@@ -227,41 +232,50 @@ impl<D> Connection<D> {
 
         loop {
             match self.async_recv_event().await? {
-                QueuedEvent::Message(m) if m.header.object_id == sync_cb.id() => return Ok(()),
-                other => self.event_queue.push_back(other),
+                None => (),
+                Some(QueuedEvent::Message(m)) if m.header.object_id == sync_cb.id() => {
+                    return Ok(());
+                }
+                Some(other) => self.event_queue.push_back(other),
             }
         }
     }
 
     #[doc(hidden)]
     pub fn send_request(&mut self, iface: &'static Interface, request: Message) {
+        let obj = self
+            .object_mgr
+            .get_object_mut(request.header.object_id)
+            .expect("attempt to send request for non-existing object");
+        assert!(obj.is_alive, "attempt to send request for dead object");
+
         if self.debug {
-            let object = self
-                .object_mgr
-                .get_object(request.header.object_id)
-                .expect("attempt to send request for non-existing or dead object");
             eprintln!(
                 "[wayrs]  -> {:?}",
-                DebugMessage::new(&request, false, object)
+                DebugMessage::new(&request, false, obj.object)
             );
         }
 
         // Destroy object if request is destrctor
         if iface.requests[request.header.opcode as usize].is_destructor {
-            self.object_mgr.destroy(request.header.object_id);
+            obj.is_alive = false;
         }
 
         // Queue request
         self.requests_queue.push_back(request);
     }
 
-    fn recv_event(&mut self, mode: IoMode) -> io::Result<QueuedEvent> {
+    /// Returns `Ok(None)` if received event for dead object.
+    fn recv_event(&mut self, mode: IoMode) -> io::Result<Option<QueuedEvent>> {
         let header = self.socket.peek_message_header(mode)?;
 
-        let object = self
+        let obj = self
             .object_mgr
-            .get_object_live_or_dead(header.object_id)
+            .get_object_mut(header.object_id)
             .expect("received event for non-existing object");
+
+        let is_alive = obj.is_alive;
+        let object = obj.object;
 
         let event = self.socket.recv_message(header, object.interface, mode)?;
         if self.debug {
@@ -280,16 +294,16 @@ impl<D> Connection<D> {
                         err.message.to_string_lossy(),
                     ),
                 )),
-                wl_display::Event::DeleteId(id) => Ok(QueuedEvent::DeleteId(ObjectId(
+                wl_display::Event::DeleteId(id) => Ok(Some(QueuedEvent::DeleteId(ObjectId(
                     NonZeroU32::new(id).expect("wl_display.delete_id with null id"),
-                ))),
+                )))),
             };
         }
 
         if event.header.object_id == self.registry.id() {
-            return Ok(QueuedEvent::RegistryEvent(
+            return Ok(Some(QueuedEvent::RegistryEvent(
                 self.registry.parse_event(event).unwrap(),
-            ));
+            )));
         }
 
         // Allocate objects if necessary
@@ -300,15 +314,16 @@ impl<D> Connection<D> {
         {
             if let ArgValue::NewId(id) = *arg {
                 let ArgType::NewId(interface) = arg_ty else { panic!() };
-                self.object_mgr.alloc_with_id(id, interface, object.version);
+                self.object_mgr
+                    .register_server_object(id, interface, object.version);
             }
         }
 
-        Ok(QueuedEvent::Message(event))
+        Ok(is_alive.then_some(QueuedEvent::Message(event)))
     }
 
     #[cfg(feature = "tokio")]
-    async fn async_recv_event(&mut self) -> io::Result<QueuedEvent> {
+    async fn async_recv_event(&mut self) -> io::Result<Option<QueuedEvent>> {
         let mut async_fd = match self.async_fd.take() {
             Some(fd) => fd,
             None => AsyncFd::new(self.as_raw_fd())?,
@@ -341,7 +356,8 @@ impl<D> Connection<D> {
 
         loop {
             let msg = match self.recv_event(mode) {
-                Ok(msg) => msg,
+                Ok(Some(msg)) => msg,
+                Ok(None) => continue,
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock && at_least_one => return Ok(()),
                 Err(e) => return Err(e),
             };
@@ -356,11 +372,17 @@ impl<D> Connection<D> {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn async_recv_events(&mut self) -> io::Result<()> {
-        let event = self.async_recv_event().await?;
-        self.event_queue.push_back(event);
+        loop {
+            if let Some(msg) = self.async_recv_event().await? {
+                self.event_queue.push_back(msg);
+                break;
+            }
+        }
+
         loop {
             match self.recv_event(IoMode::NonBlocking) {
-                Ok(msg) => self.event_queue.push_back(msg),
+                Ok(Some(msg)) => self.event_queue.push_back(msg),
+                Ok(None) => continue,
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(()),
                 Err(e) => return Err(e),
             };
@@ -412,7 +434,7 @@ impl<D> Connection<D> {
 
         while let Some(event) = self.event_queue.pop_front() {
             match event {
-                QueuedEvent::DeleteId(id) => self.object_mgr.delete(id),
+                QueuedEvent::DeleteId(id) => self.object_mgr.delete_client_object(id),
                 QueuedEvent::RegistryEvent(event) => {
                     let mut registry_cbs = self
                         .registry_cbs
@@ -430,10 +452,9 @@ impl<D> Connection<D> {
                     }
                 }
                 QueuedEvent::Message(event) => {
-                    let Some(object) = self.object_mgr.get_object_state_mut(event.header.object_id)
-                    else {
-                        // Ignore unknown/dead objects
-                        continue;
+                    let object = match self.object_mgr.get_object_mut(event.header.object_id) {
+                        Some(obj) if obj.is_alive => obj,
+                        _ => continue, // Ignore unknown/dead objects
                     };
 
                     // Removing the callback from the object to make borrow checker happy
@@ -451,18 +472,16 @@ impl<D> Connection<D> {
                         }
                     }
 
-                    if object.interface.events[opcode as usize].is_destructor {
-                        // Destroy object if event is destructor.
-                        self.object_mgr.destroy(object.id);
-                    } else {
-                        // Re-add callback
-                        // The object might have been destroyed in the callback
-                        if let Some(object) = self.object_mgr.get_object_state_mut(object.id) {
-                            // Callback might have been set again
-                            if object.cb.is_none() {
-                                object.cb = object_cb;
-                            }
-                        }
+                    let object = self.object_mgr.get_object_mut(object.id).unwrap();
+
+                    // Destroy object if event is destructor.
+                    if object.object.interface.events[opcode as usize].is_destructor {
+                        object.is_alive = false;
+                    }
+
+                    // Re-add callback if it wasn't re-set in the callback
+                    if object.is_alive && object.cb.is_none() {
+                        object.cb = object_cb;
                     }
 
                     if self.break_dispatch {
@@ -483,7 +502,11 @@ impl<D> Connection<D> {
 
     /// Allocate a new object. Returned object must be sent in a request as a "new_id" argument.
     pub fn allocate_new_object<P: Proxy>(&mut self, version: u32) -> P {
-        let id = self.object_mgr.alloc(P::INTERFACE, version).object.id;
+        let id = self
+            .object_mgr
+            .alloc_client_object(P::INTERFACE, version)
+            .object
+            .id;
         P::new(id, version)
     }
 
@@ -497,7 +520,7 @@ impl<D> Connection<D> {
         version: u32,
         cb: F,
     ) -> P {
-        let state = self.object_mgr.alloc(P::INTERFACE, version);
+        let state = self.object_mgr.alloc_client_object(P::INTERFACE, version);
         state.cb = Some(Self::make_generic_cb(cb));
         P::new(state.object.id, version)
     }
