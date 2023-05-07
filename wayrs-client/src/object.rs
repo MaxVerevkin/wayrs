@@ -146,5 +146,6 @@ impl<D> ObjectManager<D> {
         assert!(!id.created_by_server());
         self.objects.remove(&id);
         self.dead_objects.remove(&id);
+        self.vacant_ids.push(id);
     }
 }
