@@ -1,3 +1,11 @@
+## 0.10.2
+
+- Reuse object IDs (IDs weren't reused since 0.8.0).
+
+## 0.10.1
+
+- Update protocols.
+
 ## 0.10.0
 
 - Make `ObjectId` non-null.
