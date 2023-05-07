@@ -1,3 +1,8 @@
+## 0.10.3
+
+- Store objects in a `Vec` instead of `HashMap`.
+- Deprecate `ObjectId::next()`.
+
 ## 0.10.2
 
 - Reuse object IDs (IDs weren't reused since 0.8.0).
