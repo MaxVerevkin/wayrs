@@ -165,9 +165,7 @@ impl InitShmPool {
         conn: &mut Connection<D>,
         spec: BufferSpec,
     ) -> (Buffer, &mut [u8]) {
-        let size = spec.height * spec.stride;
-
-        let segment_index = self.alloc_segment(conn, size as usize, spec);
+        let segment_index = self.alloc_segment(conn, spec);
         let segment = &mut self.segments[segment_index];
 
         let (wl, spec) = *segment.buffer.get_or_insert_with(|| {
@@ -202,8 +200,8 @@ impl InitShmPool {
     fn defragment<D>(&mut self, conn: &mut Connection<D>) {
         let mut i = 0;
         while i + 1 < self.segments.len() {
-            // `refcnt`s are only incremented from Self's methods. Since we have `&mut self`,
-            // `refcnt`s can only decrease during the execution of this function.
+            // `refcnt` cannot go from zero to anything else as it implies that the segment is not
+            // used anymore.
             if self.segments[i].refcnt.load(Ordering::SeqCst) != 0
                 || self.segments[i + 1].refcnt.load(Ordering::SeqCst) != 0
             {
@@ -293,12 +291,9 @@ impl InitShmPool {
     }
 
     // Returns segment index
-    fn alloc_segment<D>(
-        &mut self,
-        conn: &mut Connection<D>,
-        len: usize,
-        spec: BufferSpec,
-    ) -> usize {
+    fn alloc_segment<D>(&mut self, conn: &mut Connection<D>, spec: BufferSpec) -> usize {
+        let len = spec.size();
+
         if let Some(index) = self.try_alloc_in_place(conn, len, spec) {
             return index;
         }
