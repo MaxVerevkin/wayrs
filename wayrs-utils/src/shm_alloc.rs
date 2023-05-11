@@ -8,6 +8,7 @@ use std::sync::Arc;
 use memmap2::MmapMut;
 
 use wayrs_client::connection::Connection;
+use wayrs_client::global::{BindError, Globals, GlobalsExt};
 use wayrs_client::protocol::*;
 
 use wl_shm::{Format, WlShm};
@@ -62,6 +63,11 @@ pub struct Buffer {
 }
 
 impl ShmAlloc {
+    /// Bind `wl_shm` and create new [`ShmAlloc`].
+    pub fn bind<D>(conn: &mut Connection<D>, globals: &Globals) -> Result<Self, BindError> {
+        Ok(Self::new(globals.bind(conn, 1..=1)?))
+    }
+
     /// Create new [`ShmAlloc`].
     pub fn new(wl_shm: WlShm) -> Self {
         Self { wl_shm, pool: None }
