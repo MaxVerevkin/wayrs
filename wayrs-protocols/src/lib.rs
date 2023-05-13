@@ -1,10 +1,11 @@
 //! A collection of Wayland protocols to use with `wayrs_client`.
 //!
-//! All protocols are behind feature gates and none of them are enabeled by default. Check out
-//! [Cargo.toml](https://github.com/MaxVerevkin/wayrs/blob/main/wayrs-protocols/Cargo.toml) for a
-//! list of available features.
+//! All protocols are behind feature gates and none of them are enabeled by default.
+
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "xdg-shell")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xdg-shell")))]
 pub mod xdg_shell {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -12,6 +13,7 @@ pub mod xdg_shell {
 }
 
 #[cfg(feature = "viewporter")]
+#[cfg_attr(docsrs, doc(cfg(feature = "viewporter")))]
 pub mod viewporter {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -19,6 +21,7 @@ pub mod viewporter {
 }
 
 #[cfg(feature = "presentation-time")]
+#[cfg_attr(docsrs, doc(cfg(feature = "presentation-time")))]
 pub mod presentation_time {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -28,6 +31,7 @@ pub mod presentation_time {
 }
 
 #[cfg(feature = "content-type-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "content-type-v1")))]
 pub mod content_type_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -35,12 +39,14 @@ pub mod content_type_v1 {
 }
 
 #[cfg(feature = "drm-lease-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "drm-lease-v1")))]
 pub mod drm_lease_v1 {
     use wayrs_client;
     wayrs_client::scanner::generate!("wayland-protocols/staging/drm-lease/drm-lease-v1.xml");
 }
 
 #[cfg(feature = "ext-foreign-toplevel-list-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ext-foreign-toplevel-list-v1")))]
 pub mod ext_foreign_toplevel_list {
     use wayrs_client;
     wayrs_client::scanner::generate!(
@@ -49,6 +55,7 @@ pub mod ext_foreign_toplevel_list {
 }
 
 #[cfg(feature = "ext-idle-notify-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ext-idle-notify-v1")))]
 pub mod ext_idle_notify_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -58,6 +65,7 @@ pub mod ext_idle_notify_v1 {
 }
 
 #[cfg(feature = "ext-session-lock-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ext-session-lock-v1")))]
 pub mod ext_session_lock_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -67,6 +75,7 @@ pub mod ext_session_lock_v1 {
 }
 
 #[cfg(feature = "fractional-scale-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fractional_scale_v1")))]
 pub mod fractional_scale_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -76,6 +85,7 @@ pub mod fractional_scale_v1 {
 }
 
 #[cfg(feature = "single-pixel-buffer-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "single-pixel-buffer-v1")))]
 pub mod single_pixel_buffer_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -85,6 +95,7 @@ pub mod single_pixel_buffer_v1 {
 }
 
 #[cfg(feature = "tearing-control-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tearing_control_v1")))]
 pub mod tearing_control_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -94,6 +105,7 @@ pub mod tearing_control_v1 {
 }
 
 #[cfg(feature = "xdg-activation-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xdg-activation-v1")))]
 pub mod xdg_activation_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -103,6 +115,7 @@ pub mod xdg_activation_v1 {
 }
 
 #[cfg(feature = "xwayland-shell-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xwayland-shell-v1")))]
 pub mod xwayland_shell_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -112,6 +125,7 @@ pub mod xwayland_shell_v1 {
 }
 
 #[cfg(feature = "fullscreen-shell-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fullscreen_shell_unstable_v1")))]
 pub mod fullscreen_shell_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -121,6 +135,7 @@ pub mod fullscreen_shell_unstable_v1 {
 }
 
 #[cfg(feature = "idle-inhibit-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "idle-inhibit-unstable-v1")))]
 pub mod idle_inhibit_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -130,6 +145,7 @@ pub mod idle_inhibit_unstable_v1 {
 }
 
 #[cfg(feature = "input-timestamps-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "input-timestamps-unstable-v1")))]
 pub mod input_timestamps_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -139,6 +155,7 @@ pub mod input_timestamps_unstable_v1 {
 }
 
 #[cfg(feature = "keyboard-shortcuts-inhibit-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "keyboard-shortcuts-inhibit-unstable-v1")))]
 pub mod keyboard_shortcuts_inhibit_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -148,6 +165,7 @@ pub mod keyboard_shortcuts_inhibit_unstable_v1 {
 }
 
 #[cfg(feature = "linux-dmabuf-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "linux-dmabuf-unstable-v1")))]
 pub mod linux_dmabuf_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -157,6 +175,10 @@ pub mod linux_dmabuf_unstable_v1 {
 }
 
 #[cfg(feature = "linux-explicit-synchronization-unstable-v1")]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(feature = "linux-explicit-synchronization-unstable-v1"))
+)]
 pub mod linux_explicit_synchronization_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -166,6 +188,7 @@ pub mod linux_explicit_synchronization_unstable_v1 {
 }
 
 #[cfg(feature = "pointer-constraints-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "pointer-constraints-unstable-v1")))]
 pub mod pointer_constraints_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -175,6 +198,7 @@ pub mod pointer_constraints_unstable_v1 {
 }
 
 #[cfg(feature = "pointer-gestures-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "pointer-gestures-unstable-v1")))]
 pub mod pointer_gestures_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -184,6 +208,7 @@ pub mod pointer_gestures_unstable_v1 {
 }
 
 #[cfg(feature = "primary-selection-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "primary-selection-unstable-v1")))]
 pub mod primary_selection_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -193,6 +218,7 @@ pub mod primary_selection_unstable_v1 {
 }
 
 #[cfg(feature = "relative-pointer-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "relative-pointer-unstable-v1")))]
 pub mod relative_pointer_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -202,6 +228,7 @@ pub mod relative_pointer_unstable_v1 {
 }
 
 #[cfg(feature = "tablet-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tablet-unstable-v1")))]
 pub mod tablet_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -209,6 +236,7 @@ pub mod tablet_unstable_v1 {
 }
 
 #[cfg(feature = "tablet-unstable-v2")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tablet-unstable-v2")))]
 pub mod tablet_unstable_v2 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -216,6 +244,7 @@ pub mod tablet_unstable_v2 {
 }
 
 #[cfg(feature = "text-input-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "text-input-unstable-v1")))]
 pub mod text_input_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -224,6 +253,7 @@ pub mod text_input_unstable_v1 {
     );
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "text-input-unstable-v3")))]
 #[cfg(feature = "text-input-unstable-v3")]
 pub mod text_input_unstable_v3 {
     use wayrs_client;
@@ -234,6 +264,7 @@ pub mod text_input_unstable_v3 {
 }
 
 #[cfg(feature = "xdg-decoration-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xdg-decoration-unstable-v1")))]
 pub mod xdg_decoration_unstable_v1 {
     use super::xdg_shell::*;
     use wayrs_client;
@@ -243,6 +274,7 @@ pub mod xdg_decoration_unstable_v1 {
 }
 
 #[cfg(feature = "xdg-foreign-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xdg-foreign-unstable-v1")))]
 pub mod xdg_foreign_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -252,6 +284,7 @@ pub mod xdg_foreign_unstable_v1 {
 }
 
 #[cfg(feature = "xdg-foreign-unstable-v2")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xdg-foreign-unstable-v2")))]
 pub mod xdg_foreign_unstable_v2 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -261,6 +294,7 @@ pub mod xdg_foreign_unstable_v2 {
 }
 
 #[cfg(feature = "xdg-output-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xdg-output-unstable-v1")))]
 pub mod xdg_output_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -270,6 +304,7 @@ pub mod xdg_output_unstable_v1 {
 }
 
 #[cfg(feature = "xdg-shell-unstable-v5")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xdg-shell-unstable-v5")))]
 pub mod xdg_shell_unstable_v5 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -279,6 +314,7 @@ pub mod xdg_shell_unstable_v5 {
 }
 
 #[cfg(feature = "xdg-shell-unstable-v6")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xdg-shell-unstable-v6")))]
 pub mod xdg_shell_unstable_v6 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -288,6 +324,7 @@ pub mod xdg_shell_unstable_v6 {
 }
 
 #[cfg(feature = "xwayland-keyboard-grab-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "xwayland-keyboard-grab-unstable-v1")))]
 pub mod xwayland_keyboard_grab_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -297,6 +334,7 @@ pub mod xwayland_keyboard_grab_unstable_v1 {
 }
 
 #[cfg(feature = "wlr-data-control-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wlr-data-control-unstable-v1")))]
 pub mod wlr_data_control_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -304,6 +342,7 @@ pub mod wlr_data_control_unstable_v1 {
 }
 
 #[cfg(feature = "wlr-export-dmabuf-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wlr-export-dmabuf-unstable-v1")))]
 pub mod wlr_export_dmabuf_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -311,6 +350,10 @@ pub mod wlr_export_dmabuf_unstable_v1 {
 }
 
 #[cfg(feature = "wlr-foreign-toplevel-management-unstable-v1")]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(feature = "wlr-foreign-toplevel-management-unstable-v1"))
+)]
 pub mod wlr_foreign_toplevel_management_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -320,6 +363,7 @@ pub mod wlr_foreign_toplevel_management_unstable_v1 {
 }
 
 #[cfg(feature = "wlr-gamma-control-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wlr-gamma-control-unstable-v1")))]
 pub mod wlr_gamma_control_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -327,12 +371,14 @@ pub mod wlr_gamma_control_unstable_v1 {
 }
 
 #[cfg(feature = "wlr-input-inhibitor-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wlr-input-inhibitor-unstable-v1")))]
 pub mod wlr_input_inhibitor_unstable_v1 {
     use wayrs_client;
     wayrs_client::scanner::generate!("wlr-protocols/unstable/wlr-input-inhibitor-unstable-v1.xml");
 }
 
 #[cfg(feature = "wlr-layer-shell-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wlr-layer-shell-unstable-v1")))]
 pub mod wlr_layer_shell_unstable_v1 {
     use super::xdg_shell::*;
     use wayrs_client;
@@ -341,6 +387,7 @@ pub mod wlr_layer_shell_unstable_v1 {
 }
 
 #[cfg(feature = "wlr-output-management-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wlr-output-management-unstable-v1")))]
 pub mod wlr_output_management_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -350,6 +397,7 @@ pub mod wlr_output_management_unstable_v1 {
 }
 
 #[cfg(feature = "wlr-output-power-management-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wlr-output-power-management-unstable-v1")))]
 pub mod wlr_output_power_management_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -359,6 +407,7 @@ pub mod wlr_output_power_management_unstable_v1 {
 }
 
 #[cfg(feature = "wlr-screencopy-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wlr-screencopy-unstable-v1")))]
 pub mod wlr_screencopy_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
@@ -366,6 +415,7 @@ pub mod wlr_screencopy_unstable_v1 {
 }
 
 #[cfg(feature = "wlr-virtual-pointer-unstable-v1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wlr-virtual-pointer-unstable-v1")))]
 pub mod wlr_virtual_pointer_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
