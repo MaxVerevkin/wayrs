@@ -125,7 +125,7 @@ pub mod xwayland_shell_v1 {
 }
 
 #[cfg(feature = "fullscreen-shell-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fullscreen_shell_unstable_v1")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "fullscreen-shell-unstable-v1")))]
 pub mod fullscreen_shell_unstable_v1 {
     use wayrs_client;
     use wayrs_client::protocol::*;
