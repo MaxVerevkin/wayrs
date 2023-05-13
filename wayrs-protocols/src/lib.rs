@@ -4,420 +4,328 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-#[cfg(feature = "xdg-shell")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xdg-shell")))]
-pub mod xdg_shell {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wayland-protocols/stable/xdg-shell/xdg-shell.xml");
+macro_rules! gen {
+    (mod: $mod:ident, feat: $feat:literal, file: $file:literal, deps: [$($dep:ident),*],) => {
+        #[cfg(feature = $feat)]
+        #[cfg_attr(docsrs, doc(cfg(feature = $feat)))]
+        pub mod $mod {
+            use wayrs_client;
+            $(gen!(@dep $dep);)*
+            wayrs_client::scanner::generate!($file);
+        }
+    };
+    (@dep core) => {
+        use wayrs_client::protocol::*;
+    };
+    (@dep $dep:ident) => {
+        use super::$dep::*;
+    };
 }
 
-#[cfg(feature = "viewporter")]
-#[cfg_attr(docsrs, doc(cfg(feature = "viewporter")))]
-pub mod viewporter {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wayland-protocols/stable/viewporter/viewporter.xml");
+gen! {
+    mod: xdg_shell,
+    feat: "xdg-shell",
+    file: "wayland-protocols/stable/xdg-shell/xdg-shell.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "presentation-time")]
-#[cfg_attr(docsrs, doc(cfg(feature = "presentation-time")))]
-pub mod presentation_time {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/stable/presentation-time/presentation-time.xml"
-    );
+gen! {
+    mod: viewporter,
+    feat: "viewporter",
+    file: "wayland-protocols/stable/viewporter/viewporter.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "content-type-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "content-type-v1")))]
-pub mod content_type_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wayland-protocols/staging/content-type/content-type-v1.xml");
+gen! {
+    mod: presentation_time,
+    feat: "presentation-time",
+    file: "wayland-protocols/stable/presentation-time/presentation-time.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "drm-lease-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "drm-lease-v1")))]
-pub mod drm_lease_v1 {
-    use wayrs_client;
-    wayrs_client::scanner::generate!("wayland-protocols/staging/drm-lease/drm-lease-v1.xml");
+gen! {
+    mod: content_type_v1,
+    feat: "content-type-v1",
+    file: "wayland-protocols/staging/content-type/content-type-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "ext-foreign-toplevel-list-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ext-foreign-toplevel-list-v1")))]
-pub mod ext_foreign_toplevel_list {
-    use wayrs_client;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1.xml"
-    );
+gen! {
+    mod: drm_lease_v1,
+    feat: "drm-lease-v1",
+    file: "wayland-protocols/staging/drm-lease/drm-lease-v1.xml",
+    deps: [],
 }
 
-#[cfg(feature = "ext-idle-notify-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ext-idle-notify-v1")))]
-pub mod ext_idle_notify_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/staging/ext-idle-notify/ext-idle-notify-v1.xml"
-    );
+gen! {
+    mod: ext_foreign_toplevel_list,
+    feat: "ext-foreign-toplevel-list-v1",
+    file: "wayland-protocols/staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1.xml",
+    deps: [],
 }
 
-#[cfg(feature = "ext-session-lock-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ext-session-lock-v1")))]
-pub mod ext_session_lock_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/staging/ext-session-lock/ext-session-lock-v1.xml"
-    );
+gen! {
+    mod: ext_idle_notify_v1,
+    feat: "ext-idle-notify-v1",
+    file: "wayland-protocols/staging/ext-idle-notify/ext-idle-notify-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "fractional-scale-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fractional_scale_v1")))]
-pub mod fractional_scale_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/staging/fractional-scale/fractional-scale-v1.xml"
-    );
+gen! {
+    mod: ext_session_lock_v1,
+    feat: "ext-session-lock-v1",
+    file: "wayland-protocols/staging/ext-session-lock/ext-session-lock-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "single-pixel-buffer-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "single-pixel-buffer-v1")))]
-pub mod single_pixel_buffer_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/staging/single-pixel-buffer/single-pixel-buffer-v1.xml"
-    );
+gen! {
+    mod: fractional_scale_v1,
+    feat: "fractional-scale-v1",
+    file: "wayland-protocols/staging/fractional-scale/fractional-scale-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "tearing-control-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "tearing_control_v1")))]
-pub mod tearing_control_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/staging/tearing-control/tearing-control-v1.xml"
-    );
+gen! {
+    mod: single_pixel_buffer_v1,
+    feat: "single-pixel-buffer-v1",
+    file: "wayland-protocols/staging/single-pixel-buffer/single-pixel-buffer-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "xdg-activation-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xdg-activation-v1")))]
-pub mod xdg_activation_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/staging/xdg-activation/xdg-activation-v1.xml"
-    );
+gen! {
+    mod: tearing_control_v1,
+    feat: "tearing-control-v1",
+    file: "wayland-protocols/staging/tearing-control/tearing-control-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "xwayland-shell-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xwayland-shell-v1")))]
-pub mod xwayland_shell_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml"
-    );
+gen! {
+    mod: xdg_activation_v1,
+    feat: "xdg-activation-v1",
+    file: "wayland-protocols/staging/xdg-activation/xdg-activation-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "fullscreen-shell-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fullscreen-shell-unstable-v1")))]
-pub mod fullscreen_shell_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/fullscreen-shell/fullscreen-shell-unstable-v1.xml"
-    );
+gen! {
+    mod: xwayland_shell_v1,
+    feat: "xwayland-shell-v1",
+    file: "wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "idle-inhibit-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "idle-inhibit-unstable-v1")))]
-pub mod idle_inhibit_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/idle-inhibit/idle-inhibit-unstable-v1.xml"
-    );
+gen! {
+    mod: fullscreen_shell_unstable_v1,
+    feat: "fullscreen-shell-unstable-v1",
+    file: "wayland-protocols/unstable/fullscreen-shell/fullscreen-shell-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "input-timestamps-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "input-timestamps-unstable-v1")))]
-pub mod input_timestamps_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/input-timestamps/input-timestamps-unstable-v1.xml"
-    );
+gen! {
+    mod: idle_inhibit_unstable_v1,
+    feat: "idle-inhibit-unstable-v1",
+    file: "wayland-protocols/unstable/idle-inhibit/idle-inhibit-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "keyboard-shortcuts-inhibit-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "keyboard-shortcuts-inhibit-unstable-v1")))]
-pub mod keyboard_shortcuts_inhibit_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml"
-    );
+gen! {
+    mod: input_timestamps_unstable_v1,
+    feat: "input-timestamps-unstable-v1",
+    file: "wayland-protocols/unstable/input-timestamps/input-timestamps-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "linux-dmabuf-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "linux-dmabuf-unstable-v1")))]
-pub mod linux_dmabuf_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml"
-    );
+gen! {
+    mod: keyboard_shortcuts_inhibit_unstable_v1,
+    feat: "keyboard-shortcuts-inhibit-unstable-v1",
+    file: "wayland-protocols/unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "linux-explicit-synchronization-unstable-v1")]
-#[cfg_attr(
-    docsrs,
-    doc(cfg(feature = "linux-explicit-synchronization-unstable-v1"))
-)]
-pub mod linux_explicit_synchronization_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/linux-explicit-synchronization/linux-explicit-synchronization-unstable-v1.xml"
-    );
+gen! {
+    mod: linux_dmabuf_unstable_v1,
+    feat: "linux-dmabuf-unstable-v1",
+    file: "wayland-protocols/unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "pointer-constraints-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "pointer-constraints-unstable-v1")))]
-pub mod pointer_constraints_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml"
-    );
+gen! {
+    mod: linux_explicit_synchronization_unstable_v1,
+    feat: "linux-explicit-synchronization-unstable-v1",
+    file: "wayland-protocols/unstable/linux-explicit-synchronization/linux-explicit-synchronization-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "pointer-gestures-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "pointer-gestures-unstable-v1")))]
-pub mod pointer_gestures_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml"
-    );
+gen! {
+    mod: pointer_constraints_unstable_v1,
+    feat: "pointer-constraints-unstable-v1",
+    file: "wayland-protocols/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "primary-selection-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "primary-selection-unstable-v1")))]
-pub mod primary_selection_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/primary-selection/primary-selection-unstable-v1.xml"
-    );
+gen! {
+    mod: pointer_gestures_unstable_v1,
+    feat: "pointer-gestures-unstable-v1",
+    file: "wayland-protocols/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "relative-pointer-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "relative-pointer-unstable-v1")))]
-pub mod relative_pointer_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/relative-pointer/relative-pointer-unstable-v1.xml"
-    );
+gen! {
+    mod: primary_selection_unstable_v1,
+    feat: "primary-selection-unstable-v1",
+    file: "wayland-protocols/unstable/primary-selection/primary-selection-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "tablet-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "tablet-unstable-v1")))]
-pub mod tablet_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wayland-protocols/unstable/tablet/tablet-unstable-v1.xml");
+gen! {
+    mod: relative_pointer_unstable_v1,
+    feat: "relative-pointer-unstable-v1",
+    file: "wayland-protocols/unstable/relative-pointer/relative-pointer-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "tablet-unstable-v2")]
-#[cfg_attr(docsrs, doc(cfg(feature = "tablet-unstable-v2")))]
-pub mod tablet_unstable_v2 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wayland-protocols/unstable/tablet/tablet-unstable-v2.xml");
+gen! {
+    mod: tablet_unstable_v1,
+    feat: "tablet-unstable-v1",
+    file: "wayland-protocols/unstable/tablet/tablet-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "text-input-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "text-input-unstable-v1")))]
-pub mod text_input_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/text-input/text-input-unstable-v1.xml"
-    );
+gen! {
+    mod: tablet_unstable_v2,
+    feat: "tablet-unstable-v2",
+    file: "wayland-protocols/unstable/tablet/tablet-unstable-v2.xml",
+    deps: [core],
 }
 
-#[cfg_attr(docsrs, doc(cfg(feature = "text-input-unstable-v3")))]
-#[cfg(feature = "text-input-unstable-v3")]
-pub mod text_input_unstable_v3 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/text-input/text-input-unstable-v3.xml"
-    );
+gen! {
+    mod: text_input_unstable_v1,
+    feat: "text-input-unstable-v1",
+    file: "wayland-protocols/unstable/text-input/text-input-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "xdg-decoration-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xdg-decoration-unstable-v1")))]
-pub mod xdg_decoration_unstable_v1 {
-    use super::xdg_shell::*;
-    use wayrs_client;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml"
-    );
+gen! {
+    mod: text_input_unstable_v3,
+    feat: "text-input-unstable-v3",
+    file: "wayland-protocols/unstable/text-input/text-input-unstable-v3.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "xdg-foreign-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xdg-foreign-unstable-v1")))]
-pub mod xdg_foreign_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/xdg-foreign/xdg-foreign-unstable-v1.xml"
-    );
+gen! {
+    mod: xdg_decoration_unstable_v1,
+    feat: "xdg-decoration-unstable-v1",
+    file: "wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml",
+    deps: [xdg_shell],
 }
 
-#[cfg(feature = "xdg-foreign-unstable-v2")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xdg-foreign-unstable-v2")))]
-pub mod xdg_foreign_unstable_v2 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/xdg-foreign/xdg-foreign-unstable-v2.xml"
-    );
+gen! {
+    mod: xdg_foreign_unstable_v1,
+    feat: "xdg-foreign-unstable-v1",
+    file: "wayland-protocols/unstable/xdg-foreign/xdg-foreign-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "xdg-output-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xdg-output-unstable-v1")))]
-pub mod xdg_output_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/xdg-output/xdg-output-unstable-v1.xml"
-    );
+gen! {
+    mod: xdg_foreign_unstable_v2,
+    feat: "xdg-foreign-unstable-v2",
+    file: "wayland-protocols/unstable/xdg-foreign/xdg-foreign-unstable-v2.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "xdg-shell-unstable-v5")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xdg-shell-unstable-v5")))]
-pub mod xdg_shell_unstable_v5 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/xdg-shell/xdg-shell-unstable-v5.xml"
-    );
+gen! {
+    mod: xdg_output_unstable_v1,
+    feat: "xdg-output-unstable-v1",
+    file: "wayland-protocols/unstable/xdg-output/xdg-output-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "xdg-shell-unstable-v6")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xdg-shell-unstable-v6")))]
-pub mod xdg_shell_unstable_v6 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/xdg-shell/xdg-shell-unstable-v6.xml"
-    );
+gen! {
+    mod: xdg_shell_unstable_v5,
+    feat: "xdg-shell-unstable-v5",
+    file: "wayland-protocols/unstable/xdg-shell/xdg-shell-unstable-v5.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "xwayland-keyboard-grab-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "xwayland-keyboard-grab-unstable-v1")))]
-pub mod xwayland_keyboard_grab_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wayland-protocols/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml"
-    );
+gen! {
+    mod: xdg_shell_unstable_v6,
+    feat: "xdg-shell-unstable-v6",
+    file: "wayland-protocols/unstable/xdg-shell/xdg-shell-unstable-v6.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "wlr-data-control-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wlr-data-control-unstable-v1")))]
-pub mod wlr_data_control_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wlr-protocols/unstable/wlr-data-control-unstable-v1.xml");
+gen! {
+    mod: xwayland_keyboard_grab_unstable_v1,
+    feat: "xwayland-keyboard-grab-unstable-v1",
+    file: "wayland-protocols/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "wlr-export-dmabuf-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wlr-export-dmabuf-unstable-v1")))]
-pub mod wlr_export_dmabuf_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wlr-protocols/unstable/wlr-export-dmabuf-unstable-v1.xml");
+gen! {
+    mod: wlr_data_control_unstable_v1,
+    feat: "wlr-data-control-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-data-control-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "wlr-foreign-toplevel-management-unstable-v1")]
-#[cfg_attr(
-    docsrs,
-    doc(cfg(feature = "wlr-foreign-toplevel-management-unstable-v1"))
-)]
-pub mod wlr_foreign_toplevel_management_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wlr-protocols/unstable/wlr-foreign-toplevel-management-unstable-v1.xml"
-    );
+gen! {
+    mod: wlr_export_dmabuf_unstable_v1,
+    feat: "wlr-export-dmabuf-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-export-dmabuf-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "wlr-gamma-control-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wlr-gamma-control-unstable-v1")))]
-pub mod wlr_gamma_control_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wlr-protocols/unstable/wlr-gamma-control-unstable-v1.xml");
+gen! {
+    mod: wlr_foreign_toplevel_management_unstable_v1,
+    feat: "wlr-foreign-toplevel-management-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-foreign-toplevel-management-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "wlr-input-inhibitor-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wlr-input-inhibitor-unstable-v1")))]
-pub mod wlr_input_inhibitor_unstable_v1 {
-    use wayrs_client;
-    wayrs_client::scanner::generate!("wlr-protocols/unstable/wlr-input-inhibitor-unstable-v1.xml");
+gen! {
+    mod: wlr_gamma_control_unstable_v1,
+    feat: "wlr-gamma-control-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-gamma-control-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "wlr-layer-shell-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wlr-layer-shell-unstable-v1")))]
-pub mod wlr_layer_shell_unstable_v1 {
-    use super::xdg_shell::*;
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wlr-protocols/unstable/wlr-layer-shell-unstable-v1.xml");
+gen! {
+    mod: wlr_input_inhibitor_unstable_v1,
+    feat: "wlr-input-inhibitor-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-input-inhibitor-unstable-v1.xml",
+    deps: [],
 }
 
-#[cfg(feature = "wlr-output-management-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wlr-output-management-unstable-v1")))]
-pub mod wlr_output_management_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wlr-protocols/unstable/wlr-output-management-unstable-v1.xml"
-    );
+gen! {
+    mod: wlr_layer_shell_unstable_v1,
+    feat: "wlr-layer-shell-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-layer-shell-unstable-v1.xml",
+    deps: [core, xdg_shell],
 }
 
-#[cfg(feature = "wlr-output-power-management-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wlr-output-power-management-unstable-v1")))]
-pub mod wlr_output_power_management_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!(
-        "wlr-protocols/unstable/wlr-output-power-management-unstable-v1.xml"
-    );
+gen! {
+    mod: wlr_output_management_unstable_v1,
+    feat: "wlr-output-management-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-output-management-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "wlr-screencopy-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wlr-screencopy-unstable-v1")))]
-pub mod wlr_screencopy_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wlr-protocols/unstable/wlr-screencopy-unstable-v1.xml");
+gen! {
+    mod: wlr_output_power_management_unstable_v1,
+    feat: "wlr-output-power-management-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-output-power-management-unstable-v1.xml",
+    deps: [core],
 }
 
-#[cfg(feature = "wlr-virtual-pointer-unstable-v1")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wlr-virtual-pointer-unstable-v1")))]
-pub mod wlr_virtual_pointer_unstable_v1 {
-    use wayrs_client;
-    use wayrs_client::protocol::*;
-    wayrs_client::scanner::generate!("wlr-protocols/unstable/wlr-virtual-pointer-unstable-v1.xml");
+gen! {
+    mod: wlr_screencopy_unstable_v1,
+    feat: "wlr-screencopy-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-screencopy-unstable-v1.xml",
+    deps: [core],
+}
+
+gen! {
+    mod: wlr_virtual_pointer_unstable_v1,
+    feat: "wlr-virtual-pointer-unstable-v1",
+    file: "wlr-protocols/unstable/wlr-virtual-pointer-unstable-v1.xml",
+    deps: [core],
 }
