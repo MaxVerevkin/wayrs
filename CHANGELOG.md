@@ -1,3 +1,7 @@
+## 0.10.4
+
+- Do not require `use wayrs_client;` when using `wayrs_client::scanner::generate!()`.
+
 ## 0.10.3
 
 - Store objects in a `Vec` instead of `HashMap`.
