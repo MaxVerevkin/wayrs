@@ -1,2 +1,1 @@
-use crate as wayrs_client;
-wayrs_scanner::generate!("wayland.xml");
+wayrs_scanner::generate_internal!("wayland.xml");

@@ -12,6 +12,16 @@ use convert_case::{Case, Casing};
 
 #[proc_macro]
 pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    generate_imp(input, false)
+}
+
+#[doc(hidden)]
+#[proc_macro]
+pub fn generate_internal(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    generate_imp(input, true)
+}
+
+fn generate_imp(input: proc_macro::TokenStream, internal: bool) -> proc_macro::TokenStream {
     let path = syn::parse_macro_input!(input as syn::LitStr).value();
     let path = match std::env::var_os("CARGO_MANIFEST_DIR") {
         Some(manifest) => {
@@ -26,8 +36,18 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let parser = Parser::new(&file);
     let protocol = parser.get_grotocol();
 
+    let import = if internal {
+        quote! { use crate as _wayrs_client; }
+    } else {
+        quote! { extern crate wayrs_client as _wayrs_client; }
+    };
+
     let modules = protocol.interfaces.iter().map(gen_interface);
-    let expanded = quote! { #(#modules)* };
+
+    let expanded = quote! {
+        #import
+        #(#modules)*
+    };
 
     // let mut rustfmt = std::process::Command::new("rustfmt")
     //     .stdin(std::process::Stdio::piped())
@@ -80,10 +100,10 @@ fn gen_interface(iface: &Interface) -> TokenStream {
         let name = &msg.name;
         let is_destructor = msg.kind.as_deref() == Some("destructor");
         quote! {
-            wayrs_client::interface::MessageDesc {
+            _wayrs_client::interface::MessageDesc {
                 name: #name,
                 is_destructor: #is_destructor,
-                signature: &[ #( wayrs_client::wire::ArgType::#args, )* ]
+                signature: &[ #( _wayrs_client::wire::ArgType::#args, )* ]
             }
         }
     };
@@ -136,7 +156,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 "int" | "uint" if arg.enum_type.is_some() => quote! {
                     match #arg_name.try_into() {
                         Ok(val) => val,
-                        Err(_) => return Err(wayrs_client::proxy::BadMessage),
+                        Err(_) => return Err(_wayrs_client::proxy::BadMessage),
                     }
                 },
                 _ => quote!(#arg_name),
@@ -155,10 +175,10 @@ fn gen_interface(iface: &Interface) -> TokenStream {
         quote! {
             #opcode => {
                 if event.args.len() != #args_len {
-                    return Err(wayrs_client::proxy::BadMessage);
+                    return Err(_wayrs_client::proxy::BadMessage);
                 }
                 let mut args = event.args.into_iter();
-                #( let Some(wayrs_client::wire::ArgValue::#arg_ty(#arg_names)) = args.next() else { return Err(wayrs_client::proxy::BadMessage) }; )*
+                #( let Some(_wayrs_client::wire::ArgValue::#arg_ty(#arg_names)) = args.next() else { return Err(_wayrs_client::proxy::BadMessage) }; )*
                 Ok(#retval)
             }
         }
@@ -248,40 +268,40 @@ fn gen_interface(iface: &Interface) -> TokenStream {
     quote! {
         #mod_doc
         pub mod #mod_name {
-            use super::wayrs_client;
-            use super::wayrs_client::proxy::Proxy;
-            use super::wayrs_client::connection::Connection;
+            use super::_wayrs_client;
+            use super::_wayrs_client::proxy::Proxy;
+            use super::_wayrs_client::connection::Connection;
 
             #mod_doc
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct #proxy_name {
-                id: wayrs_client::object::ObjectId,
+                id: _wayrs_client::object::ObjectId,
                 version: u32,
             }
 
             impl Proxy for #proxy_name {
                 type Event = Event;
 
-                const INTERFACE: &'static wayrs_client::interface::Interface
-                    = &wayrs_client::interface::Interface {
-                        name: wayrs_client::cstr!(#raw_name),
+                const INTERFACE: &'static _wayrs_client::interface::Interface
+                    = &_wayrs_client::interface::Interface {
+                        name: _wayrs_client::cstr!(#raw_name),
                         version: #version,
                         events: &[ #(#events_desc,)* ],
                         requests: &[ #(#requests_desc,)* ],
                     };
 
-                fn new(id: wayrs_client::object::ObjectId, version: u32) -> Self {
+                fn new(id: _wayrs_client::object::ObjectId, version: u32) -> Self {
                     Self { id, version }
                 }
 
-                fn parse_event(&self, event: wayrs_client::wire::Message) -> Result<Event, wayrs_client::proxy::BadMessage> {
+                fn parse_event(&self, event: _wayrs_client::wire::Message) -> Result<Event, _wayrs_client::proxy::BadMessage> {
                     match event.header.opcode {
                         #( #event_decoding )*
-                        _ => Err(wayrs_client::proxy::BadMessage),
+                        _ => Err(_wayrs_client::proxy::BadMessage),
                     }
                 }
 
-                fn id(&self) -> wayrs_client::object::ObjectId {
+                fn id(&self) -> _wayrs_client::object::ObjectId {
                     self.id
                 }
 
@@ -290,22 +310,22 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 }
             }
 
-            impl TryFrom<wayrs_client::object::Object> for #proxy_name {
-                type Error = wayrs_client::proxy::WrongObject;
+            impl TryFrom<_wayrs_client::object::Object> for #proxy_name {
+                type Error = _wayrs_client::proxy::WrongObject;
 
-                fn try_from(object: wayrs_client::object::Object) -> Result<Self, Self::Error> {
+                fn try_from(object: _wayrs_client::object::Object) -> Result<Self, Self::Error> {
                     if object.interface == Self::INTERFACE {
                         Ok(Self {
                             id: object.id,
                             version: object.version,
                         })
                     } else {
-                        Err(wayrs_client::proxy::WrongObject)
+                        Err(_wayrs_client::proxy::WrongObject)
                     }
                 }
             }
 
-            impl From<#proxy_name> for wayrs_client::object::Object {
+            impl From<#proxy_name> for _wayrs_client::object::Object {
                 fn from(proxy: #proxy_name) -> Self {
                     Self {
                         id: proxy.id,
@@ -315,7 +335,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 }
             }
 
-            impl From<#proxy_name> for wayrs_client::object::ObjectId {
+            impl From<#proxy_name> for _wayrs_client::object::ObjectId {
                 fn from(proxy: #proxy_name) -> Self {
                     proxy.id
                 }
@@ -382,19 +402,19 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
         let arg_name = make_ident(&arg.name);
         let arg_ty = map_arg_to_argval(arg);
         match arg.arg_type.as_str() {
-            "new_id" => quote! { wayrs_client::wire::ArgValue::#arg_ty(new_object.into()) },
+            "new_id" => quote! { _wayrs_client::wire::ArgValue::#arg_ty(new_object.into()) },
             "object" if arg.allow_null => {
-                quote! { wayrs_client::wire::ArgValue::#arg_ty(#arg_name.map(Into::into)) }
+                quote! { _wayrs_client::wire::ArgValue::#arg_ty(#arg_name.map(Into::into)) }
             }
-            _ => quote! { wayrs_client::wire::ArgValue::#arg_ty(#arg_name.into()) },
+            _ => quote! { _wayrs_client::wire::ArgValue::#arg_ty(#arg_name.into()) },
         }
     });
 
     let send_message = quote! {
         conn.send_request(
             Self::INTERFACE,
-            wayrs_client::wire::Message {
-                header: wayrs_client::wire::MessageHeader {
+            _wayrs_client::wire::Message {
+                header: _wayrs_client::wire::MessageHeader {
                     object_id: self.id,
                     size: 0,
                     opcode: #opcode,
@@ -591,10 +611,10 @@ impl ArgExt for Argument {
                     quote!(#arg_name: #enum_name)
                 }
             }
-            ("fixed", None, None, false) => quote!(#arg_name: wayrs_client::wire::Fixed),
+            ("fixed", None, None, false) => quote!(#arg_name: _wayrs_client::wire::Fixed),
             ("object", None, None, allow_null) => match allow_null {
-                false => quote!(#arg_name: wayrs_client::object::Object),
-                true => quote!(#arg_name: ::std::option::Option<wayrs_client::object::Object>),
+                false => quote!(#arg_name: _wayrs_client::object::Object),
+                true => quote!(#arg_name: ::std::option::Option<_wayrs_client::object::Object>),
             },
             ("object", Some(iface), None, allow_null) => {
                 let proxy_path = make_proxy_path(iface);
@@ -631,16 +651,16 @@ impl ArgExt for Argument {
             }
             "int" => quote!(i32),
             "uint" => quote!(u32),
-            "fixed" => quote!(wayrs_client::wire::Fixed),
+            "fixed" => quote!(_wayrs_client::wire::Fixed),
             "object" => match self.allow_null {
-                false => quote!(wayrs_client::object::ObjectId),
-                true => quote!(::std::option::Option<wayrs_client::object::ObjectId>),
+                false => quote!(_wayrs_client::object::ObjectId),
+                true => quote!(::std::option::Option<_wayrs_client::object::ObjectId>),
             },
             "new_id" => {
                 if let Some(iface) = &self.interface {
                     make_proxy_path(iface)
                 } else {
-                    quote!(wayrs_client::object::Object)
+                    quote!(_wayrs_client::object::Object)
                 }
             }
             "string" => match self.allow_null {
