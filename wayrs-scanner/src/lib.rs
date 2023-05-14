@@ -36,18 +36,12 @@ fn generate_imp(input: proc_macro::TokenStream, internal: bool) -> proc_macro::T
     let parser = Parser::new(&file);
     let protocol = parser.get_grotocol();
 
-    let import = if internal {
-        quote! { use crate as _wayrs_client; }
-    } else {
-        quote! { extern crate wayrs_client as _wayrs_client; }
-    };
+    let modules = protocol
+        .interfaces
+        .iter()
+        .map(|i| gen_interface(i, internal));
 
-    let modules = protocol.interfaces.iter().map(gen_interface);
-
-    let expanded = quote! {
-        #import
-        #(#modules)*
-    };
+    let expanded = quote! { #(#modules)* };
 
     // let mut rustfmt = std::process::Command::new("rustfmt")
     //     .stdin(std::process::Stdio::piped())
@@ -86,7 +80,7 @@ fn make_proxy_path(iface: impl AsRef<str>) -> TokenStream {
     quote! { super::#proxy_name }
 }
 
-fn gen_interface(iface: &Interface) -> TokenStream {
+fn gen_interface(iface: &Interface, internal: bool) -> TokenStream {
     let mod_doc = gen_doc(&iface.description, None);
     let mod_name = syn::Ident::new(&iface.name, Span::call_site());
 
@@ -265,12 +259,18 @@ fn gen_interface(iface: &Interface) -> TokenStream {
         }
     });
 
+    let import = if internal {
+        quote! { use crate as _wayrs_client; }
+    } else {
+        quote! { extern crate wayrs_client as _wayrs_client; }
+    };
+
     quote! {
         #mod_doc
         pub mod #mod_name {
-            use super::_wayrs_client;
-            use super::_wayrs_client::proxy::Proxy;
-            use super::_wayrs_client::connection::Connection;
+            #import
+            use _wayrs_client::proxy::Proxy;
+            use _wayrs_client::connection::Connection;
 
             #mod_doc
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
