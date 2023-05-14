@@ -202,6 +202,7 @@ fn gen_interface(iface: &Interface) -> TokenStream {
                 impl #name {
                     #(
                         #item_docs
+                        #[allow(non_upper_case_globals)]
                         pub const #items: Self = Self(#values);
                     )*
 
