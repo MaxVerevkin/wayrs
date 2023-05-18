@@ -12,11 +12,12 @@ keywords = ["wayland", "client"]
 [features]
 seats = []
 shm_alloc = ["memmap2", "shmemfdrs"]
-cursor = ["shm_alloc", "xcursor"]
+cursor = ["shm_alloc", "xcursor", "wayrs-protocols/cursor-shape-v1"]
 keyboard = ["xkbcommon"]
 
 [dependencies]
 wayrs-client = { version = "0.10", path = "../wayrs-client" }
+wayrs-protocols = { version = "0.10", path = "../wayrs-protocols", optional = true }
 thiserror = "1.0"
 memmap2 = { version = "0.6", optional = true }
 shmemfdrs = { version = "0.1", optional = true }

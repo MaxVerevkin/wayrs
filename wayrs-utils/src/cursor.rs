@@ -2,23 +2,13 @@
 //!
 //! # Example
 //!
-//! ```no_run
-//! # use wayrs_utils::cursor::*;
-//! # use wayrs_client::connection::Connection;
-//! # let mut conn = Connection::<()>::connect().unwrap();
-//! # let conn = &mut conn;
-//! # let shm = todo!();
-//! # let surface_scale = todo!();
-//! # let enter_serial = todo!();
-//! # let pointer = todo!();
-//! # let wl_compositor = todo!();
-//! #
+//! ```ignore
 //! // Do this once
-//! let cursor_theme = CursorTheme::new(None, None);
-//! let default_cursor = cursor_theme.get_image("default").unwrap();
+//! let cursor_theme = CursorTheme::new(conn, &globals);
+//! let default_cursor = cursor_theme.get_image(CursorShape::Default).unwrap();
 //!
 //! // Do this when you bind a pointer
-//! let themed_pointer = ThemedPointer::new(conn, pointer, wl_compositor);
+//! let themed_pointer = cursor_theme.get_themed_pointer(conn, pointer);
 //!
 //! // Set cursor (on `wl_pointer.enter` or whenever you need to)
 //! themed_pointer.set_cursor(conn, shm, &default_cursor, surface_scale, enter_serial);
@@ -28,122 +18,158 @@
 use std::io;
 
 use wayrs_client::connection::Connection;
+use wayrs_client::global::*;
 use wayrs_client::protocol::*;
+use wayrs_client::proxy::Proxy;
 
 use crate::shm_alloc::{BufferSpec, ShmAlloc};
 
-use xcursor::parser::Image;
+use xcursor::parser::{parse_xcursor, Image};
+
+use wayrs_protocols::cursor_shape_v1::*;
+pub use wp_cursor_shape_device_v1::Shape as CursorShape;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CursorError {
-    #[error("cursor not found")]
-    CursorNotFound,
+    #[error("default cursor not found")]
+    DefaultCursorNotFound,
     #[error("theme could not be parsed")]
     ThemeParseError,
     #[error(transparent)]
     ReadError(#[from] io::Error),
 }
 
-/// An easy to use xcursor theme wrapper.
-#[derive(Debug, Clone)]
-pub struct CursorTheme {
-    cursor_size: u32,
-    theme: xcursor::CursorTheme,
+/// [`WpCursorShapeManagerV1`] wrapper which fallbacks to `xcursor` when `cursor-shape-v1` protocol
+/// extension is not supported.
+#[derive(Debug)]
+pub struct CursorTheme(CursorThemeImp);
+
+#[derive(Debug)]
+enum CursorThemeImp {
+    Server {
+        manager: WpCursorShapeManagerV1,
+    },
+    Client {
+        compositor: WlCompositor,
+        cursor_size: u32,
+        theme: xcursor::CursorTheme,
+    },
 }
 
 /// A cursor image.
-#[derive(Debug, Clone)]
-pub struct CursorImage {
-    cursor_size: u32,
-    imgs: Vec<Image>,
+#[derive(Debug)]
+pub struct CursorImage(CursorImageImp);
+
+#[derive(Debug)]
+pub enum CursorImageImp {
+    Server { shape: CursorShape },
+    Client { cursor_size: u32, imgs: Vec<Image> },
 }
 
 /// A wrapper around [`WlPointer`] with convenient [`set_cursor`](Self::set_cursor) and
 /// [`hide_cursor`](Self::hide_cursor) methods.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct ThemedPointer {
     pointer: WlPointer,
-    surface: WlSurface,
+    imp: ThemedPointerImp,
+}
+
+#[derive(Debug)]
+enum ThemedPointerImp {
+    Server { device: WpCursorShapeDeviceV1 },
+    Client { surface: WlSurface },
 }
 
 impl CursorTheme {
-    /// Load a cursor theme.
+    /// Create new [`CursorTheme`], preferring the server-side implementation if possible.
     ///
-    /// `theme_name` defaults to `XCURSOR_THEME` env variable or `default`.
+    /// # Panics
     ///
-    /// `cursor_size` defaults to `XCURSOR_SIZE` env variable or `24`.
-    pub fn new(theme_name: Option<&str>, cursor_size: Option<u32>) -> Self {
-        let mut theme_name_buf = None;
+    /// The function may panic if `wl_compositor` global is not found.
+    pub fn new<D>(conn: &mut Connection<D>, globals: &Globals) -> Self {
+        match globals.bind(conn, 1..=1) {
+            Ok(manager) => Self(CursorThemeImp::Server { manager }),
+            Err(_) => {
+                let theme = xcursor::CursorTheme::load(
+                    std::env::var("XCURSOR_THEME")
+                        .as_deref()
+                        .unwrap_or("default"),
+                );
 
-        let theme_name = theme_name
-            .or_else(|| {
-                theme_name_buf = std::env::var("XCURSOR_THEME").ok();
-                theme_name_buf.as_deref()
-            })
-            .unwrap_or("default");
-
-        let cursor_size = cursor_size
-            .or_else(|| {
-                std::env::var("XCURSOR_SIZE")
+                let cursor_size = std::env::var("XCURSOR_SIZE")
                     .ok()
                     .and_then(|x| x.parse().ok())
-            })
-            .unwrap_or(24);
+                    .unwrap_or(24);
 
-        let theme = xcursor::CursorTheme::load(theme_name);
-
-        CursorTheme { cursor_size, theme }
+                Self(CursorThemeImp::Client {
+                    compositor: globals.bind(conn, 1..=6).unwrap(),
+                    cursor_size,
+                    theme,
+                })
+            }
+        }
     }
 
     /// Find and parse a cursor image.
     ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use wayrs_utils::cursor::CursorTheme;
-    /// let theme = CursorTheme::new(None, None);
-    /// let default_cursor = theme.get_image("default");
-    /// let move_cursor = theme.get_image("move");
-    /// ```
-    pub fn get_image(&self, cursor: &str) -> Result<CursorImage, CursorError> {
-        let theme_path = self
-            .theme
-            .load_icon(cursor)
-            .ok_or(CursorError::CursorNotFound)?;
+    /// No-op if server-side implementation is used.
+    pub fn get_image(&self, shape: CursorShape) -> Result<CursorImage, CursorError> {
+        match &self.0 {
+            CursorThemeImp::Server { .. } => Ok(CursorImage(CursorImageImp::Server { shape })),
+            CursorThemeImp::Client {
+                cursor_size, theme, ..
+            } => {
+                let theme_path = theme
+                    .load_icon(stringify_cursor_shape(shape))
+                    .or_else(|| theme.load_icon("default"))
+                    .ok_or(CursorError::DefaultCursorNotFound)?;
 
-        let raw_theme = std::fs::read(theme_path)?;
+                let mut imgs = parse_xcursor(&std::fs::read(theme_path)?)
+                    .ok_or(CursorError::ThemeParseError)?;
+                if imgs.is_empty() {
+                    return Err(CursorError::DefaultCursorNotFound);
+                }
 
-        let mut imgs =
-            xcursor::parser::parse_xcursor(&raw_theme).ok_or(CursorError::ThemeParseError)?;
-        if imgs.is_empty() {
-            return Err(CursorError::CursorNotFound);
+                imgs.sort_unstable_by_key(|img| img.size);
+
+                Ok(CursorImage(CursorImageImp::Client {
+                    cursor_size: *cursor_size,
+                    imgs,
+                }))
+            }
         }
+    }
 
-        imgs.sort_unstable_by_key(|img| img.size);
-
-        Ok(CursorImage {
-            cursor_size: self.cursor_size,
-            imgs,
-        })
+    pub fn get_themed_pointer<D>(
+        &self,
+        conn: &mut Connection<D>,
+        pointer: WlPointer,
+    ) -> ThemedPointer {
+        ThemedPointer {
+            pointer,
+            imp: match &self.0 {
+                CursorThemeImp::Server { manager } => ThemedPointerImp::Server {
+                    device: manager.get_pointer(conn, pointer),
+                },
+                CursorThemeImp::Client { compositor, .. } => ThemedPointerImp::Client {
+                    surface: compositor.create_surface(conn),
+                },
+            },
+        }
     }
 }
 
 impl ThemedPointer {
-    /// Create new pointer wrapper.
-    pub fn new<D>(
-        conn: &mut Connection<D>,
-        pointer: WlPointer,
-        wl_compositor: WlCompositor,
-    ) -> Self {
-        Self {
-            pointer,
-            surface: wl_compositor.create_surface(conn),
-        }
-    }
-
     /// Set cursor image.
     ///
     /// Refer to [`WlPointer::set_cursor`] for more info.
+    ///
+    /// `shm` and `scale` are ignored if server-side implementation is used.
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if the [`CursorShape`] was created form different [`CursorTheme`]
+    /// than this [`ThemedPointer`].
     pub fn set_cursor<D>(
         &self,
         conn: &mut Connection<D>,
@@ -152,52 +178,62 @@ impl ThemedPointer {
         scale: u32,
         serial: u32,
     ) {
-        let target_size = image.cursor_size * scale;
-
-        let image = match image
-            .imgs
-            .binary_search_by_key(&target_size, |img| img.size)
-        {
-            Ok(indx) => &image.imgs[indx],
-            Err(indx) if indx == 0 => image.imgs.first().unwrap(),
-            Err(indx) if indx >= image.imgs.len() => image.imgs.last().unwrap(),
-            Err(indx) => {
-                let a = &image.imgs[indx - 1];
-                let b = &image.imgs[indx];
-                if target_size - a.size < b.size - target_size {
-                    a
-                } else {
-                    b
-                }
+        match (&self.imp, &image.0) {
+            (ThemedPointerImp::Server { device }, CursorImageImp::Server { shape }) => {
+                device.set_shape(conn, serial, *shape);
             }
-        };
+            (
+                ThemedPointerImp::Client { surface },
+                CursorImageImp::Client { cursor_size, imgs },
+            ) => {
+                let scale = if surface.version() >= 3 { scale } else { 1 };
+                let target_size = cursor_size * scale;
 
-        let (buffer, canvas) = shm.alloc_buffer(
-            conn,
-            BufferSpec {
-                width: image.width,
-                height: image.height,
-                stride: image.width * 4,
-                format: wl_shm::Format::Argb8888,
-            },
-        );
+                let image = match imgs.binary_search_by_key(&target_size, |img| img.size) {
+                    Ok(indx) => &imgs[indx],
+                    Err(indx) if indx == 0 => imgs.first().unwrap(),
+                    Err(indx) if indx >= imgs.len() => imgs.last().unwrap(),
+                    Err(indx) => {
+                        let a = &imgs[indx - 1];
+                        let b = &imgs[indx];
+                        if target_size - a.size < b.size - target_size {
+                            a
+                        } else {
+                            b
+                        }
+                    }
+                };
 
-        assert_eq!(image.pixels_rgba.len(), canvas.len());
-        canvas.copy_from_slice(&image.pixels_rgba);
+                let (buffer, canvas) = shm.alloc_buffer(
+                    conn,
+                    BufferSpec {
+                        width: image.width,
+                        height: image.height,
+                        stride: image.width * 4,
+                        format: wl_shm::Format::Argb8888,
+                    },
+                );
 
-        self.surface
-            .attach(conn, Some(buffer.into_wl_buffer()), 0, 0);
-        self.surface.damage(conn, 0, 0, i32::MAX, i32::MAX);
-        self.surface.set_buffer_scale(conn, scale as i32);
-        self.surface.commit(conn);
+                assert_eq!(image.pixels_rgba.len(), canvas.len());
+                canvas.copy_from_slice(&image.pixels_rgba);
 
-        self.pointer.set_cursor(
-            conn,
-            serial,
-            Some(self.surface),
-            (image.xhot / scale) as i32,
-            (image.yhot / scale) as i32,
-        );
+                surface.attach(conn, Some(buffer.into_wl_buffer()), 0, 0);
+                surface.damage(conn, 0, 0, i32::MAX, i32::MAX);
+                if surface.version() >= 3 {
+                    surface.set_buffer_scale(conn, scale as i32);
+                }
+                surface.commit(conn);
+
+                self.pointer.set_cursor(
+                    conn,
+                    serial,
+                    Some(*surface),
+                    (image.xhot / scale) as i32,
+                    (image.yhot / scale) as i32,
+                );
+            }
+            _ => panic!("ThemedPointer and CursorImage implementation mismatch"),
+        }
     }
 
     /// Hide cursor.
@@ -207,8 +243,55 @@ impl ThemedPointer {
         self.pointer.set_cursor(conn, serial, None, 0, 0);
     }
 
-    /// Destroy cursor's surface.
+    /// Destroy cursor's surface / cursor shape device.
+    ///
+    /// This function does not destroy the pointer.
     pub fn destroy<D>(self, conn: &mut Connection<D>) {
-        self.surface.destroy(conn);
+        match &self.imp {
+            ThemedPointerImp::Server { device } => device.destroy(conn),
+            ThemedPointerImp::Client { surface } => surface.destroy(conn),
+        }
     }
+}
+
+fn stringify_cursor_shape(shape: CursorShape) -> &'static str {
+    const NAMES: &[&str] = &[
+        "default",
+        "context-menu",
+        "help",
+        "pointer",
+        "progress",
+        "wait",
+        "cell",
+        "crosshair",
+        "text",
+        "vertical-text",
+        "alias",
+        "copy",
+        "move",
+        "no-drop",
+        "not-allowed",
+        "grab",
+        "grabbing",
+        "e-resize",
+        "n-resize",
+        "ne-resize",
+        "nw-resize",
+        "s-resize",
+        "se-resize",
+        "sw-resize",
+        "w-resize",
+        "ew-resize",
+        "ns-resize",
+        "nesw-resize",
+        "nwse-resize",
+        "col-resize",
+        "row-resize",
+        "all-scroll",
+        "zoom-in",
+        "zoom-out",
+    ];
+    NAMES
+        .get(u32::from(shape).saturating_sub(1) as usize)
+        .unwrap_or(&"default")
 }
