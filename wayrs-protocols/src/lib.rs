@@ -51,6 +51,13 @@ gen! {
 }
 
 gen! {
+    mod: cursor_shape_v1,
+    feat: "cursor-shape-v1",
+    file: "wayland-protocols/staging/cursor-shape/cursor-shape-v1.xml",
+    deps: [core, tablet_unstable_v2],
+}
+
+gen! {
     mod: drm_lease_v1,
     feat: "drm-lease-v1",
     file: "wayland-protocols/staging/drm-lease/drm-lease-v1.xml",

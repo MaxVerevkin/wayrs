@@ -16,6 +16,7 @@ viewporter = []
 presentation-time = []
 # wayland-staging
 content-type-v1 = []
+cursor-shape-v1 = ["tablet-unstable-v2"]
 drm-lease-v1 = []
 ext-foreign-toplevel-list-v1 = []
 ext-idle-notify-v1 = []
