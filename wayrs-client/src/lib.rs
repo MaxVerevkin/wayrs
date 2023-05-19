@@ -49,6 +49,7 @@ macro_rules! cstr {
 #[doc(hidden)]
 pub const fn cstr(string: &str) -> &CStr {
     let bytes = string.as_bytes();
+    assert!(!bytes.is_empty());
 
     let mut i = 0;
     while i < bytes.len() {
