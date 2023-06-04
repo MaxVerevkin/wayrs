@@ -5,6 +5,9 @@ name: Rust
 jobs:
   check:
     name: Check
+    strategy:
+      matrix:
+        rust: [1.65.0, stable]
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
@@ -12,7 +15,9 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@1.65.0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
       - name: Check
         run: cargo check --all --all-features
 
@@ -25,7 +30,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@1.65.0
+      - uses: dtolnay/rust-toolchain@stable
       - name: Tests
         run: cargo test --all --all-features
 
@@ -40,7 +45,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@1.65.0
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - name: Fmt check
@@ -55,7 +60,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@1.65.0
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - name: Clippy check
