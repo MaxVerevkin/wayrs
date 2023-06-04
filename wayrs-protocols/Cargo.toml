@@ -5,6 +5,7 @@ repository = "https://github.com/MaxVerevkin/wayrs"
 readme = "../README.md"
 version = "0.10.5"
 edition = "2021"
+rust-version = "1.65"
 license = "MIT"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "client"]
