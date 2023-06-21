@@ -1,3 +1,7 @@
+## 0.10.5
+
+- Implove scanner proc macro: `wayrs-client` can now be renamed in your Cargo.toml.
+
 ## 0.10.4
 
 - Do not require `use wayrs_client;` when using `wayrs_client::scanner::generate!()`.
