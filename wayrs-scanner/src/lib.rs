@@ -3,25 +3,27 @@ mod types;
 
 use std::path::PathBuf;
 
+use convert_case::{Case, Casing};
 use proc_macro2::{Span, TokenStream};
+use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{format_ident, quote};
 
 use crate::parser::Parser;
 use crate::types::*;
-use convert_case::{Case, Casing};
+
+fn wayrs_client_path() -> TokenStream {
+    match crate_name("wayrs-client") {
+        Ok(FoundCrate::Name(name)) => {
+            let ident = format_ident!("{}", name);
+            quote! { ::#ident }
+        }
+        Ok(FoundCrate::Itself) => quote! { crate },
+        _ => quote! { ::wayrs_client },
+    }
+}
 
 #[proc_macro]
 pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    generate_imp(input, false)
-}
-
-#[doc(hidden)]
-#[proc_macro]
-pub fn generate_internal(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    generate_imp(input, true)
-}
-
-fn generate_imp(input: proc_macro::TokenStream, internal: bool) -> proc_macro::TokenStream {
     let path = syn::parse_macro_input!(input as syn::LitStr).value();
     let path = match std::env::var_os("CARGO_MANIFEST_DIR") {
         Some(manifest) => {
@@ -36,10 +38,11 @@ fn generate_imp(input: proc_macro::TokenStream, internal: bool) -> proc_macro::T
     let parser = Parser::new(&file);
     let protocol = parser.get_grotocol();
 
+    let wayrs_client_path = wayrs_client_path();
     let modules = protocol
         .interfaces
         .iter()
-        .map(|i| gen_interface(i, internal));
+        .map(|i| gen_interface(i, &wayrs_client_path));
 
     let expanded = quote! { #(#modules)* };
 
@@ -80,14 +83,14 @@ fn make_proxy_path(iface: impl AsRef<str>) -> TokenStream {
     quote! { super::#proxy_name }
 }
 
-fn gen_interface(iface: &Interface, internal: bool) -> TokenStream {
+fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStream {
     let mod_doc = gen_doc(&iface.description, None);
     let mod_name = syn::Ident::new(&iface.name, Span::call_site());
 
     let proxy_name = make_pascal_case_ident(&iface.name);
 
-    let raw_name = &iface.name;
-    let version = iface.version;
+    let raw_iface_name = &iface.name;
+    let iface_version = iface.version;
 
     let gen_msg_gesc = |msg: &Message| {
         let args = msg.args.iter().map(map_arg_to_argtype);
@@ -259,16 +262,10 @@ fn gen_interface(iface: &Interface, internal: bool) -> TokenStream {
         }
     });
 
-    let import = if internal {
-        quote! { use crate as _wayrs_client; }
-    } else {
-        quote! { extern crate wayrs_client as _wayrs_client; }
-    };
-
     quote! {
         #mod_doc
         pub mod #mod_name {
-            #import
+            use #wayrs_client_path as _wayrs_client;
             use _wayrs_client::proxy::Proxy;
             use _wayrs_client::connection::Connection;
 
@@ -284,8 +281,8 @@ fn gen_interface(iface: &Interface, internal: bool) -> TokenStream {
 
                 const INTERFACE: &'static _wayrs_client::interface::Interface
                     = &_wayrs_client::interface::Interface {
-                        name: _wayrs_client::cstr!(#raw_name),
-                        version: #version,
+                        name: _wayrs_client::cstr!(#raw_iface_name),
+                        version: #iface_version,
                         events: &[ #(#events_desc,)* ],
                         requests: &[ #(#requests_desc,)* ],
                     };

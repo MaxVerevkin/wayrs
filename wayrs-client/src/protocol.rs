@@ -1,1 +1,3 @@
-wayrs_scanner::generate_internal!("wayland.xml");
+//! The core Wayland protocol
+
+wayrs_scanner::generate!("wayland.xml");
