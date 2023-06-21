@@ -3,7 +3,7 @@ name = "wayrs-client"
 description = "A simple wayland library"
 repository = "https://github.com/MaxVerevkin/wayrs"
 readme = "../README.md"
-version = "0.10.4"
+version = "0.10.5"
 edition = "2021"
 rust-version = "1.65"
 license = "MIT"
@@ -11,7 +11,7 @@ authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "client"]
 
 [dependencies]
-wayrs-scanner = { version = "0.10.2", path = "../wayrs-scanner" }
+wayrs-scanner = { version = "0.10.4", path = "../wayrs-scanner" }
 thiserror = "1.0"
 
 [dependencies.nix]
