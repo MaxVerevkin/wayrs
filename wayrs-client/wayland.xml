@@ -419,6 +419,21 @@
       <entry name="xbgr16161616" value="0x38344258" summary="[63:0] x:B:G:R 16:16:16:16 little endian"/>
       <entry name="argb16161616" value="0x38345241" summary="[63:0] A:R:G:B 16:16:16:16 little endian"/>
       <entry name="abgr16161616" value="0x38344241" summary="[63:0] A:B:G:R 16:16:16:16 little endian"/>
+      <entry name="c1" value="0x20203143" summary="[7:0] C0:C1:C2:C3:C4:C5:C6:C7 1:1:1:1:1:1:1:1 eight pixels/byte"/>
+      <entry name="c2" value="0x20203243" summary="[7:0] C0:C1:C2:C3 2:2:2:2 four pixels/byte"/>
+      <entry name="c4" value="0x20203443" summary="[7:0] C0:C1 4:4 two pixels/byte"/>
+      <entry name="d1" value="0x20203144" summary="[7:0] D0:D1:D2:D3:D4:D5:D6:D7 1:1:1:1:1:1:1:1 eight pixels/byte"/>
+      <entry name="d2" value="0x20203244" summary="[7:0] D0:D1:D2:D3 2:2:2:2 four pixels/byte"/>
+      <entry name="d4" value="0x20203444" summary="[7:0] D0:D1 4:4 two pixels/byte"/>
+      <entry name="d8" value="0x20203844" summary="[7:0] D"/>
+      <entry name="r1" value="0x20203152" summary="[7:0] R0:R1:R2:R3:R4:R5:R6:R7 1:1:1:1:1:1:1:1 eight pixels/byte"/>
+      <entry name="r2" value="0x20203252" summary="[7:0] R0:R1:R2:R3 2:2:2:2 four pixels/byte"/>
+      <entry name="r4" value="0x20203452" summary="[7:0] R0:R1 4:4 two pixels/byte"/>
+      <entry name="r10" value="0x20303152" summary="[15:0] x:R 6:10 little endian"/>
+      <entry name="r12" value="0x20323152" summary="[15:0] x:R 4:12 little endian"/>
+      <entry name="avuy8888" value="0x59555641" summary="[31:0] A:Cr:Cb:Y 8:8:8:8 little endian"/>
+      <entry name="xvuy8888" value="0x59555658" summary="[31:0] X:Cr:Cb:Y 8:8:8:8 little endian"/>
+      <entry name="p030" value="0x30333050" summary="2x2 subsampled Cr:Cb plane 10 bits per channel packed"/>
     </enum>
 
     <request name="create_pool">
@@ -454,8 +469,8 @@
       interface.
 
       If the buffer uses a format that has an alpha channel, the alpha channel
-      is assumed to be premultiplied in the color channels unless otherwise
-      specified.
+      is assumed to be premultiplied in the electrical color channel values
+      (after transfer function encoding) unless otherwise specified.
 
       Note, because wl_buffer objects are created from multiple independent
       factory interfaces, the wl_buffer interface is frozen at version 1.
@@ -2001,9 +2016,9 @@
 	where (x, y) are the coordinates of the pointer location, in
 	surface-local coordinates.
 
-	On surface.attach requests to the pointer surface, hotspot_x
+	On wl_surface.offset requests to the pointer surface, hotspot_x
 	and hotspot_y are decremented by the x and y parameters
-	passed to the request. Attach must be confirmed by
+	passed to the request. The offset must be applied by
 	wl_surface.commit as usual.
 
 	The hotspot can also be updated by passing the currently set
