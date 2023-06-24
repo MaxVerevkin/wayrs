@@ -270,7 +270,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             use _wayrs_client::connection::Connection;
 
             #mod_doc
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+            #[derive(Clone, Copy, PartialEq, Eq, Hash)]
             pub struct #proxy_name {
                 id: _wayrs_client::object::ObjectId,
                 version: u32,
@@ -335,6 +335,18 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             impl From<#proxy_name> for _wayrs_client::object::ObjectId {
                 fn from(proxy: #proxy_name) -> Self {
                     proxy.id
+                }
+            }
+
+            impl ::std::fmt::Debug for #proxy_name {
+                fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                    write!(
+                        f,
+                        "{}@{}v{}",
+                        #raw_iface_name,
+                        self.id.0,
+                        self.version
+                    )
                 }
             }
 
