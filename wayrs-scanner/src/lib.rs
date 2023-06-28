@@ -358,6 +358,18 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
 
             impl ::std::cmp::Eq for #proxy_name {}
 
+            impl ::std::cmp::PartialOrd for #proxy_name {
+                fn partial_cmp(&self, other: &Self) -> ::std::option::Option<::std::cmp::Ordering> {
+                    self.id.partial_cmp(&other.id)
+                }
+            }
+
+            impl ::std::cmp::Ord for #proxy_name {
+                fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
+                    self.id.cmp(&other.id)
+                }
+            }
+
             impl ::std::hash::Hash for #proxy_name {
                 fn hash<H>(&self, state: &mut H)
                     where H: ::std::hash::Hasher
