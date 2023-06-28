@@ -270,7 +270,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             use _wayrs_client::connection::Connection;
 
             #mod_doc
-            #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+            #[derive(Clone, Copy)]
             pub struct #proxy_name {
                 id: _wayrs_client::object::ObjectId,
                 version: u32,
@@ -347,6 +347,22 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                         self.id.0,
                         self.version
                     )
+                }
+            }
+
+            impl ::std::cmp::PartialEq for #proxy_name {
+                fn eq(&self, other: &Self) -> bool {
+                    self.id == other.id
+                }
+            }
+
+            impl ::std::cmp::Eq for #proxy_name {}
+
+            impl ::std::hash::Hash for #proxy_name {
+                fn hash<H>(&self, state: &mut H)
+                    where H: ::std::hash::Hasher
+                {
+                    self.id.hash(state);
                 }
             }
 
