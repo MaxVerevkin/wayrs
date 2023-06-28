@@ -251,7 +251,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                 }
                 impl TryFrom<u32> for #name {
                     type Error = ();
-                    fn try_from(val: u32) -> Result<Self, ()> {
+                    fn try_from(val: u32) -> ::std::result::Result<Self, ()> {
                         match val {
                             #( #values2 => Ok(Self::#items2), )*
                             _ => Err(()),
@@ -291,7 +291,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                     Self { id, version }
                 }
 
-                fn parse_event(&self, event: _wayrs_client::wire::Message) -> Result<Event, _wayrs_client::proxy::BadMessage> {
+                fn parse_event(&self, event: _wayrs_client::wire::Message) -> std::result::Result<Event, _wayrs_client::proxy::BadMessage> {
                     match event.header.opcode {
                         #( #event_decoding )*
                         _ => Err(_wayrs_client::proxy::BadMessage),
@@ -310,7 +310,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             impl TryFrom<_wayrs_client::object::Object> for #proxy_name {
                 type Error = _wayrs_client::proxy::WrongObject;
 
-                fn try_from(object: _wayrs_client::object::Object) -> Result<Self, Self::Error> {
+                fn try_from(object: _wayrs_client::object::Object) -> std::result::Result<Self, Self::Error> {
                     if object.interface == Self::INTERFACE {
                         Ok(Self {
                             id: object.id,
