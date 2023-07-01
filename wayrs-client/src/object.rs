@@ -51,11 +51,6 @@ impl ObjectId {
     pub const MAX_CLIENT: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFEFFFFFF) });
     pub const MIN_SERVER: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFF000000) });
 
-    #[deprecated]
-    pub fn next(self) -> Self {
-        Self(self.0.checked_add(1).expect("ObjectId overflow"))
-    }
-
     /// Returns the numeric representation of the ID
     pub fn as_u32(self) -> u32 {
         self.0.get()
