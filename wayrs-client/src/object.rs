@@ -63,10 +63,6 @@ impl ObjectId {
     pub fn created_by_client(self) -> bool {
         self <= Self::MAX_CLIENT
     }
-
-    fn as_usize(self) -> usize {
-        self.0.get() as usize
-    }
 }
 
 pub(crate) struct ObjectManager<D> {
@@ -142,7 +138,7 @@ impl<D> ObjectManager<D> {
     ) -> &mut ObjectState<D> {
         assert!(id.created_by_server());
 
-        let index = id.as_usize() - ObjectId::MIN_SERVER.as_usize();
+        let index = (id.as_u32() - ObjectId::MIN_SERVER.as_u32()) as usize;
 
         while index >= self.server_objects.len() {
             self.server_objects.push(None);
@@ -162,11 +158,11 @@ impl<D> ObjectManager<D> {
     pub fn get_object_mut(&mut self, id: ObjectId) -> Option<&mut ObjectState<D>> {
         if id.created_by_client() {
             self.client_objects
-                .get_mut(id.as_usize())
+                .get_mut(id.as_u32() as usize)
                 .and_then(Option::as_mut)
         } else {
             self.server_objects
-                .get_mut(id.as_usize() - ObjectId::MIN_SERVER.as_usize())
+                .get_mut((id.as_u32() - ObjectId::MIN_SERVER.as_u32()) as usize)
                 .and_then(Option::as_mut)
         }
     }
@@ -174,7 +170,7 @@ impl<D> ObjectManager<D> {
     /// Call it only on client-created objects in response to `wl_display.delete_id`.
     pub fn delete_client_object(&mut self, id: ObjectId) {
         assert!(id.created_by_client());
-        *self.client_objects.get_mut(id.as_usize()).unwrap() = None;
+        *self.client_objects.get_mut(id.as_u32() as usize).unwrap() = None;
         self.vacant_ids.push(id);
     }
 }
