@@ -344,7 +344,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                         f,
                         "{}@{}v{}",
                         #raw_iface_name,
-                        self.id.0,
+                        self.id.as_u32(),
                         self.version
                     )
                 }

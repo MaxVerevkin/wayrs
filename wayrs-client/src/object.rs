@@ -44,7 +44,7 @@ impl Debug for Object {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ObjectId(pub NonZeroU32);
+pub struct ObjectId(pub(crate) NonZeroU32);
 
 impl ObjectId {
     pub const DISPLAY: Self = Self(unsafe { NonZeroU32::new_unchecked(1) });
@@ -54,6 +54,11 @@ impl ObjectId {
     #[deprecated]
     pub fn next(self) -> Self {
         Self(self.0.checked_add(1).expect("ObjectId overflow"))
+    }
+
+    /// Returns the numeric representation of the ID
+    pub fn as_u32(self) -> u32 {
+        self.0.get()
     }
 
     pub fn created_by_server(self) -> bool {
