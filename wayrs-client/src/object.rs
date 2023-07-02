@@ -130,26 +130,17 @@ impl<D> ObjectManager<D> {
         })
     }
 
-    pub fn register_server_object(
-        &mut self,
-        id: ObjectId,
-        interface: &'static Interface,
-        version: u32,
-    ) -> &mut ObjectState<D> {
-        assert!(id.created_by_server());
+    pub fn register_server_object(&mut self, object: Object) -> &mut ObjectState<D> {
+        assert!(object.id.created_by_server());
 
-        let index = (id.as_u32() - ObjectId::MIN_SERVER.as_u32()) as usize;
+        let index = (object.id.as_u32() - ObjectId::MIN_SERVER.as_u32()) as usize;
 
         while index >= self.server_objects.len() {
             self.server_objects.push(None);
         }
 
         self.server_objects[index].insert(ObjectState {
-            object: Object {
-                id,
-                interface,
-                version,
-            },
+            object,
             is_alive: true,
             cb: None,
         })

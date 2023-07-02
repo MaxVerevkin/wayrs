@@ -29,10 +29,12 @@ pub enum ArgType {
     Int,
     Uint,
     Fixed,
+
     Object,
     OptObject,
     NewId(&'static Interface),
     AnyNewId,
+
     String,
     OptString,
     Array,
@@ -44,10 +46,14 @@ pub enum ArgValue {
     Int(i32),
     Uint(u32),
     Fixed(Fixed),
+
     Object(ObjectId),
     OptObject(Option<ObjectId>),
-    NewId(ObjectId),
-    AnyNewId(Object),
+
+    NewIdRequest(ObjectId),
+    AnyNewIdRequest(Object),
+    NewIdEvent(Object),
+
     String(CString),
     OptString(Option<CString>),
     Array(Vec<u8>),
@@ -67,9 +73,10 @@ impl ArgValue {
             | Self::Fixed(_)
             | Self::Object(_)
             | Self::OptObject(_)
-            | Self::NewId(_)
+            | Self::NewIdRequest(_)
+            | Self::NewIdEvent(_)
             | Self::OptString(None) => 4,
-            Self::AnyNewId(object) => {
+            Self::AnyNewIdRequest(object) => {
                 len_with_padding(object.interface.name.to_bytes_with_nul().len()) + 8
             }
             Self::String(string) | Self::OptString(Some(string)) => {
@@ -140,12 +147,12 @@ impl Debug for DebugMessage<'_> {
                 }
                 ArgValue::OptObject(None) | ArgValue::OptString(None) => write!(f, "null")?,
                 ArgValue::Fixed(x) => write!(f, "{}", x.as_f64())?,
-                ArgValue::NewId(ObjectId(id)) => {
+                ArgValue::NewIdRequest(id) => {
                     let ArgType::NewId(new_id_iface) = &msg_desc.signature[arg_i]
                     else { panic!("signature mismatch") };
-                    write!(f, "{}@{id}", new_id_iface.name.to_string_lossy())?
+                    write!(f, "{}@{}", new_id_iface.name.to_string_lossy(), id.as_u32())?
                 }
-                ArgValue::AnyNewId(x) => write!(f, "{x:?}")?,
+                ArgValue::AnyNewIdRequest(x) | ArgValue::NewIdEvent(x) => write!(f, "{x:?}")?,
                 ArgValue::String(x) | ArgValue::OptString(Some(x)) => write!(f, "{x:?}")?,
                 ArgValue::Array(_) => write!(f, "<array>")?,
                 ArgValue::Fd(x) => write!(f, "{}", x.as_raw_fd())?,

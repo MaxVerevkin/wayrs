@@ -14,15 +14,12 @@ pub struct WrongObject;
 pub trait Proxy:
     TryFrom<Object, Error = WrongObject> + Into<Object> + Into<ObjectId> + Copy
 {
-    type Event;
+    type Event: TryFrom<Message, Error = BadMessage>;
 
     const INTERFACE: &'static Interface;
 
     #[doc(hidden)]
     fn new(id: ObjectId, version: u32) -> Self;
-
-    #[doc(hidden)]
-    fn parse_event(&self, event: Message) -> Result<Self::Event, BadMessage>;
 
     fn id(&self) -> ObjectId;
 

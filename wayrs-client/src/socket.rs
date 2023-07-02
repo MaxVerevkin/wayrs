@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use nix::sys::socket::{self, ControlMessage, ControlMessageOwned};
 
 use crate::interface::Interface;
-use crate::object::ObjectId;
+use crate::object::{Object, ObjectId};
 use crate::wire::{ArgType, ArgValue, Fixed, Message, MessageHeader};
 use crate::{ConnectError, IoMode};
 
@@ -96,11 +96,11 @@ impl BufferedSocket {
                 ArgValue::Int(x) | ArgValue::Fixed(Fixed(x)) => self.bytes_out.write_int(x),
                 ArgValue::Object(ObjectId(x))
                 | ArgValue::OptObject(Some(ObjectId(x)))
-                | ArgValue::NewId(ObjectId(x)) => self.bytes_out.write_uint(x.get()),
+                | ArgValue::NewIdRequest(ObjectId(x)) => self.bytes_out.write_uint(x.get()),
                 ArgValue::OptObject(None) | ArgValue::OptString(None) => {
                     self.bytes_out.write_uint(0)
                 }
-                ArgValue::AnyNewId(obj) => {
+                ArgValue::AnyNewIdRequest(obj) => {
                     self.send_array(obj.interface.name.to_bytes_with_nul());
                     self.bytes_out.write_uint(obj.version);
                     self.bytes_out.write_uint(obj.id.0.get());
@@ -110,6 +110,7 @@ impl BufferedSocket {
                 }
                 ArgValue::Array(array) => self.send_array(&array),
                 ArgValue::Fd(fd) => self.fds_out.write_one(fd.into_raw_fd()),
+                ArgValue::NewIdEvent(_) => panic!("NewIdEvent in request"),
             }
         }
 
@@ -136,6 +137,7 @@ impl BufferedSocket {
         &mut self,
         header: MessageHeader,
         iface: &'static Interface,
+        version: u32,
         mode: IoMode,
     ) -> io::Result<Message> {
         let signature = iface
@@ -166,16 +168,15 @@ impl BufferedSocket {
                 ArgType::Int => ArgValue::Int(self.bytes_in.read_int()),
                 ArgType::Uint => ArgValue::Uint(self.bytes_in.read_uint()),
                 ArgType::Fixed => ArgValue::Fixed(Fixed(self.bytes_in.read_int())),
-                ArgType::Object => ArgValue::Object(ObjectId(
-                    NonZeroU32::new(self.bytes_in.read_uint())
-                        .expect("received unexpected null object id"),
-                )),
-                ArgType::OptObject => {
-                    ArgValue::OptObject(NonZeroU32::new(self.bytes_in.read_uint()).map(ObjectId))
+                ArgType::Object => {
+                    ArgValue::Object(self.bytes_in.read_id().expect("unexpected null object id"))
                 }
-                ArgType::NewId(_) => ArgValue::NewId(ObjectId(
-                    NonZeroU32::new(self.bytes_in.read_uint()).expect("received null new_id"),
-                )),
+                ArgType::OptObject => ArgValue::OptObject(self.bytes_in.read_id()),
+                ArgType::NewId(interface) => ArgValue::NewIdEvent(Object {
+                    id: self.bytes_in.read_id().expect("unexpected null new_id"),
+                    interface,
+                    version,
+                }),
                 ArgType::AnyNewId => unimplemented!(),
                 ArgType::String => ArgValue::String(self.recv_string()),
                 ArgType::OptString => ArgValue::OptString(match self.bytes_in.read_uint() {
@@ -408,5 +409,9 @@ impl<const N: usize> ArrayBuffer<u8, N> {
         let mut buf = [0; 4];
         self.read_exact(&mut buf);
         u32::from_ne_bytes(buf)
+    }
+
+    fn read_id(&mut self) -> Option<ObjectId> {
+        NonZeroU32::new(self.read_uint()).map(ObjectId)
     }
 }

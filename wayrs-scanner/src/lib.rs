@@ -140,17 +140,12 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
     let event_decoding = iface.events.iter().enumerate().map(|(opcode, event)| {
         let event_name = make_pascal_case_ident(&event.name);
         let opcode = opcode as u16;
-        let arg_ty = event.args.iter().map(map_arg_to_argval);
+        let arg_ty = event.args.iter().map(|x| map_arg_to_argval(x, true));
         let arg_names = event.args.iter().map(|arg| make_ident(&arg.name));
         let arg_decode = event.args.iter().map(|arg| {
             let arg_name = make_ident(&arg.name);
-            match arg.arg_type.as_str() {
-                "new_id" => {
-                    let iface = arg.interface.as_deref().unwrap();
-                    let proxy_name = make_proxy_path(iface);
-                    quote!(#proxy_name::new(#arg_name, self.version))
-                }
-                "int" | "uint" if arg.enum_type.is_some() => quote! {
+            match (arg.arg_type.as_str(), arg.enum_type.is_some()) {
+                ("new_id", _) | ("int" | "uint", true) => quote! {
                     match #arg_name.try_into() {
                         Ok(val) => val,
                         Err(_) => return Err(_wayrs_client::proxy::BadMessage),
@@ -291,13 +286,6 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                     Self { id, version }
                 }
 
-                fn parse_event(&self, event: _wayrs_client::wire::Message) -> std::result::Result<Event, _wayrs_client::proxy::BadMessage> {
-                    match event.header.opcode {
-                        #( #event_decoding )*
-                        _ => Err(_wayrs_client::proxy::BadMessage),
-                    }
-                }
-
                 fn id(&self) -> _wayrs_client::object::ObjectId {
                     self.id
                 }
@@ -307,10 +295,21 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                 }
             }
 
+            impl TryFrom<_wayrs_client::wire::Message> for Event {
+                type Error = _wayrs_client::proxy::BadMessage;
+
+                fn try_from(event: _wayrs_client::wire::Message) -> ::std::result::Result<Self, _wayrs_client::proxy::BadMessage> {
+                    match event.header.opcode {
+                        #( #event_decoding )*
+                        _ => Err(_wayrs_client::proxy::BadMessage),
+                    }
+                }
+            }
+
             impl TryFrom<_wayrs_client::object::Object> for #proxy_name {
                 type Error = _wayrs_client::proxy::WrongObject;
 
-                fn try_from(object: _wayrs_client::object::Object) -> std::result::Result<Self, Self::Error> {
+                fn try_from(object: _wayrs_client::object::Object) -> ::std::result::Result<Self, _wayrs_client::proxy::WrongObject> {
                     if object.interface == Self::INTERFACE {
                         Ok(Self {
                             id: object.id,
@@ -437,7 +436,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
 
     let msg_args = request.args.iter().map(|arg| {
         let arg_name = make_ident(&arg.name);
-        let arg_ty = map_arg_to_argval(arg);
+        let arg_ty = map_arg_to_argval(arg, false);
         match arg.arg_type.as_str() {
             "new_id" => quote! { _wayrs_client::wire::ArgValue::#arg_ty(new_object.into()) },
             "object" if arg.allow_null => {
@@ -572,7 +571,7 @@ fn map_arg_to_argtype(arg: &Argument) -> TokenStream {
     }
 }
 
-fn map_arg_to_argval(arg: &Argument) -> TokenStream {
+fn map_arg_to_argval(arg: &Argument, is_event: bool) -> TokenStream {
     match arg.arg_type.as_str() {
         "int" if arg.enum_type.is_some() => quote!(Uint),
         "int" => quote!(Int),
@@ -582,9 +581,13 @@ fn map_arg_to_argval(arg: &Argument) -> TokenStream {
             false => quote!(Object),
             true => quote!(OptObject),
         },
-        "new_id" => match arg.interface.as_deref() {
-            Some(_) => quote!(NewId),
-            None => quote!(AnyNewId),
+        "new_id" if is_event => match arg.interface.as_deref() {
+            Some(_) => quote!(NewIdEvent),
+            None => unimplemented!(),
+        },
+        "new_id" if !is_event => match arg.interface.as_deref() {
+            Some(_) => quote!(NewIdRequest),
+            None => quote!(AnyNewIdRequest),
         },
         "string" => match arg.allow_null {
             false => quote!(String),

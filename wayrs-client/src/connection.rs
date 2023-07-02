@@ -11,7 +11,7 @@ use crate::protocol::wl_registry::GlobalArgs;
 use crate::protocol::*;
 use crate::proxy::Proxy;
 use crate::socket::{BufferedSocket, SendMessageError};
-use crate::wire::{ArgType, ArgValue, DebugMessage, Message};
+use crate::wire::{ArgValue, DebugMessage, Message};
 use crate::{ConnectError, IoMode};
 
 #[cfg(feature = "tokio")]
@@ -277,13 +277,15 @@ impl<D> Connection<D> {
         let is_alive = obj.is_alive;
         let object = obj.object;
 
-        let event = self.socket.recv_message(header, object.interface, mode)?;
+        let event = self
+            .socket
+            .recv_message(header, object.interface, object.version, mode)?;
         if self.debug {
             eprintln!("[wayrs] {:?}", DebugMessage::new(&event, true, object));
         }
 
         if event.header.object_id == ObjectId::DISPLAY {
-            return match self.object_mgr.display.parse_event(event).unwrap() {
+            return match wl_display::Event::try_from(event).unwrap() {
                 // Catch protocol error as early as possible
                 wl_display::Event::Error(err) => Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -301,21 +303,13 @@ impl<D> Connection<D> {
         }
 
         if event.header.object_id == self.registry.id() {
-            return Ok(Some(QueuedEvent::RegistryEvent(
-                self.registry.parse_event(event).unwrap(),
-            )));
+            return Ok(Some(QueuedEvent::RegistryEvent(event.try_into().unwrap())));
         }
 
         // Allocate objects if necessary
-        for (arg, arg_ty) in event
-            .args
-            .iter()
-            .zip(object.interface.events[header.opcode as usize].signature)
-        {
-            if let ArgValue::NewId(id) = *arg {
-                let ArgType::NewId(interface) = arg_ty else { panic!() };
-                self.object_mgr
-                    .register_server_object(id, interface, object.version);
+        for arg in &event.args {
+            if let ArgValue::NewIdEvent(new_obj) = *arg {
+                self.object_mgr.register_server_object(new_obj);
             }
         }
 
@@ -534,7 +528,7 @@ impl<D> Connection<D> {
         // Note: if `F` does not capture anything, this `Box::new` will not allocate.
         Box::new(move |conn, state, object, event| {
             let proxy: P = object.try_into().unwrap();
-            let event = proxy.parse_event(event).unwrap();
+            let event = event.try_into().unwrap();
             cb(conn, state, proxy, event);
         })
     }
