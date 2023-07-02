@@ -321,22 +321,6 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                 }
             }
 
-            impl From<#proxy_name> for _wayrs_client::object::Object {
-                fn from(proxy: #proxy_name) -> Self {
-                    Self {
-                        id: proxy.id,
-                        version: proxy.version,
-                        interface: #proxy_name::INTERFACE,
-                    }
-                }
-            }
-
-            impl From<#proxy_name> for _wayrs_client::object::ObjectId {
-                fn from(proxy: #proxy_name) -> Self {
-                    proxy.id
-                }
-            }
-
             impl ::std::fmt::Debug for #proxy_name {
                 fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                     write!(
