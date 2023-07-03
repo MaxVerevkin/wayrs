@@ -257,9 +257,28 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         }
     });
 
+    let visibility = if iface.name == "wl_display" {
+        quote!(pub(crate))
+    } else {
+        quote!(pub)
+    };
+
+    let extra_impl = if iface.name == "wl_display" {
+        quote! {
+            impl WlDisplay {
+                pub const INSTANCE: Self = Self {
+                    id: _wayrs_client::object::ObjectId::DISPLAY,
+                    version: 1,
+                };
+            }
+        }
+    } else {
+        quote!()
+    };
+
     quote! {
         #mod_doc
-        pub mod #mod_name {
+        #visibility mod #mod_name {
             use #wayrs_client_path as _wayrs_client;
             use _wayrs_client::proxy::Proxy;
             use _wayrs_client::connection::Connection;
@@ -270,6 +289,8 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                 id: _wayrs_client::object::ObjectId,
                 version: u32,
             }
+
+            #extra_impl
 
             impl Proxy for #proxy_name {
                 type Event = Event;
@@ -375,7 +396,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             }
         }
 
-        pub use #mod_name::#proxy_name;
+        #visibility use #mod_name::#proxy_name;
     }
 }
 

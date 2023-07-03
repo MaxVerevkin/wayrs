@@ -84,7 +84,7 @@ impl<D> Connection<D> {
             debug: std::env::var("WAYRS_DEBUG").as_deref() == Ok("1"),
         };
 
-        this.registry = this.object_mgr.display.get_registry(&mut this);
+        this.registry = WlDisplay::INSTANCE.get_registry(&mut this);
 
         Ok(this)
     }
@@ -209,7 +209,7 @@ impl<D> Connection<D> {
     /// This function flushes the buffer of pending requests. All received events during the
     /// roundtrip are queued.
     pub fn blocking_roundtrip(&mut self) -> io::Result<()> {
-        let sync_cb = self.object_mgr.display.sync(self);
+        let sync_cb = WlDisplay::INSTANCE.sync(self);
         self.flush(IoMode::Blocking)?;
 
         loop {
@@ -227,7 +227,7 @@ impl<D> Connection<D> {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn async_roundtrip(&mut self) -> io::Result<()> {
-        let sync_cb = self.object_mgr.display.sync(self);
+        let sync_cb = WlDisplay::INSTANCE.sync(self);
         self.async_flush().await?;
 
         loop {

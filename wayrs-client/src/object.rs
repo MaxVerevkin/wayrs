@@ -6,7 +6,6 @@ use std::num::NonZeroU32;
 use crate::connection::GenericCallback;
 use crate::interface::Interface;
 use crate::protocol::WlDisplay;
-use crate::proxy::Proxy;
 
 /// A Wayland object.
 ///
@@ -97,7 +96,6 @@ pub(crate) struct ObjectManager<D> {
     vacant_ids: Vec<ObjectId>,
     client_objects: Vec<Option<ObjectState<D>>>,
     server_objects: Vec<Option<ObjectState<D>>>,
-    pub display: WlDisplay,
 }
 
 pub(crate) struct ObjectState<D> {
@@ -112,7 +110,6 @@ impl<D> ObjectManager<D> {
             vacant_ids: Vec::new(),
             client_objects: Vec::with_capacity(16),
             server_objects: Vec::new(),
-            display: WlDisplay::new(ObjectId::DISPLAY, 1),
         };
 
         // Dummy NULL object
@@ -120,11 +117,7 @@ impl<D> ObjectManager<D> {
 
         // Display
         this.client_objects.push(Some(ObjectState {
-            object: Object {
-                id: ObjectId::DISPLAY,
-                interface: WlDisplay::INTERFACE,
-                version: 1,
-            },
+            object: WlDisplay::INSTANCE.into(),
             is_alive: true,
             cb: None,
         }));
