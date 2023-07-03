@@ -64,6 +64,11 @@ impl Debug for Object {
     }
 }
 
+/// A Wayland object ID.
+///
+/// Uniquely identifies an object at each point of time. Note that an ID may have a limited
+/// lifetime. Also an ID which once pointed to a certain object, may point to a different object in
+/// the future, due to ID reuse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ObjectId(pub(crate) NonZeroU32);
 
@@ -77,10 +82,12 @@ impl ObjectId {
         self.0.get()
     }
 
+    /// Whether the object with this ID was created by the server
     pub fn created_by_server(self) -> bool {
         self >= Self::MIN_SERVER
     }
 
+    /// Whether the object with this ID was created by the client
     pub fn created_by_client(self) -> bool {
         self <= Self::MAX_CLIENT
     }
