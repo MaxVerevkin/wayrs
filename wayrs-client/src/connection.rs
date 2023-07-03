@@ -495,6 +495,7 @@ impl<D> Connection<D> {
     }
 
     /// Allocate a new object. Returned object must be sent in a request as a "new_id" argument.
+    #[doc(hidden)]
     pub fn allocate_new_object<P: Proxy>(&mut self, version: u32) -> P {
         let id = self
             .object_mgr
@@ -506,6 +507,7 @@ impl<D> Connection<D> {
 
     /// Allocate a new object and set callback. Returned object must be sent in a request as a
     /// "new_id" argument.
+    #[doc(hidden)]
     pub fn allocate_new_object_with_cb<
         P: Proxy,
         F: FnMut(&mut Connection<D>, &mut D, P, P::Event) + Send + 'static,
