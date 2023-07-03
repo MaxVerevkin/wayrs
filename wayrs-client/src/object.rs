@@ -73,9 +73,9 @@ impl Debug for Object {
 pub struct ObjectId(pub(crate) NonZeroU32);
 
 impl ObjectId {
-    pub const DISPLAY: Self = Self(unsafe { NonZeroU32::new_unchecked(1) });
-    pub const MAX_CLIENT: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFEFFFFFF) });
-    pub const MIN_SERVER: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFF000000) });
+    pub(crate) const DISPLAY: Self = Self(unsafe { NonZeroU32::new_unchecked(1) });
+    pub(crate) const MAX_CLIENT: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFEFFFFFF) });
+    pub(crate) const MIN_SERVER: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFF000000) });
 
     /// Returns the numeric representation of the ID
     pub fn as_u32(self) -> u32 {
