@@ -13,7 +13,7 @@ pub struct MessageHeader {
 }
 
 impl MessageHeader {
-    pub fn size() -> u16 {
+    pub const fn size() -> u16 {
         8
     }
 }
