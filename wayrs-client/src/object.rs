@@ -11,6 +11,10 @@ use crate::proxy::Proxy;
 /// A Wayland object.
 ///
 /// The [`Debug`] representation is `<interface>@<id>v<version>`.
+///
+/// [`Eq`], [`Ord`] and [`Hash`] implementations are delegated to the object's ID for performance
+/// reasons. This is fine because two different objects with the same ID must not exist at the same
+/// time.
 #[derive(Clone, Copy)]
 pub struct Object {
     pub id: ObjectId,
