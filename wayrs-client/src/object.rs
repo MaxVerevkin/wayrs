@@ -1,3 +1,4 @@
+use std::cmp;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
 use std::num::NonZeroU32;
@@ -18,6 +19,7 @@ pub struct Object {
 }
 
 impl PartialEq for Object {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
@@ -25,7 +27,22 @@ impl PartialEq for Object {
 
 impl Eq for Object {}
 
+impl PartialOrd for Object {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.id.partial_cmp(&other.id)
+    }
+}
+
+impl Ord for Object {
+    #[inline]
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
 impl Hash for Object {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
