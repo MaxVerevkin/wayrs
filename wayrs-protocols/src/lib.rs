@@ -93,6 +93,13 @@ gen! {
 }
 
 gen! {
+    mod: security_context_v1,
+    feat: "security-context-v1",
+    file: "wayland-protocols/staging/security-context/security-context-v1.xml",
+    deps: [],
+}
+
+gen! {
     mod: single_pixel_buffer_v1,
     feat: "single-pixel-buffer-v1",
     file: "wayland-protocols/staging/single-pixel-buffer/single-pixel-buffer-v1.xml",
