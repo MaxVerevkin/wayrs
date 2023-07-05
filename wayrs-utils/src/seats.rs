@@ -1,4 +1,56 @@
 //! wl_seat helper
+//!
+//! To use this abstraction, create an instance of [`Seats`] using [`Seats::bind`], store it in your
+//! state struct and finally implement [`SeatHandler`] for your state type.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use wayrs_utils::seats::*;
+//! use wayrs_client::connection::Connection;
+//! use wayrs_client::protocol::*;
+//! use wayrs_client::proxy::Proxy;
+//!
+//! #[derive(Debug)]
+//! struct State {
+//!     seats: Seats,
+//!     keyboards: Vec<(WlSeat, WlKeyboard)>,
+//! }
+//!
+//! impl SeatHandler for State {
+//!     fn get_seats(&mut self) -> &mut Seats {
+//!         &mut self.seats
+//!     }
+//!
+//!     // All other functions are optional to implement
+//!
+//!     fn keyboard_added(&mut self, conn: &mut Connection<Self>, seat: WlSeat) {
+//!         self.keyboards.push((seat, seat.get_keyboard(conn)));
+//!     }
+//!
+//!     fn keyboard_removed(&mut self, conn: &mut Connection<Self>, seat: WlSeat) {
+//!         let i = self.keyboards.iter().position(|&(s, _)| s == seat).unwrap();
+//!         let (_, keyboard) = self.keyboards.swap_remove(i);
+//!         if keyboard.version() >= 3 {
+//!             keyboard.release(conn);
+//!         }
+//!     }
+//! }
+//!
+//! let mut conn = Connection::connect().unwrap();
+//! let globals = conn.blocking_collect_initial_globals().unwrap();
+//!
+//! let mut state = State {
+//!     // NOTE: you can pass `&[]` if you choose not to collect initial globals.
+//!     seats: Seats::bind(&mut conn, &globals),
+//!     keyboards: Vec::new(),
+//! };
+//!
+//! conn.blocking_roundtrip().unwrap();
+//! conn.dispatch_events(&mut state);
+//!
+//! dbg!(state);
+//! ```
 
 use std::ffi::CString;
 
