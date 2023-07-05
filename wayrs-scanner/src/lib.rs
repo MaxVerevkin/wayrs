@@ -1,15 +1,16 @@
 mod parser;
 mod types;
+mod utils;
 
 use std::path::PathBuf;
 
-use convert_case::{Case, Casing};
 use proc_macro2::{Span, TokenStream};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{format_ident, quote};
 
 use crate::parser::Parser;
 use crate::types::*;
+use crate::utils::*;
 
 fn wayrs_client_path() -> TokenStream {
     match crate_name("wayrs-client") {
@@ -69,12 +70,9 @@ fn make_ident(name: impl AsRef<str>) -> syn::Ident {
 fn make_pascal_case_ident(name: impl AsRef<str>) -> syn::Ident {
     let name = name.as_ref();
     if name.chars().next().unwrap().is_ascii_digit() {
-        syn::Ident::new_raw(
-            &format!("_{}", name.to_case(Case::Pascal)),
-            Span::call_site(),
-        )
+        syn::Ident::new_raw(&format!("_{name}"), Span::call_site())
     } else {
-        syn::Ident::new_raw(&name.to_case(Case::Pascal), Span::call_site())
+        syn::Ident::new_raw(&snake_to_pascal(name), Span::call_site())
     }
 }
 
