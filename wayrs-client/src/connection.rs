@@ -308,12 +308,12 @@ impl<D> Connection<D> {
 
         loop {
             let mut fd_guard = async_fd.readable_mut().await?;
-            match fd_guard.try_io(|_| self.recv_event(IoMode::NonBlocking)) {
-                Ok(result) => {
+            match self.recv_event(IoMode::NonBlocking) {
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => fd_guard.clear_ready(),
+                result => {
                     self.async_fd = Some(async_fd);
                     return result;
                 }
-                Err(_would_block) => continue,
             }
         }
     }
@@ -391,12 +391,12 @@ impl<D> Connection<D> {
 
         loop {
             let mut fd_guard = async_fd.writable_mut().await?;
-            match fd_guard.try_io(|_| self.flush(IoMode::NonBlocking)) {
-                Ok(result) => {
+            match self.flush(IoMode::NonBlocking) {
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => fd_guard.clear_ready(),
+                result => {
                     self.async_fd = Some(async_fd);
                     return result;
                 }
-                Err(_would_block) => continue,
             }
         }
     }
