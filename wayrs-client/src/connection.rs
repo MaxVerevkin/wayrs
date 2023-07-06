@@ -22,7 +22,7 @@ use tokio::io::unix::AsyncFd;
 /// This struct manages a buffered Wayland socket, keeps track of objects and request/event queues
 /// and dispatches object events.
 ///
-/// Set `WAYRS_DEBUG=1` environment variable to get debug messages.
+/// Set `WAYLAND_DEBUG=1` environment variable to get debug messages.
 pub struct Connection<D> {
     socket: BufferedSocket,
 
@@ -81,7 +81,7 @@ impl<D> Connection<D> {
             #[cfg(feature = "tokio")]
             async_fd: None,
 
-            debug: std::env::var("WAYRS_DEBUG").as_deref() == Ok("1"),
+            debug: std::env::var_os("WAYLAND_DEBUG").is_some(),
         };
 
         this.registry = WlDisplay::INSTANCE.get_registry(&mut this);
