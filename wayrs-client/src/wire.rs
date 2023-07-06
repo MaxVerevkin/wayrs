@@ -156,7 +156,7 @@ impl Debug for DebugMessage<'_> {
                 ArgValue::AnyNewIdRequest(x) | ArgValue::NewIdEvent(x) => write!(f, "{x:?}")?,
                 ArgValue::String(x) | ArgValue::OptString(Some(x)) => write!(f, "{x:?}")?,
                 ArgValue::Array(_) => write!(f, "<array>")?,
-                ArgValue::Fd(x) => write!(f, "{}", x.as_raw_fd())?,
+                ArgValue::Fd(x) => write!(f, "fd {}", x.as_raw_fd())?,
             }
         }
 
