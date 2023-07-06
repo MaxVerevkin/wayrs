@@ -151,9 +151,16 @@ impl Debug for DebugMessage<'_> {
                     let ArgType::NewId(new_id_iface) = &msg_desc.signature[arg_i] else {
                         panic!("signature mismatch")
                     };
-                    write!(f, "{}@{}", new_id_iface.name.to_string_lossy(), id.as_u32())?
+                    write!(
+                        f,
+                        "new id {}@{}",
+                        new_id_iface.name.to_string_lossy(),
+                        id.as_u32()
+                    )?
                 }
-                ArgValue::AnyNewIdRequest(x) | ArgValue::NewIdEvent(x) => write!(f, "{x:?}")?,
+                ArgValue::AnyNewIdRequest(x) | ArgValue::NewIdEvent(x) => {
+                    write!(f, "new id {x:?}")?
+                }
                 ArgValue::String(x) | ArgValue::OptString(Some(x)) => write!(f, "{x:?}")?,
                 ArgValue::Array(_) => write!(f, "<array>")?,
                 ArgValue::Fd(x) => write!(f, "fd {}", x.as_raw_fd())?,
