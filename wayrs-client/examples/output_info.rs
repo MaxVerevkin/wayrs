@@ -6,11 +6,10 @@ use wayrs_client::proxy::Proxy;
 use wayrs_client::{Connection, IoMode};
 
 fn main() {
-    let mut conn = Connection::connect().unwrap();
-    let initial_globals = conn.blocking_collect_initial_globals().unwrap();
+    let (mut conn, globals) = Connection::connect_and_collect_globals().unwrap();
 
     let mut state = State {
-        outputs: initial_globals
+        outputs: globals
             .iter()
             .filter(|g| g.is::<WlOutput>())
             .map(|g| g.bind_with_cb(&mut conn, 2..=4, wl_output_cb).unwrap())

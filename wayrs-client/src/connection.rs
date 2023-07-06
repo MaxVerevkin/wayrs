@@ -89,58 +89,37 @@ impl<D> Connection<D> {
         Ok(this)
     }
 
-    /// Collect the initial set of advertised globals. This function must be called right after
-    /// [`connect`](Self::connect) or not called at all.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use wayrs_client::Connection;
-    /// struct MyState;
-    /// let mut conn = Connection::<MyState>::connect().unwrap();
-    /// let globals = conn.blocking_collect_initial_globals().unwrap();
-    /// ```
-    pub fn blocking_collect_initial_globals(&mut self) -> io::Result<Vec<GlobalArgs>> {
-        self.blocking_roundtrip()?;
-
-        let mut globals = Vec::new();
-
-        for event in self.event_queue.drain(..) {
-            let QueuedEvent::RegistryEvent(event) = event else {
-                panic!()
-            };
-            match event {
-                wl_registry::Event::Global(global) => globals.push(global),
-                wl_registry::Event::GlobalRemove(name) => {
-                    globals.retain(|g| g.name != name);
-                }
-            }
-        }
-
-        Ok(globals)
+    /// [`connect`](Self::connect) and collect the initial set of advertised globals.
+    pub fn connect_and_collect_globals() -> Result<(Self, Vec<GlobalArgs>), ConnectError> {
+        let mut this = Self::connect()?;
+        this.blocking_roundtrip()?;
+        let globals = this
+            .event_queue
+            .drain(..)
+            .map(|event| match event {
+                QueuedEvent::RegistryEvent(wl_registry::Event::Global(global)) => global,
+                _ => unreachable!("unexpected event during the initial burst of globals"),
+            })
+            .collect();
+        Ok((this, globals))
     }
 
-    /// Async version of [`blocking_collect_initial_globals`](Self::blocking_collect_initial_globals).
+    /// Async version of [`connect_and_collect_globals`](Self::connect_and_collect_globals).
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    pub async fn async_collect_initial_globals(&mut self) -> io::Result<Vec<GlobalArgs>> {
-        self.async_roundtrip().await?;
-
-        let mut globals = Vec::new();
-
-        for event in self.event_queue.drain(..) {
-            let QueuedEvent::RegistryEvent(event) = event else {
-                panic!()
-            };
-            match event {
-                wl_registry::Event::Global(global) => globals.push(global),
-                wl_registry::Event::GlobalRemove(name) => {
-                    globals.retain(|g| g.name != name);
-                }
-            }
-        }
-
-        Ok(globals)
+    pub async fn async_connect_and_collect_globals() -> Result<(Self, Vec<GlobalArgs>), ConnectError>
+    {
+        let mut this = Self::connect()?;
+        this.async_roundtrip().await?;
+        let globals = this
+            .event_queue
+            .drain(..)
+            .map(|event| match event {
+                QueuedEvent::RegistryEvent(wl_registry::Event::Global(global)) => global,
+                _ => unreachable!("unexpected event during the initial burst of globals"),
+            })
+            .collect();
+        Ok((this, globals))
     }
 
     /// Get Wayland registry.

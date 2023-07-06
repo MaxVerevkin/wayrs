@@ -37,8 +37,7 @@
 //!     }
 //! }
 //!
-//! let mut conn = Connection::connect().unwrap();
-//! let globals = conn.blocking_collect_initial_globals().unwrap();
+//! let (mut conn, globals) = Connection::connect_and_collect_globals().unwrap();
 //!
 //! let mut state = State {
 //!     // NOTE: you can pass `&[]` if you choose not to collect initial globals.
