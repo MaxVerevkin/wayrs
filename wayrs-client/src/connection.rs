@@ -441,12 +441,7 @@ impl<D> Connection<D> {
 
                     match &mut object_cb {
                         Some(cb) => cb(self, state, object, event),
-                        None => {
-                            if self.debug {
-                                eprintln!("[wayrs] no callback for {object:?}");
-                            }
-                            continue;
-                        }
+                        None => continue, // Skip if object has no callback
                     }
 
                     let object = self.object_mgr.get_object_mut(object.id).unwrap();
