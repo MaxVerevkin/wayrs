@@ -137,7 +137,7 @@ impl Debug for DebugMessage<'_> {
 
         for (arg_i, arg) in self.message.args.iter().enumerate() {
             if arg_i != 0 {
-                write!(f, ",")?;
+                write!(f, ", ")?;
             }
             match arg {
                 ArgValue::Int(x) => write!(f, "{x}")?,
