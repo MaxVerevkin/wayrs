@@ -4,10 +4,10 @@ use std::fmt::{self, Debug};
 use std::os::unix::io::AsRawFd;
 use std::time::Duration;
 
-use wayrs_client::connection::Connection;
 use wayrs_client::protocol::wl_keyboard::{EnterArgs, LeaveArgs};
 use wayrs_client::protocol::*;
 use wayrs_client::proxy::Proxy;
+use wayrs_client::Connection;
 
 pub use xkbcommon::xkb;
 
@@ -116,7 +116,9 @@ fn wl_keyboard_cb<D: KeyboardHandler>(
             state.leave_surface(conn, wl_keyboard, args);
         }
         wl_keyboard::Event::Key(args) => {
-            let Some(xkb_state) = kbd.xkb_state.clone() else { return };
+            let Some(xkb_state) = kbd.xkb_state.clone() else {
+                return;
+            };
             let event = KeyboardEvent {
                 seat: kbd.seat,
                 keyboard: kbd.wl,

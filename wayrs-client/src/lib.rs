@@ -2,7 +2,6 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub mod connection;
 pub mod global;
 pub mod interface;
 pub mod object;
@@ -10,8 +9,10 @@ pub mod protocol;
 pub mod proxy;
 pub mod wire;
 
+mod connection;
 mod socket;
 
+pub use connection::Connection;
 pub use wayrs_scanner as scanner;
 
 use std::ffi::CStr;

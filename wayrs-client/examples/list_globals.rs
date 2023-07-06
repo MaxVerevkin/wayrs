@@ -1,4 +1,4 @@
-use wayrs_client::connection::Connection;
+use wayrs_client::Connection;
 
 fn main() {
     let mut conn = Connection::<()>::connect().unwrap();

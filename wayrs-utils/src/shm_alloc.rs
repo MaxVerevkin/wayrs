@@ -7,9 +7,9 @@ use std::sync::Arc;
 
 use memmap2::MmapMut;
 
-use wayrs_client::connection::Connection;
 use wayrs_client::global::{BindError, Globals, GlobalsExt};
 use wayrs_client::protocol::*;
+use wayrs_client::Connection;
 
 use wl_shm::{Format, WlShm};
 use wl_shm_pool::WlShmPool;

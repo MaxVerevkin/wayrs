@@ -1,10 +1,9 @@
 use std::ffi::CString;
 
-use wayrs_client::connection::Connection;
 use wayrs_client::global::GlobalExt;
 use wayrs_client::protocol::wl_output::{self, WlOutput};
 use wayrs_client::protocol::wl_registry::{self, GlobalArgs};
-use wayrs_client::IoMode;
+use wayrs_client::{Connection, IoMode};
 
 fn main() {
     let mut conn = Connection::connect().unwrap();

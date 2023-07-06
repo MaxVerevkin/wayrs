@@ -279,7 +279,6 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         #visibility mod #mod_name {
             use #wayrs_client_path as _wayrs_client;
             use _wayrs_client::proxy::Proxy;
-            use _wayrs_client::connection::Connection;
 
             #mod_doc
             #[derive(Clone, Copy)]
@@ -434,7 +433,10 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
         .find(|x| x.arg_type == "new_id")
         .map(|x| x.interface.as_deref());
 
-    let mut fn_args = vec![quote!(self), quote!(conn: &mut Connection<D>)];
+    let mut fn_args = vec![
+        quote!(self),
+        quote!(conn: &mut _wayrs_client::Connection<D>),
+    ];
     fn_args.extend(request.args.iter().flat_map(|arg| arg.as_request_fn_arg()));
 
     let msg_args = request.args.iter().map(|arg| {
@@ -494,7 +496,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                 &[
                     quote!(P: Proxy),
                     quote!(D),
-                    quote!(F: FnMut(&mut Connection<D>, &mut D, P, <P as Proxy>::Event) + Send + 'static),
+                    quote!(F: FnMut(&mut _wayrs_client::Connection<D>, &mut D, P, <P as Proxy>::Event) + Send + 'static),
                 ],
                 &fn_args,
                 quote!(P),
@@ -529,7 +531,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                 &format!("{}_with_cb", request.name),
                 &[
                     quote!(D),
-                    quote!(F: FnMut(&mut Connection<D>, &mut D, #proxy_path, <#proxy_path as Proxy>::Event) + Send + 'static),
+                    quote!(F: FnMut(&mut _wayrs_client::Connection<D>, &mut D, #proxy_path, <#proxy_path as Proxy>::Event) + Send + 'static),
                 ],
                 &fn_args,
                 proxy_path.clone(),

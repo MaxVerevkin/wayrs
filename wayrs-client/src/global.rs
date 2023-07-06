@@ -1,9 +1,9 @@
 use std::ffi::{CStr, CString};
 use std::ops::RangeInclusive;
 
-use crate::connection::Connection;
 use crate::protocol::wl_registry::GlobalArgs;
 use crate::proxy::Proxy;
+use crate::Connection;
 
 pub type Global = GlobalArgs;
 pub type Globals = [Global];

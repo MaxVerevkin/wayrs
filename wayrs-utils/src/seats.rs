@@ -7,7 +7,7 @@
 //!
 //! ```no_run
 //! use wayrs_utils::seats::*;
-//! use wayrs_client::connection::Connection;
+//! use wayrs_client::Connection;
 //! use wayrs_client::protocol::*;
 //! use wayrs_client::proxy::Proxy;
 //!
@@ -54,11 +54,11 @@
 
 use std::ffi::CString;
 
-use wayrs_client::connection::Connection;
 use wayrs_client::global::*;
 use wayrs_client::protocol::wl_seat::Capability;
 use wayrs_client::protocol::*;
 use wayrs_client::proxy::Proxy;
+use wayrs_client::Connection;
 
 pub trait SeatHandler: Sized + 'static {
     fn get_seats(&mut self) -> &mut Seats;
@@ -151,7 +151,9 @@ fn registry_cb<D: SeatHandler>(
             state.seat_added(conn, wl_seat);
         }
         wl_registry::Event::GlobalRemove(name) => {
-            let Some(i) = seat_state.seats.iter().position(|s| s.reg_name == *name) else { return };
+            let Some(i) = seat_state.seats.iter().position(|s| s.reg_name == *name) else {
+                return;
+            };
             let seat = seat_state.seats.swap_remove(i);
 
             if seat.capabilities.contains(Capability::Pointer) {

@@ -95,7 +95,7 @@ impl<D> Connection<D> {
     /// # Example
     ///
     /// ```no_run
-    /// # use wayrs_client::connection::Connection;
+    /// # use wayrs_client::Connection;
     /// struct MyState;
     /// let mut conn = Connection::<MyState>::connect().unwrap();
     /// let globals = conn.blocking_collect_initial_globals().unwrap();
@@ -106,7 +106,9 @@ impl<D> Connection<D> {
         let mut globals = Vec::new();
 
         for event in self.event_queue.drain(..) {
-            let QueuedEvent::RegistryEvent(event) = event else { panic!() };
+            let QueuedEvent::RegistryEvent(event) = event else {
+                panic!()
+            };
             match event {
                 wl_registry::Event::Global(global) => globals.push(global),
                 wl_registry::Event::GlobalRemove(name) => {
@@ -127,7 +129,9 @@ impl<D> Connection<D> {
         let mut globals = Vec::new();
 
         for event in self.event_queue.drain(..) {
-            let QueuedEvent::RegistryEvent(event) = event else { panic!() };
+            let QueuedEvent::RegistryEvent(event) = event else {
+                panic!()
+            };
             match event {
                 wl_registry::Event::Global(global) => globals.push(global),
                 wl_registry::Event::GlobalRemove(name) => {
