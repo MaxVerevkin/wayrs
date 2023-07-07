@@ -228,16 +228,17 @@ impl InitShmPool {
         }
     }
 
+    /// Resize the memmap, at least doubling the size.
     fn resize<D>(&mut self, conn: &mut Connection<D>, new_len: usize) {
         if new_len > self.len {
-            self.len = new_len;
-            self.file.set_len(new_len as u64).unwrap();
-            self.pool.resize(conn, new_len as i32);
+            self.len = usize::max(self.len * 2, new_len);
+            self.file.set_len(self.len as u64).unwrap();
+            self.pool.resize(conn, self.len as i32);
             self.mmap = unsafe { MmapMut::map_mut(&self.file).expect("memory mapping failed") };
         }
     }
 
-    // Returns segment index, does not resize
+    /// Returns segment index, does not resize
     fn try_alloc_in_place<D>(
         &mut self,
         conn: &mut Connection<D>,
@@ -309,7 +310,7 @@ impl InitShmPool {
             return index;
         }
 
-        match self.segments.last_mut() {
+        let segments_len = match self.segments.last_mut() {
             Some(segment)
                 if segment
                     .refcnt
@@ -319,9 +320,10 @@ impl InitShmPool {
                 if let Some(buffer) = segment.buffer.take() {
                     buffer.0.destroy(conn);
                 }
-                let new_size = self.len + len - segment.len;
                 segment.len = len;
+                let new_size = segment.offset + segment.len;
                 self.resize(conn, new_size);
+                new_size
             }
             _ => {
                 let offset = self.len;
@@ -332,7 +334,18 @@ impl InitShmPool {
                     refcnt: Arc::new(AtomicU32::new(1)),
                     buffer: None,
                 });
+                offset + len
             }
+        };
+
+        // Create a segment if `self.resize()` over allocated
+        if segments_len > self.len {
+            self.segments.push(Segment {
+                offset: segments_len,
+                len: self.len - segments_len,
+                refcnt: Arc::new(AtomicU32::new(0)),
+                buffer: None,
+            });
         }
 
         self.segments.len() - 1
