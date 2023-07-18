@@ -197,7 +197,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         if en.is_bitfield {
             quote! {
                 #doc
-                #[derive(Debug, Clone, Copy)]
+                #[derive(Debug, Default, Clone, Copy)]
                 pub struct #name(u32);
                 impl From<#name> for u32 {
                     fn from(val: #name) -> Self {
