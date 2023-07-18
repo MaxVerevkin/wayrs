@@ -17,3 +17,7 @@ pub mod cursor;
 #[cfg(feature = "keyboard")]
 #[cfg_attr(docsrs, doc(cfg(feature = "keyboard")))]
 pub mod keyboard;
+
+#[cfg(feature = "dmabuf_feedback")]
+#[cfg_attr(docsrs, doc(cfg(feature = "dmabuf_feedback")))]
+pub mod dmabuf_feedback;
