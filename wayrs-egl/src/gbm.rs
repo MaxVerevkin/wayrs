@@ -1,6 +1,6 @@
+use std::ffi::CStr;
 use std::io;
-use std::os::fd::{FromRawFd, RawFd};
-use std::{ffi::CStr, os::fd::OwnedFd};
+use std::os::unix::io::{FromRawFd, OwnedFd, RawFd};
 
 use crate::{Error, Fourcc, Result};
 

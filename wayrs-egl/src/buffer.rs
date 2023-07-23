@@ -1,4 +1,4 @@
-use std::os::fd::AsRawFd;
+use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Mutex};
 
 use wayrs_client::protocol::*;
@@ -13,6 +13,7 @@ use crate::{egl_ffi, EglDisplay, Error, Fourcc, Result};
 /// [`WlBuffer`]. To allocate a buffer, use [`EglDisplay::alloc_buffer`].
 ///
 /// Buffers can and should be reused.
+// TODO: derive Debug when MSRV is >= 1.70
 pub struct Buffer {
     state: Arc<Mutex<BufferState>>,
     wl_buffer: WlBuffer,
