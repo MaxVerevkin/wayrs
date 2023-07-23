@@ -3,7 +3,7 @@ name = "wayrs-protocols"
 description = "A collection of Wayland protocols to use with wayrs-client"
 repository = "https://github.com/MaxVerevkin/wayrs"
 readme = "../README.md"
-version = "0.10.5"
+version = "0.11.0"
 edition = "2021"
 rust-version = "1.65"
 license = "MIT"
@@ -64,7 +64,7 @@ wlr-screencopy-unstable-v1 = []
 wlr-virtual-pointer-unstable-v1 = []
 
 [dependencies]
-wayrs-client = { version = "0.10", path = "../wayrs-client" }
+wayrs-client = { version = "0.11", path = "../wayrs-client" }
 
 [package.metadata.docs.rs]
 # To build locally:
