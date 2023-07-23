@@ -1,2 +1,2 @@
 [workspace]
-members = ["wayrs-client", "wayrs-scanner", "wayrs-protocols", "wayrs-utils"]
+members = ["wayrs-client", "wayrs-scanner", "wayrs-protocols", "wayrs-utils", "wayrs-egl"]

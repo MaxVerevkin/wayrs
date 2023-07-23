@@ -1,0 +1,24 @@
+[package]
+name = "wayrs-egl"
+description = "EGL for wayrs-client"
+repository = "https://github.com/MaxVerevkin/wayrs"
+readme = "../README.md"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.65"
+license = "MIT"
+authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
+keywords = ["wayland", "egl", "opengl"]
+
+[dependencies]
+gbm-sys = "0.2"
+libc = "0.2"
+memmap2 = "0.7"
+thiserror = "1.0"
+wayrs-client = { version = "0.10", path = "../wayrs-client" }
+wayrs-protocols = { version = "0.10", path = "../wayrs-protocols", features = ["linux-dmabuf-unstable-v1"] }
+
+[dev-dependencies]
+gles31 = "1.0"
+wayrs-protocols = { version = "0.10", path = "../wayrs-protocols", features = ["xdg-shell"] }
+wayrs-utils = { version = "0.6", path = "../wayrs-utils", features = ["dmabuf_feedback"] }
