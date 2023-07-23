@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
-        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
       - uses: actions/checkout@v3
         with:
           submodules: recursive
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
-        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
       - uses: actions/checkout@v3
         with:
           submodules: recursive
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
-        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
       - name: Get required packages
         run: sudo apt-get install fd-find
       - uses: actions/checkout@v3
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
-        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
       - uses: actions/checkout@v3
         with:
           submodules: recursive
