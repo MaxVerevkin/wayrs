@@ -262,11 +262,11 @@
 	created, but using the new size.  This request can only be
 	used to make the pool bigger.
 
-        This request only changes the amount of bytes that are mmapped
-        by the server and does not touch the file corresponding to the
-        file descriptor passed at creation time. It is the client's
-        responsibility to ensure that the file is at least as big as
-        the new pool size.
+	This request only changes the amount of bytes that are mmapped
+	by the server and does not touch the file corresponding to the
+	file descriptor passed at creation time. It is the client's
+	responsibility to ensure that the file is at least as big as
+	the new pool size.
       </description>
       <arg name="size" type="int" summary="new size of the pool, in bytes"/>
     </request>
@@ -1435,7 +1435,7 @@
       <entry name="invalid_size" value="2" summary="buffer size is invalid"/>
       <entry name="invalid_offset" value="3" summary="buffer offset is invalid"/>
       <entry name="defunct_role_object" value="4"
-             summary="surface was destroyed before its role object"/>
+	     summary="surface was destroyed before its role object"/>
     </enum>
 
     <request name="destroy" type="destructor">
@@ -1464,9 +1464,9 @@
 
 	When the bound wl_surface version is 5 or higher, passing any
 	non-zero x or y is a protocol violation, and will result in an
-        'invalid_offset' error being raised. The x and y arguments are ignored
-        and do not change the pending state. To achieve equivalent semantics,
-        use wl_surface.offset.
+	'invalid_offset' error being raised. The x and y arguments are ignored
+	and do not change the pending state. To achieve equivalent semantics,
+	use wl_surface.offset.
 
 	Surface contents are double-buffered state, see wl_surface.commit.
 
