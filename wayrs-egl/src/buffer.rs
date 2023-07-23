@@ -13,7 +13,6 @@ use crate::{egl_ffi, EglDisplay, Error, Fourcc, Result};
 /// [`WlBuffer`]. To allocate a buffer, use [`EglDisplay::alloc_buffer`].
 ///
 /// Buffers can and should be reused.
-#[derive(Debug)]
 pub struct Buffer {
     state: Arc<Mutex<BufferState>>,
     wl_buffer: WlBuffer,
