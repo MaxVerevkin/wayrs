@@ -27,7 +27,7 @@
 //! renderbuffer object using [`Buffer::set_as_gl_renderbuffer_storage`]. After rendering, attach
 //! and commit [`Buffer::wl_buffer`].
 //!
-//! See an example in `examples/triangle.rs`.
+//! See an example in [`examples/triangle.rs`](https://github.com/MaxVerevkin/wayrs/blob/main/wayrs-egl/examples/triangle.rs).
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
