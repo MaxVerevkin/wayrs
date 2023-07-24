@@ -215,3 +215,79 @@ impl Drop for Buffer {
         unsafe { egl_ffi::eglDestroyImage(self.egl_display, self.egl_image) };
     }
 }
+
+/// A pool of `N` buffers.
+pub struct BufferPool<const N: usize> {
+    buffers: [Option<Buffer>; N],
+}
+
+impl<const N: usize> Default for BufferPool<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<const N: usize> BufferPool<N> {
+    /// Create a new buffer pool.
+    pub fn new() -> Self {
+        Self {
+            buffers: std::array::from_fn(|_| None),
+        }
+    }
+
+    /// Get a buffer, reusing free buffers if possible.
+    ///
+    /// Returns `Ok(None)` if all buffers are currently in use.
+    pub fn get_buffer<D>(
+        &mut self,
+        egl_display: &EglDisplay,
+        conn: &mut Connection<D>,
+        width: u32,
+        height: u32,
+        fourcc: Fourcc,
+        modifiers: &[u64],
+    ) -> Result<Option<&Buffer>> {
+        // Try to find a free, compatible buffer.
+        for (i, buf) in self.buffers.iter().enumerate() {
+            if let Some(buf) = buf {
+                if buf.is_available()
+                    && buf.width() == width
+                    && buf.height() == height
+                    && buf.fourcc() == fourcc
+                    && modifiers.contains(&buf.modifier())
+                {
+                    return Ok(Some(self.buffers[i].as_ref().unwrap()));
+                }
+            }
+        }
+
+        // Try to find any free buffer.
+        let buf_i = 'blk: {
+            for (i, buf) in self.buffers.iter().enumerate() {
+                if buf.as_ref().map_or(true, |b| b.is_available()) {
+                    break 'blk i;
+                }
+            }
+            return Ok(None);
+        };
+
+        if let Some(old_buf) = self.buffers[buf_i].take() {
+            old_buf.destroy(conn);
+        }
+
+        Ok(Some(self.buffers[buf_i].insert(
+            egl_display.alloc_buffer(conn, width, height, fourcc, modifiers)?,
+        )))
+    }
+
+    /// Destroy all buffers in this pool.
+    ///
+    /// Not calling this function and just dropping the buffer pool will leak some resources.
+    pub fn destroy<D>(self, conn: &mut Connection<D>) {
+        for buf in self.buffers {
+            if let Some(buf) = buf {
+                buf.destroy(conn);
+            }
+        }
+    }
+}

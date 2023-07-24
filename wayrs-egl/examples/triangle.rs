@@ -5,6 +5,7 @@ use gles31::*;
 use wayrs_client::global::*;
 use wayrs_client::protocol::*;
 use wayrs_client::{Connection, IoMode};
+use wayrs_egl::BufferPool;
 use wayrs_egl::{egl_ffi, Buffer, DrmDevice, EglContext, EglDisplay, Fourcc};
 use wayrs_protocols::linux_dmabuf_unstable_v1::*;
 use wayrs_protocols::xdg_shell::*;
@@ -16,57 +17,14 @@ const BUFFERS: usize = 3;
 struct Renderer {
     format: Fourcc,
     modifiers: Vec<u64>,
-    swap_chain: SwapChain<BUFFERS>,
+    buffers: BufferPool<BUFFERS>,
     rbo: u32,
     screensize_loc: i32,
     time_loc: i32,
-    egl_display: EglDisplay,
+
     #[allow(dead_code)]
     egl_context: EglContext,
-}
-
-struct SwapChain<const N: usize> {
-    buffers: [Option<Buffer>; N],
-}
-
-impl<const N: usize> SwapChain<N> {
-    fn new() -> Self {
-        Self {
-            buffers: std::array::from_fn(|_| None),
-        }
-    }
-
-    fn get_buffer_and_swap<D>(
-        &mut self,
-        egl_display: &EglDisplay,
-        conn: &mut Connection<D>,
-        width: u32,
-        height: u32,
-        fourcc: Fourcc,
-        modifiers: &[u64],
-    ) -> wayrs_egl::Result<Option<&Buffer>> {
-        if let Some(buf) = self.buffers[0].take() {
-            if !buf.is_available() {
-                self.buffers[0] = Some(buf);
-                return Ok(None);
-            }
-            if buf.width() == width
-                && buf.height() == height
-                && buf.fourcc() == fourcc
-                && modifiers.contains(&buf.modifier())
-            {
-                self.buffers.rotate_right(1);
-                return Ok(Some(self.buffers[1].insert(buf)));
-            }
-            buf.destroy(conn);
-        }
-
-        self.buffers.rotate_right(1);
-        let buf = self.buffers[1]
-            .insert(egl_display.alloc_buffer(conn, width, height, fourcc, modifiers)?);
-
-        Ok(Some(buf))
-    }
+    egl_display: EglDisplay,
 }
 
 impl Renderer {
@@ -195,17 +153,16 @@ void main() {
             glVertexAttribPointer(0, 3, GL_FLOAT, 0, 0, std::ptr::null());
         }
 
-        let swap_chain = SwapChain::new();
-
         Self {
             format,
             modifiers,
-            swap_chain,
+            buffers: BufferPool::new(),
             rbo,
             screensize_loc,
             time_loc,
-            egl_display,
+
             egl_context,
+            egl_display,
         }
     }
 
@@ -217,8 +174,8 @@ void main() {
         time: f32,
     ) -> Option<&Buffer> {
         let buf = self
-            .swap_chain
-            .get_buffer_and_swap(
+            .buffers
+            .get_buffer(
                 &self.egl_display,
                 conn,
                 width,

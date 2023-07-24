@@ -22,10 +22,11 @@
 //! 1. Load graphics API functons using [`egl_ffi::eglGetProcAddress`].
 //! 1. Assert that `GL_OES_EGL_image` is supported.
 //! 1. Setup a framebuffer and a renderbuffer objects.
+//! 1. Create a [`BufferPool`] with the desired number of buffers. Three may be a good choice. This step is optional, you may manually manage your buffers.
 //!
-//! Before rendering, allocate (or if you can reuse already allocated) [`Buffer`] and link it to your
-//! renderbuffer object using [`Buffer::set_as_gl_renderbuffer_storage`]. After rendering, attach
-//! and commit [`Buffer::wl_buffer`].
+//! Before rendering, select a free [`Buffer`] and link it to your renderbuffer object using
+//! [`Buffer::set_as_gl_renderbuffer_storage`]. After rendering, attach and commit
+//! [`Buffer::wl_buffer`].
 //!
 //! See an example in [`examples/triangle.rs`](https://github.com/MaxVerevkin/wayrs/blob/main/wayrs-egl/examples/triangle.rs).
 
@@ -41,7 +42,7 @@ mod gbm;
 mod xf86drm_ffi;
 
 pub mod egl_ffi;
-pub use buffer::Buffer;
+pub use buffer::{Buffer, BufferPool};
 pub use drm::DrmDevice;
 pub use egl::{EglContext, EglDisplay, EglExtensions};
 pub use errors::*;
