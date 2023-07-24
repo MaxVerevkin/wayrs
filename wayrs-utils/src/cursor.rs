@@ -61,7 +61,7 @@ enum CursorThemeImp {
 pub struct CursorImage(CursorImageImp);
 
 #[derive(Debug)]
-pub enum CursorImageImp {
+enum CursorImageImp {
     Server { shape: CursorShape },
     Client { cursor_size: u32, imgs: Vec<Image> },
 }
