@@ -284,10 +284,8 @@ impl<const N: usize> BufferPool<N> {
     ///
     /// Not calling this function and just dropping the buffer pool will leak some resources.
     pub fn destroy<D>(self, conn: &mut Connection<D>) {
-        for buf in self.buffers {
-            if let Some(buf) = buf {
-                buf.destroy(conn);
-            }
+        for buf in self.buffers.into_iter().flatten() {
+            buf.destroy(conn);
         }
     }
 }
