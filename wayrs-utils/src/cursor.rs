@@ -4,7 +4,7 @@
 //!
 //! ```ignore
 //! // Do this once
-//! let cursor_theme = CursorTheme::new(conn, &globals);
+//! let cursor_theme = CursorTheme::new(conn, &globals, wl_compositor);
 //! let default_cursor = cursor_theme.get_image(CursorShape::Default).unwrap();
 //!
 //! // Do this when you bind a pointer
@@ -82,11 +82,7 @@ enum ThemedPointerImp {
 
 impl CursorTheme {
     /// Create new [`CursorTheme`], preferring the server-side implementation if possible.
-    ///
-    /// # Panics
-    ///
-    /// The function may panic if `wl_compositor` global is not found.
-    pub fn new<D>(conn: &mut Connection<D>, globals: &Globals) -> Self {
+    pub fn new<D>(conn: &mut Connection<D>, globals: &Globals, compositor: WlCompositor) -> Self {
         match globals.bind(conn, 1..=1) {
             Ok(manager) => Self(CursorThemeImp::Server { manager }),
             Err(_) => {
@@ -102,7 +98,7 @@ impl CursorTheme {
                     .unwrap_or(24);
 
                 Self(CursorThemeImp::Client {
-                    compositor: globals.bind(conn, 1..=6).unwrap(),
+                    compositor,
                     cursor_size,
                     theme,
                 })
