@@ -180,6 +180,9 @@ impl Buffer {
 
     /// Get a [`WlBuffer`] object which points to this buffer.
     ///
+    /// This function marks the buffer as being in use, i.e. [`is_available`](Self::is_available)
+    /// will return `false`.
+    ///
     /// # Safety
     ///
     /// The returned [`WlBuffer`] object must be attached and commited to exactly one [`WlSurface`].
