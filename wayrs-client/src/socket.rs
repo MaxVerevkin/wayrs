@@ -316,15 +316,15 @@ impl BufferedSocket {
 }
 
 struct ArrayBuffer<T, const N: usize> {
-    bytes: [T; N],
+    bytes: Box<[T; N]>,
     offset: usize,
     len: usize,
 }
 
-impl<T: Default + Clone + Copy, const N: usize> ArrayBuffer<T, N> {
+impl<T: Default + Copy, const N: usize> ArrayBuffer<T, N> {
     fn new() -> Self {
         Self {
-            bytes: [T::default(); N],
+            bytes: Box::new([T::default(); N]),
             offset: 0,
             len: 0,
         }
