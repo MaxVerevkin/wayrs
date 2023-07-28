@@ -197,11 +197,10 @@ impl<D> Connection<D> {
 
         loop {
             match self.recv_event(IoMode::Blocking)? {
-                None => (),
-                Some(QueuedEvent::Message(m)) if m.header.object_id == sync_cb.id() => {
+                QueuedEvent::Message(m) if m.header.object_id == sync_cb.id() => {
                     return Ok(());
                 }
-                Some(other) => self.event_queue.push_back(other),
+                other => self.event_queue.push_back(other),
             }
         }
     }
@@ -215,11 +214,10 @@ impl<D> Connection<D> {
 
         loop {
             match self.async_recv_event().await? {
-                None => (),
-                Some(QueuedEvent::Message(m)) if m.header.object_id == sync_cb.id() => {
+                QueuedEvent::Message(m) if m.header.object_id == sync_cb.id() => {
                     return Ok(());
                 }
-                Some(other) => self.event_queue.push_back(other),
+                other => self.event_queue.push_back(other),
             }
         }
     }
@@ -248,16 +246,13 @@ impl<D> Connection<D> {
         self.requests_queue.push_back(request);
     }
 
-    /// Returns `Ok(None)` if received event for dead object.
-    fn recv_event(&mut self, mode: IoMode) -> io::Result<Option<QueuedEvent>> {
+    fn recv_event(&mut self, mode: IoMode) -> io::Result<QueuedEvent> {
         let header = self.socket.peek_message_header(mode)?;
 
         let obj = self
             .object_mgr
             .get_object_mut(header.object_id)
             .expect("received event for non-existing object");
-
-        let is_alive = obj.is_alive;
         let object = obj.object;
 
         let event = self
@@ -279,14 +274,14 @@ impl<D> Connection<D> {
                         err.message.to_string_lossy(),
                     ),
                 )),
-                wl_display::Event::DeleteId(id) => Ok(Some(QueuedEvent::DeleteId(ObjectId(
+                wl_display::Event::DeleteId(id) => Ok(QueuedEvent::DeleteId(ObjectId(
                     NonZeroU32::new(id).expect("wl_display.delete_id with null id"),
-                )))),
+                ))),
             };
         }
 
         if event.header.object_id == self.registry.id() {
-            return Ok(Some(QueuedEvent::RegistryEvent(event.try_into().unwrap())));
+            return Ok(QueuedEvent::RegistryEvent(event.try_into().unwrap()));
         }
 
         // Allocate objects if necessary
@@ -296,11 +291,11 @@ impl<D> Connection<D> {
             }
         }
 
-        Ok(is_alive.then_some(QueuedEvent::Message(event)))
+        Ok(QueuedEvent::Message(event))
     }
 
     #[cfg(feature = "tokio")]
-    async fn async_recv_event(&mut self) -> io::Result<Option<QueuedEvent>> {
+    async fn async_recv_event(&mut self) -> io::Result<QueuedEvent> {
         let mut async_fd = match self.async_fd.take() {
             Some(fd) => fd,
             None => AsyncFd::new(self.as_raw_fd())?,
@@ -333,8 +328,7 @@ impl<D> Connection<D> {
 
         loop {
             let msg = match self.recv_event(mode) {
-                Ok(Some(msg)) => msg,
-                Ok(None) => continue,
+                Ok(msg) => msg,
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock && at_least_one => return Ok(()),
                 Err(e) => return Err(e),
             };
@@ -349,17 +343,12 @@ impl<D> Connection<D> {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn async_recv_events(&mut self) -> io::Result<()> {
-        loop {
-            if let Some(msg) = self.async_recv_event().await? {
-                self.event_queue.push_back(msg);
-                break;
-            }
-        }
+        let msg = self.async_recv_event().await?;
+        self.event_queue.push_back(msg);
 
         loop {
             match self.recv_event(IoMode::NonBlocking) {
-                Ok(Some(msg)) => self.event_queue.push_back(msg),
-                Ok(None) => continue,
+                Ok(msg) => self.event_queue.push_back(msg),
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => return Ok(()),
                 Err(e) => return Err(e),
             };
