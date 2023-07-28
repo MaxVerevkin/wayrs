@@ -78,9 +78,8 @@ impl BufferedSocket {
         if (size as usize) < self.bytes_out.get_writable().len()
             || fds_cnt < self.fds_out.get_writable().len()
         {
-            match self.flush(mode) {
-                Ok(()) => (),
-                Err(err) => return Err(SendMessageError { msg, err }),
+            if let Err(err) = self.flush(mode) {
+                return Err(SendMessageError { msg, err });
             }
         }
 
@@ -160,7 +159,7 @@ impl BufferedSocket {
         }
 
         // Consume header
-        self.bytes_in.consume(8);
+        self.bytes_in.consume(MessageHeader::size() as usize);
 
         let args = signature
             .iter()
