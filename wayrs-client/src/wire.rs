@@ -88,7 +88,8 @@ impl ArgValue {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Signed 24.8 decimal number
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Fixed(pub i32);
 
 impl From<i32> for Fixed {
@@ -106,6 +107,16 @@ impl From<u32> for Fixed {
 impl Fixed {
     pub fn as_f64(self) -> f64 {
         self.0 as f64 / 256.0
+    }
+
+    pub fn as_int(self) -> i32 {
+        self.0 / 256
+    }
+}
+
+impl Debug for Fixed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.as_f64().fmt(f)
     }
 }
 
