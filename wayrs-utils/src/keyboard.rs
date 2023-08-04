@@ -51,6 +51,10 @@ pub struct KeyboardEvent {
     pub serial: u32,
     pub time: u32,
     pub keycode: xkb::Keycode,
+    /// How this key should be repeated.
+    ///
+    /// Present if the compositor advertised repeat info AND this key should be repeated (as defined
+    /// by the current keymap).
     pub repeat_info: Option<RepeatInfo>,
     pub xkb_state: xkb::State,
 }
@@ -128,15 +132,25 @@ fn wl_keyboard_cb<D: KeyboardHandler>(
             let Some(xkb_state) = kbd.xkb_state.clone() else {
                 return;
             };
+
+            let keycode = args.key + 8;
+
+            let repeat_info = if xkb_state.get_keymap().key_repeats(keycode) {
+                kbd.repeat_info
+            } else {
+                None
+            };
+
             let event = KeyboardEvent {
                 seat: kbd.seat,
                 keyboard: kbd.wl,
                 serial: args.serial,
                 time: args.time,
-                keycode: args.key + 8,
-                repeat_info: kbd.repeat_info,
+                keycode,
+                repeat_info,
                 xkb_state,
             };
+
             match args.state {
                 wl_keyboard::KeyState::Released => state.key_released(conn, event),
                 wl_keyboard::KeyState::Pressed => state.key_presed(conn, event),
