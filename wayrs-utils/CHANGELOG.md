@@ -1,3 +1,8 @@
+# 0.9.0
+
+- Add `Timer`. Usefull for keyboard repeats.
+- Keyboard: set `repeat_info` only on events that should be repeated (as defined by the current keymap).
+
 # 0.8.0
 
 - Make `CursorImageImp` private.
