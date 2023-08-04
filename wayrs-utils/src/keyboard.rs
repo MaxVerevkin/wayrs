@@ -11,6 +11,8 @@ use wayrs_client::Connection;
 
 pub use xkbcommon::xkb;
 
+use crate::timer::Timer;
+
 pub trait KeyboardHandler: Sized + 'static {
     /// Get a reference to a [`Keyboard`]. It is guaranteed that the requested keyboard was created
     /// in [`Keyboard::new`].
@@ -83,6 +85,13 @@ impl Keyboard {
         if self.wl.version() >= 3 {
             self.wl.release(conn);
         }
+    }
+}
+
+impl RepeatInfo {
+    /// Create a timer.
+    pub fn timer(self) -> Timer {
+        Timer::new(self.delay, self.interval)
     }
 }
 

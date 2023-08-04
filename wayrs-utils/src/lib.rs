@@ -2,6 +2,8 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+pub mod timer;
+
 #[cfg(feature = "seats")]
 #[cfg_attr(docsrs, doc(cfg(feature = "seats")))]
 pub mod seats;
