@@ -1,3 +1,7 @@
+# 0.2.1
+
+- Update doc links.
+
 # 0.2.0
 
 - Remove `EglDisplay::create_context` if favor of `EglContextBuilder` API.
