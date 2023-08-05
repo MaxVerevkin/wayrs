@@ -156,53 +156,6 @@ impl EglDisplay {
         }
     }
 
-    /// Create a new graphics API context
-    ///
-    /// Call [`EglContext::make_current`] to activate the context.
-    pub fn create_context(
-        &self,
-        api: GraphicsApi,
-        api_major_v: u32,
-        api_minor_v: u32,
-    ) -> Result<EglContext> {
-        let api = match api {
-            GraphicsApi::OpenGl => egl_ffi::EGL_OPENGL_API,
-            GraphicsApi::OpenGlEs => egl_ffi::EGL_OPENGL_ES_API,
-            GraphicsApi::OpenVg => egl_ffi::EGL_OPENVG_API,
-        };
-
-        if unsafe { egl_ffi::eglBindAPI(api) } != egl_ffi::EGL_TRUE {
-            return Err(Error::last_egl());
-        }
-
-        let context_attrs = [
-            egl_ffi::EGL_CONTEXT_MAJOR_VERSION,
-            api_major_v as _,
-            egl_ffi::EGL_CONTEXT_MINOR_VERSION,
-            api_minor_v as _,
-            egl_ffi::EGL_NONE,
-        ];
-
-        let raw = unsafe {
-            egl_ffi::eglCreateContext(
-                self.raw,
-                egl_ffi::EGL_NO_CONFIG,
-                egl_ffi::EGL_NO_CONTEXT,
-                context_attrs.as_ptr(),
-            )
-        };
-
-        if raw == egl_ffi::EGL_NO_CONTEXT {
-            return Err(Error::last_egl());
-        }
-
-        Ok(EglContext {
-            raw,
-            api,
-            egl_display: self.raw,
-        })
-    }
-
     /// Allocate a new buffer
     pub fn alloc_buffer<D>(
         &self,
@@ -294,6 +247,83 @@ unsafe fn get_supported_formats(
     }
 
     Ok(retval)
+}
+
+/// [`EglContext`] builder
+pub struct EglContextBuilder {
+    api: GraphicsApi,
+    major_v: u32,
+    minor_v: u32,
+    debug: bool,
+}
+
+impl EglContextBuilder {
+    /// Create a new [`EGLContext`] builder
+    pub fn new(api: GraphicsApi) -> Self {
+        Self {
+            api,
+            major_v: 1,
+            minor_v: 0,
+            debug: false,
+        }
+    }
+
+    /// Set the required API version. Default is `1.0`.
+    pub fn version(mut self, major: u32, minor: u32) -> Self {
+        self.major_v = major;
+        self.minor_v = minor;
+        self
+    }
+
+    /// Enable/disable debugging. Default is `false`.
+    pub fn debug(mut self, enable: bool) -> Self {
+        self.debug = enable;
+        self
+    }
+
+    /// Create a new graphics API context
+    ///
+    /// Call [`EglContext::make_current`] to activate the context.
+    pub fn build(self, display: &EglDisplay) -> Result<EglContext> {
+        let api = match self.api {
+            GraphicsApi::OpenGl => egl_ffi::EGL_OPENGL_API,
+            GraphicsApi::OpenGlEs => egl_ffi::EGL_OPENGL_ES_API,
+            GraphicsApi::OpenVg => egl_ffi::EGL_OPENVG_API,
+        };
+
+        if unsafe { egl_ffi::eglBindAPI(api) } != egl_ffi::EGL_TRUE {
+            return Err(Error::last_egl());
+        }
+
+        let context_attrs = [
+            egl_ffi::EGL_CONTEXT_MAJOR_VERSION,
+            self.major_v as _,
+            egl_ffi::EGL_CONTEXT_MINOR_VERSION,
+            self.minor_v as _,
+            egl_ffi::EGL_CONTEXT_OPENGL_DEBUG,
+            self.debug as _,
+            egl_ffi::EGL_NONE,
+        ];
+
+        let raw = unsafe {
+            egl_ffi::eglCreateContext(
+                display.raw,
+                egl_ffi::EGL_NO_CONFIG,
+                egl_ffi::EGL_NO_CONTEXT,
+                context_attrs.as_ptr(),
+            )
+        };
+
+        if raw == egl_ffi::EGL_NO_CONTEXT {
+            return Err(Error::last_egl());
+        }
+
+        Ok(EglContext {
+            raw,
+            api,
+            egl_display: display.raw,
+        })
+    }
 }
 
 /// EGL graphics API context

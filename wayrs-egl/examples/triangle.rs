@@ -5,8 +5,7 @@ use gles31::*;
 use wayrs_client::global::*;
 use wayrs_client::protocol::*;
 use wayrs_client::{Connection, IoMode};
-use wayrs_egl::BufferPool;
-use wayrs_egl::{egl_ffi, Buffer, DrmDevice, EglContext, EglDisplay, Fourcc};
+use wayrs_egl::*;
 use wayrs_protocols::linux_dmabuf_unstable_v1::*;
 use wayrs_protocols::xdg_shell::*;
 use wayrs_utils::dmabuf_feedback::*;
@@ -35,8 +34,9 @@ impl Renderer {
             egl_display.minor_version()
         );
 
-        let egl_context = egl_display
-            .create_context(wayrs_egl::GraphicsApi::OpenGlEs, 3, 1)
+        let egl_context = EglContextBuilder::new(GraphicsApi::OpenGlEs)
+            .version(3, 1)
+            .build(&egl_display)
             .unwrap();
 
         egl_context.make_current().unwrap();

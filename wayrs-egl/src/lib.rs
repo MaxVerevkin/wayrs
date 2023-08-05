@@ -44,7 +44,7 @@ mod xf86drm_ffi;
 pub mod egl_ffi;
 pub use buffer::{Buffer, BufferPool};
 pub use drm::DrmDevice;
-pub use egl::{EglContext, EglDisplay, EglExtensions};
+pub use egl::{EglContext, EglContextBuilder, EglDisplay, EglExtensions};
 pub use errors::*;
 
 #[derive(Debug, Clone, Copy)]

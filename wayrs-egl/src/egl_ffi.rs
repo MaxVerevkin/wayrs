@@ -63,6 +63,7 @@ pub const EGL_BAD_SURFACE: EGLint = 0x300D;
 pub const EGL_CONTEXT_LOST: EGLint = 0x300E;
 pub const EGL_CONTEXT_MAJOR_VERSION: EGLint = 0x3098;
 pub const EGL_CONTEXT_MINOR_VERSION: EGLint = 0x30FB;
+pub const EGL_CONTEXT_OPENGL_DEBUG: EGLint = 0x31B0;
 pub const EGL_DEFAULT_DISPLAY: *mut c_void = std::ptr::null_mut();
 pub const EGL_DMA_BUF_PLANE0_FD_EXT: EGLint = 0x3272;
 pub const EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT: EGLint = 0x3444;
