@@ -18,7 +18,7 @@
 //! 1. Subscribe to `zwp_linux_dmabuf_feedback_v1` (for example, using `wayrs_utils::dmabuf_feedback::DmabufFeedback`).
 //! 1. When feedback is received, get the render node path using [`DrmDevice`] and create [`EglDisplay`] for the given path.
 //! 1. Select buffer formats that where advertised by dmabuf feedback and are supported by [`EglDisplay`]. From these formats choose the one you will use.
-//! 1. Create [`EglContext`] using [`EglDisplay::create_context`] and make it current.
+//! 1. Create [`EglContext`] using [`EglContextBuilder`] and make it current.
 //! 1. Load graphics API functons using [`egl_ffi::eglGetProcAddress`].
 //! 1. Assert that `GL_OES_EGL_image` is supported.
 //! 1. Setup a framebuffer and a renderbuffer objects.

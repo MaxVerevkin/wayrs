@@ -258,7 +258,7 @@ pub struct EglContextBuilder {
 }
 
 impl EglContextBuilder {
-    /// Create a new [`EGLContext`] builder
+    /// Create a new [`EglContext`] builder
     pub fn new(api: GraphicsApi) -> Self {
         Self {
             api,
