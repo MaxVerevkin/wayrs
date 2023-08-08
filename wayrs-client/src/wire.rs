@@ -109,6 +109,10 @@ impl Fixed {
         self.0 as f64 / 256.0
     }
 
+    pub fn as_f32(self) -> f32 {
+        self.0 as f32 / 256.0
+    }
+
     pub fn as_int(self) -> i32 {
         self.0 / 256
     }
