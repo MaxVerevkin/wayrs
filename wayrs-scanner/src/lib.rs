@@ -361,7 +361,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
 
             impl ::std::cmp::PartialOrd for #proxy_name {
                 fn partial_cmp(&self, other: &Self) -> ::std::option::Option<::std::cmp::Ordering> {
-                    self.id.partial_cmp(&other.id)
+                    ::std::option::Option::Some(::std::cmp::Ord::cmp(self, other))
                 }
             }
 
