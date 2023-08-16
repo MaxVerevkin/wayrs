@@ -133,7 +133,7 @@ fn wl_keyboard_cb<D: KeyboardHandler>(
                 return;
             };
 
-            let keycode = args.key + 8;
+            let keycode = xkb::Keycode::new(args.key + 8);
 
             let repeat_info = if xkb_state.get_keymap().key_repeats(keycode) {
                 kbd.repeat_info
