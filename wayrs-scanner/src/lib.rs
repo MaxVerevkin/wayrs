@@ -403,13 +403,14 @@ fn gen_pub_fn(
     generics: &[TokenStream],
     args: &[TokenStream],
     ret_ty: TokenStream,
+    where_: Option<TokenStream>,
     body: TokenStream,
 ) -> TokenStream {
     let name = make_ident(name);
     quote! {
         #attrs
         #[allow(clippy::too_many_arguments)]
-        pub fn #name<#(#generics),*>(#(#args),*) -> #ret_ty {
+        pub fn #name<#(#generics),*>(#(#args),*) -> #ret_ty #where_ {
             #body
         }
     }
@@ -474,6 +475,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             &[quote!(D)],
             &fn_args,
             quote!(()),
+            None,
             send_message,
         ),
         Some(None) => {
@@ -483,6 +485,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                 &[quote!(P: Proxy), quote!(D)],
                 &fn_args,
                 quote!(P),
+                None,
                 quote! {
                     let new_object = conn.allocate_new_object::<P>(version);
                     #send_message
@@ -493,13 +496,12 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             let cb = gen_pub_fn(
                 &doc,
                 &format!("{}_with_cb", request.name),
-                &[
-                    quote!(P: Proxy),
-                    quote!(D),
-                    quote!(F: FnMut(&mut _wayrs_client::Connection<D>, &mut D, P, <P as Proxy>::Event) + Send + 'static),
-                ],
+                &[quote!(P: Proxy), quote!(D), quote!(F)],
                 &fn_args,
                 quote!(P),
+                Some(
+                    quote!(where F: FnMut(&mut _wayrs_client::Connection<D>, &mut D, P, <P as Proxy>::Event) + Send + 'static),
+                ),
                 quote! {
                     let new_object = conn.allocate_new_object_with_cb::<P, F>(version, cb);
                     #send_message
@@ -519,6 +521,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                 &[quote!(D)],
                 &fn_args,
                 proxy_path.clone(),
+                None,
                 quote! {
                     let new_object = conn.allocate_new_object::<#proxy_path>(self.version);
                     #send_message
@@ -529,12 +532,12 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             let cb = gen_pub_fn(
                 &doc,
                 &format!("{}_with_cb", request.name),
-                &[
-                    quote!(D),
-                    quote!(F: FnMut(&mut _wayrs_client::Connection<D>, &mut D, #proxy_path, <#proxy_path as Proxy>::Event) + Send + 'static),
-                ],
+                &[quote!(D), quote!(F)],
                 &fn_args,
                 proxy_path.clone(),
+                Some(
+                    quote!(where  F: FnMut(&mut _wayrs_client::Connection<D>, &mut D, #proxy_path, <#proxy_path as Proxy>::Event) + Send + 'static),
+                ),
                 quote! {
                     let new_object = conn.allocate_new_object_with_cb::<#proxy_path, F>(self.version, cb);
                     #send_message
