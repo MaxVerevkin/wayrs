@@ -1,3 +1,9 @@
+# Next
+
+- Improve `Debug` implementation for `Fixed`.
+- Add `Fixed::as_int()` and `Fixed::as_f32()`.
+- Store the socket buffer on the heap (significantly reduces `Connection` stack size).
+
 # 0.11.0
 
 - Update core protocol to [72da004b](72da004b3eed19a94265d564f1fa59276ceb4340).
