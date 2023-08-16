@@ -187,7 +187,7 @@ impl ThemedPointer {
 
                 let image = match imgs.binary_search_by_key(&target_size, |img| img.size) {
                     Ok(indx) => &imgs[indx],
-                    Err(indx) if indx == 0 => imgs.first().unwrap(),
+                    Err(0) => imgs.first().unwrap(),
                     Err(indx) if indx >= imgs.len() => imgs.last().unwrap(),
                     Err(indx) => {
                         let a = &imgs[indx - 1];
