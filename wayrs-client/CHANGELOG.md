@@ -1,4 +1,4 @@
-# Next
+# 0.11.1
 
 - Improve `Debug` implementation for `Fixed`.
 - Add `Fixed::as_int()` and `Fixed::as_f32()`.
