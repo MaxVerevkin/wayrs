@@ -2,8 +2,7 @@ use std::ffi::CString;
 
 use wayrs_client::global::GlobalExt;
 use wayrs_client::protocol::wl_output::{self, WlOutput};
-use wayrs_client::proxy::Proxy;
-use wayrs_client::{Connection, IoMode};
+use wayrs_client::{Connection, EventCtx, IoMode};
 
 fn main() {
     let (mut conn, globals) = Connection::connect_and_collect_globals().unwrap();
@@ -42,19 +41,15 @@ struct OutputInfo {
     mode: Option<String>,
 }
 
-fn wl_output_cb(
-    _: &mut Connection<State>,
-    state: &mut State,
-    output: WlOutput,
-    event: wl_output::Event,
-) {
-    let output = &mut state
+fn wl_output_cb(ctx: EventCtx<State, WlOutput>) {
+    let output = &mut ctx
+        .state
         .outputs
         .iter_mut()
-        .find(|o| o.0.id() == output.id())
+        .find(|o| o.0 == ctx.proxy)
         .unwrap()
         .1;
-    match event {
+    match ctx.event {
         wl_output::Event::Geometry(_) => (),
         wl_output::Event::Mode(mode) => {
             output.mode = Some(format!(

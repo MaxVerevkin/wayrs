@@ -120,9 +120,9 @@ impl Buffer {
             self.spec.height as i32,
             self.spec.stride as i32,
             self.spec.format,
-            move |conn, _state, wl_buffer, _released_event| {
+            move |ctx| {
                 assert!(refcnt.fetch_sub(1, Ordering::AcqRel) > 0);
-                wl_buffer.destroy(conn);
+                ctx.proxy.destroy(ctx.conn);
             },
         )
     }
@@ -183,7 +183,7 @@ impl InitShmPool {
                 spec.height as i32,
                 spec.stride as i32,
                 spec.format,
-                move |_conn, _state, _wl_buffer, _released_event| {
+                move |_| {
                     assert!(seg_refcnt.fetch_sub(1, Ordering::SeqCst) > 0);
                     // We don't destroy the buffer here because it can be reused later
                 },

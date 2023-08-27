@@ -8,10 +8,10 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use crate::interface::Interface;
 use crate::object::{Object, ObjectId, ObjectManager};
 use crate::protocol::wl_registry::GlobalArgs;
-use crate::protocol::*;
 use crate::proxy::Proxy;
 use crate::socket::{BufferedSocket, SendMessageError};
 use crate::wire::{ArgValue, DebugMessage, Message};
+use crate::{protocol::*, EventCtx};
 use crate::{ConnectError, IoMode};
 
 #[cfg(feature = "tokio")]
@@ -162,10 +162,7 @@ impl<D> Connection<D> {
     ///
     /// Calling this function on a destroyed object will most likely panic, but this is not
     /// guarantied due to id-reuse.
-    pub fn set_callback_for<
-        P: Proxy,
-        F: FnMut(&mut Connection<D>, &mut D, P, P::Event) + Send + 'static,
-    >(
+    pub fn set_callback_for<P: Proxy, F: FnMut(EventCtx<D, P>) + Send + 'static>(
         &mut self,
         proxy: P,
         cb: F,
@@ -475,10 +472,7 @@ impl<D> Connection<D> {
     /// Allocate a new object and set callback. Returned object must be sent in a request as a
     /// "new_id" argument.
     #[doc(hidden)]
-    pub fn allocate_new_object_with_cb<
-        P: Proxy,
-        F: FnMut(&mut Connection<D>, &mut D, P, P::Event) + Send + 'static,
-    >(
+    pub fn allocate_new_object_with_cb<P: Proxy, F: FnMut(EventCtx<D, P>) + Send + 'static>(
         &mut self,
         version: u32,
         cb: F,
@@ -488,17 +482,20 @@ impl<D> Connection<D> {
         P::new(state.object.id, version)
     }
 
-    fn make_generic_cb<
-        P: Proxy,
-        F: FnMut(&mut Connection<D>, &mut D, P, P::Event) + Send + 'static,
-    >(
+    fn make_generic_cb<P: Proxy, F: FnMut(EventCtx<D, P>) + Send + 'static>(
         mut cb: F,
     ) -> GenericCallback<D> {
         // Note: if `F` does not capture anything, this `Box::new` will not allocate.
         Box::new(move |conn, state, object, event| {
             let proxy: P = object.try_into().unwrap();
             let event = event.try_into().unwrap();
-            cb(conn, state, proxy, event);
+            let ctx = EventCtx {
+                conn,
+                state,
+                proxy,
+                event,
+            };
+            cb(ctx);
         })
     }
 }

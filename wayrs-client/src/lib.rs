@@ -15,7 +15,9 @@ mod socket;
 pub use connection::Connection;
 pub use wayrs_scanner as scanner;
 
+use proxy::Proxy;
 use std::ffi::CStr;
+use std::fmt;
 use std::io;
 
 /// An error that can occur while connecting to a Wayland socket.
@@ -46,7 +48,7 @@ macro_rules! cstr {
     }};
 }
 
-// TODO: remove once `CStr::from_bytes_with_nul` becomes const-stable
+// TODO: remove when MSRV is at least 1.72
 #[doc(hidden)]
 pub const fn cstr(string: &str) -> &CStr {
     let bytes = string.as_bytes();
@@ -61,4 +63,26 @@ pub const fn cstr(string: &str) -> &CStr {
 
     // SAFETY: We've just checked that evey byte excepet the last one is not NULL.
     unsafe { CStr::from_bytes_with_nul_unchecked(bytes) }
+}
+
+/// Event callback context.
+#[non_exhaustive]
+pub struct EventCtx<'a, D, P: Proxy> {
+    pub conn: &'a mut Connection<D>,
+    pub state: &'a mut D,
+    pub proxy: P,
+    pub event: P::Event,
+}
+
+impl<'a, D, P: Proxy> fmt::Debug for EventCtx<'a, D, P>
+where
+    P: fmt::Debug,
+    P::Event: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventCtx")
+            .field("proxy", &self.proxy)
+            .field("event", &self.event)
+            .finish_non_exhaustive()
+    }
 }
