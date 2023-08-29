@@ -1,3 +1,7 @@
+# 0.3.0
+
+- Use `wayrs-client` v0.12.
+
 # 0.2.1
 
 - Update doc links.
