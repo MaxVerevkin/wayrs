@@ -1,3 +1,8 @@
+# 0.10.0
+
+- Update `xkbcommon` to v0.6.
+- Use `wayrs-client` v0.12.
+
 # 0.9.0
 
 - Add `Timer`. Usefull for keyboard repeats.
