@@ -213,13 +213,8 @@ impl BufferedSocket {
             }
         };
 
-        let sent = socket::sendmsg::<()>(
-            self.socket.as_raw_fd(),
-            &[IoSlice::new(self.bytes_out.get_readable())],
-            cmsgs,
-            flags,
-            None,
-        )?;
+        let iov = [IoSlice::new(self.bytes_out.get_readable())];
+        let sent = socket::sendmsg::<()>(self.socket.as_raw_fd(), &iov, cmsgs, flags, None)?;
 
         for fd in self.fds_out.get_readable() {
             let _ = nix::unistd::close(*fd);
@@ -250,12 +245,8 @@ impl BufferedSocket {
             flags |= socket::MsgFlags::MSG_DONTWAIT;
         }
 
-        let msg = socket::recvmsg::<()>(
-            self.socket.as_raw_fd(),
-            &mut [IoSliceMut::new(self.bytes_in.get_writable())],
-            Some(&mut cmsg),
-            flags,
-        )?;
+        let mut iov = [IoSliceMut::new(self.bytes_in.get_writable())];
+        let msg = socket::recvmsg::<()>(self.socket.as_raw_fd(), &mut iov, Some(&mut cmsg), flags)?;
 
         for cmsg in msg.cmsgs() {
             if let ControlMessageOwned::ScmRights(fds) = cmsg {
