@@ -11,7 +11,7 @@ use libc::dev_t;
 use std::fmt;
 
 use wayrs_client::protocol::WlSurface;
-use wayrs_client::Connection;
+use wayrs_client::{Connection, EventCtx};
 use wayrs_protocols::linux_dmabuf_unstable_v1::*;
 
 #[derive(Debug)]
@@ -89,23 +89,18 @@ impl DmabufFeedback {
     }
 }
 
-fn dmabuf_feedback_cb<D: DmabufFeedbackHandler>(
-    conn: &mut Connection<D>,
-    state: &mut D,
-    wl: ZwpLinuxDmabufFeedbackV1,
-    event: zwp_linux_dmabuf_feedback_v1::Event,
-) {
-    let feedback = state.get_dmabuf_feedback(wl);
+fn dmabuf_feedback_cb<D: DmabufFeedbackHandler>(ctx: EventCtx<D, ZwpLinuxDmabufFeedbackV1>) {
+    let feedback = ctx.state.get_dmabuf_feedback(ctx.proxy);
     assert_eq!(
-        feedback.wl, wl,
+        feedback.wl, ctx.proxy,
         "invalid DmabufFeedbackHandler::get_dmabuf_feedback() implementation"
     );
 
     use zwp_linux_dmabuf_feedback_v1::Event;
-    match event {
+    match ctx.event {
         Event::Done => {
             feedback.tranches_done = true;
-            state.feedback_done(conn, wl);
+            ctx.state.feedback_done(ctx.conn, ctx.proxy);
         }
         Event::FormatTable(args) => {
             feedback.format_table.clear();

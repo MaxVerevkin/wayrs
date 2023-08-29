@@ -4,6 +4,7 @@ use gles31::*;
 
 use wayrs_client::global::*;
 use wayrs_client::protocol::*;
+use wayrs_client::EventCtx;
 use wayrs_client::{Connection, IoMode};
 use wayrs_egl::*;
 use wayrs_protocols::linux_dmabuf_unstable_v1::*;
@@ -264,13 +265,13 @@ impl State {
             eprintln!("skipping frame (not enough buffers)");
         }
 
-        self.surf.frame_cb = Some(self.surf.wl.frame_with_cb(conn, |conn, state, cb, event| {
-            let wl_callback::Event::Done(time) = event else {
+        self.surf.frame_cb = Some(self.surf.wl.frame_with_cb(conn, |ctx| {
+            let wl_callback::Event::Done(time) = ctx.event else {
                 unreachable!()
             };
-            assert_eq!(state.surf.frame_cb, Some(cb));
-            state.surf.frame_cb = None;
-            state.render(conn, Some(time));
+            assert_eq!(ctx.state.surf.frame_cb, Some(ctx.proxy));
+            ctx.state.surf.frame_cb = None;
+            ctx.state.render(ctx.conn, Some(time));
         }));
 
         self.surf.wl.commit(conn);
@@ -307,35 +308,29 @@ impl Surface {
         // results in a y-flipped image.
         wl.set_buffer_transform(conn, wl_output::Transform::Flipped180);
 
-        conn.set_callback_for(
-            xdg_surface,
-            |conn, state: &mut State, xdg_surface, event| {
-                if let xdg_surface::Event::Configure(serial) = event {
-                    xdg_surface.ack_configure(conn, serial);
-                    state.surf.mapped = true;
-                    state.render(conn, None);
-                }
-            },
-        );
+        conn.set_callback_for(xdg_surface, |ctx| {
+            if let xdg_surface::Event::Configure(serial) = ctx.event {
+                ctx.proxy.ack_configure(ctx.conn, serial);
+                ctx.state.surf.mapped = true;
+                ctx.state.render(ctx.conn, None);
+            }
+        });
 
-        conn.set_callback_for(
-            xdg_toplevel,
-            |conn, state: &mut State, _xdg_surface, event| match event {
-                xdg_toplevel::Event::Configure(args) => {
-                    if args.width != 0 {
-                        state.surf.width = args.width.try_into().unwrap();
-                    }
-                    if args.height != 0 {
-                        state.surf.height = args.height.try_into().unwrap();
-                    }
+        conn.set_callback_for(xdg_toplevel, |ctx| match ctx.event {
+            xdg_toplevel::Event::Configure(args) => {
+                if args.width != 0 {
+                    ctx.state.surf.width = args.width.try_into().unwrap();
                 }
-                xdg_toplevel::Event::Close => {
-                    state.surf.should_close = true;
-                    conn.break_dispatch_loop();
+                if args.height != 0 {
+                    ctx.state.surf.height = args.height.try_into().unwrap();
                 }
-                _ => (),
-            },
-        );
+            }
+            xdg_toplevel::Event::Close => {
+                ctx.state.surf.should_close = true;
+                ctx.conn.break_dispatch_loop();
+            }
+            _ => (),
+        });
 
         xdg_toplevel.set_app_id(conn, wayrs_client::cstr!("wayrs-egl").into());
         xdg_toplevel.set_title(conn, wayrs_client::cstr!("TITLE").into());
@@ -423,14 +418,9 @@ impl DmabufFeedbackHandler for State {
     }
 }
 
-fn xdg_wm_base_cb(
-    conn: &mut Connection<State>,
-    _: &mut State,
-    xdg_wm_base: XdgWmBase,
-    event: xdg_wm_base::Event,
-) {
-    if let xdg_wm_base::Event::Ping(serial) = event {
-        xdg_wm_base.pong(conn, serial);
+fn xdg_wm_base_cb(ctx: EventCtx<State, XdgWmBase>) {
+    if let xdg_wm_base::Event::Ping(serial) = ctx.event {
+        ctx.proxy.pong(ctx.conn, serial);
     }
 }
 

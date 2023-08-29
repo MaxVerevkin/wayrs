@@ -3,7 +3,7 @@ use std::ops;
 
 use crate::protocol::wl_registry::GlobalArgs;
 use crate::proxy::Proxy;
-use crate::Connection;
+use crate::{Connection, EventCtx};
 
 pub type Global = GlobalArgs;
 pub type Globals = [Global];
@@ -39,11 +39,7 @@ pub trait GlobalExt {
     ) -> Result<P, BindError>;
 
     /// Same as [`bind`](Self::bind) but also sets the callback
-    fn bind_with_cb<
-        P: Proxy,
-        D,
-        F: FnMut(&mut Connection<D>, &mut D, P, P::Event) + Send + 'static,
-    >(
+    fn bind_with_cb<P: Proxy, D, F: FnMut(EventCtx<D, P>) + Send + 'static>(
         &self,
         conn: &mut Connection<D>,
         version: impl VersionBounds,
@@ -59,11 +55,7 @@ pub trait GlobalsExt {
     ) -> Result<P, BindError>;
 
     /// Same as [`bind`](Self::bind) but also sets the callback
-    fn bind_with_cb<
-        P: Proxy,
-        D,
-        F: FnMut(&mut Connection<D>, &mut D, P, P::Event) + Send + 'static,
-    >(
+    fn bind_with_cb<P: Proxy, D, F: FnMut(EventCtx<D, P>) + Send + 'static>(
         &self,
         conn: &mut Connection<D>,
         version: impl VersionBounds,
@@ -117,11 +109,7 @@ impl GlobalExt for Global {
     }
 
     /// Same as [`bind`](Self::bind) but also sets the callback
-    fn bind_with_cb<
-        P: Proxy,
-        D,
-        F: FnMut(&mut Connection<D>, &mut D, P, P::Event) + Send + 'static,
-    >(
+    fn bind_with_cb<P: Proxy, D, F: FnMut(EventCtx<D, P>) + Send + 'static>(
         &self,
         conn: &mut Connection<D>,
         version: impl VersionBounds,
@@ -168,11 +156,7 @@ impl GlobalsExt for Globals {
         global.bind(conn, version)
     }
 
-    fn bind_with_cb<
-        P: Proxy,
-        D,
-        F: FnMut(&mut Connection<D>, &mut D, P, P::Event) + Send + 'static,
-    >(
+    fn bind_with_cb<P: Proxy, D, F: FnMut(EventCtx<D, P>) + Send + 'static>(
         &self,
         conn: &mut Connection<D>,
         version: impl VersionBounds,

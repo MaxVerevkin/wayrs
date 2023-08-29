@@ -109,12 +109,12 @@ impl Buffer {
 
         let state = Arc::new(Mutex::new(BufferState::Available));
         let state_copy = Arc::clone(&state);
-        conn.set_callback_for(wl_buffer, move |conn, _, wl_buffer, _| {
+        conn.set_callback_for(wl_buffer, move |ctx| {
             let mut state_guard = state_copy.lock().unwrap();
             match *state_guard {
                 BufferState::Available => unreachable!(),
                 BufferState::InUse => *state_guard = BufferState::Available,
-                BufferState::PendingDestruction => wl_buffer.destroy(conn),
+                BufferState::PendingDestruction => ctx.proxy.destroy(ctx.conn),
             }
         });
 

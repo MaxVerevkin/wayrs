@@ -53,11 +53,11 @@
 
 use std::ffi::CString;
 
-use wayrs_client::global::*;
 use wayrs_client::protocol::wl_seat::Capability;
 use wayrs_client::protocol::*;
 use wayrs_client::proxy::Proxy;
 use wayrs_client::Connection;
+use wayrs_client::{global::*, EventCtx};
 
 pub trait SeatHandler: Sized + 'static {
     fn get_seats(&mut self) -> &mut Seats;
@@ -175,20 +175,16 @@ fn registry_cb<D: SeatHandler>(
     }
 }
 
-fn wl_seat_cb<D: SeatHandler>(
-    conn: &mut Connection<D>,
-    state: &mut D,
-    wl_seat: WlSeat,
-    event: wl_seat::Event,
-) {
-    let seat = state
+fn wl_seat_cb<D: SeatHandler>(ctx: EventCtx<D, WlSeat>) {
+    let seat = ctx
+        .state
         .get_seats()
         .seats
         .iter_mut()
-        .find(|s| s.wl_seat == wl_seat)
+        .find(|s| s.wl_seat == ctx.proxy)
         .unwrap();
 
-    match event {
+    match ctx.event {
         wl_seat::Event::Capabilities(new_caps) => {
             let old_caps = seat.capabilities;
             seat.capabilities = new_caps;
@@ -197,8 +193,8 @@ fn wl_seat_cb<D: SeatHandler>(
                 new_caps.contains(Capability::Pointer),
                 old_caps.contains(Capability::Pointer),
             ) {
-                (true, false) => state.pointer_added(conn, wl_seat),
-                (false, true) => state.pointer_removed(conn, wl_seat),
+                (true, false) => ctx.state.pointer_added(ctx.conn, ctx.proxy),
+                (false, true) => ctx.state.pointer_removed(ctx.conn, ctx.proxy),
                 _ => (),
             }
 
@@ -206,8 +202,8 @@ fn wl_seat_cb<D: SeatHandler>(
                 new_caps.contains(Capability::Keyboard),
                 old_caps.contains(Capability::Keyboard),
             ) {
-                (true, false) => state.keyboard_added(conn, wl_seat),
-                (false, true) => state.keyboard_removed(conn, wl_seat),
+                (true, false) => ctx.state.keyboard_added(ctx.conn, ctx.proxy),
+                (false, true) => ctx.state.keyboard_removed(ctx.conn, ctx.proxy),
                 _ => (),
             }
 
@@ -215,13 +211,13 @@ fn wl_seat_cb<D: SeatHandler>(
                 new_caps.contains(Capability::Touch),
                 old_caps.contains(Capability::Touch),
             ) {
-                (true, false) => state.touch_added(conn, wl_seat),
-                (false, true) => state.touch_removed(conn, wl_seat),
+                (true, false) => ctx.state.touch_added(ctx.conn, ctx.proxy),
+                (false, true) => ctx.state.touch_removed(ctx.conn, ctx.proxy),
                 _ => (),
             }
         }
         wl_seat::Event::Name(name) => {
-            state.seat_name(conn, wl_seat, name);
+            ctx.state.seat_name(ctx.conn, ctx.proxy, name);
         }
         _ => (),
     }

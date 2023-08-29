@@ -279,6 +279,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         #visibility mod #mod_name {
             use #wayrs_client_path as _wayrs_client;
             use _wayrs_client::proxy::Proxy;
+            use _wayrs_client::EventCtx;
 
             #mod_doc
             #[derive(Clone, Copy)]
@@ -492,18 +493,16 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                     new_object
                 },
             );
-            fn_args.push(quote!(cb: F));
+            fn_args.push(quote!(cb: impl FnMut(EventCtx<D, P>) + Send + 'static));
             let cb = gen_pub_fn(
                 &doc,
                 &format!("{}_with_cb", request.name),
-                &[quote!(P: Proxy), quote!(D), quote!(F)],
+                &[quote!(P: Proxy), quote!(D)],
                 &fn_args,
                 quote!(P),
-                Some(
-                    quote!(where F: FnMut(&mut _wayrs_client::Connection<D>, &mut D, P, <P as Proxy>::Event) + Send + 'static),
-                ),
+                None,
                 quote! {
-                    let new_object = conn.allocate_new_object_with_cb::<P, F>(version, cb);
+                    let new_object = conn.allocate_new_object_with_cb(version, cb);
                     #send_message
                     new_object
                 },
@@ -528,18 +527,16 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                     new_object
                 },
             );
-            fn_args.push(quote!(cb: F));
+            fn_args.push(quote!(cb: impl FnMut(EventCtx<D, #proxy_path>) + Send + 'static));
             let cb = gen_pub_fn(
                 &doc,
                 &format!("{}_with_cb", request.name),
-                &[quote!(D), quote!(F)],
+                &[quote!(D)],
                 &fn_args,
                 proxy_path.clone(),
-                Some(
-                    quote!(where  F: FnMut(&mut _wayrs_client::Connection<D>, &mut D, #proxy_path, <#proxy_path as Proxy>::Event) + Send + 'static),
-                ),
+                None,
                 quote! {
-                    let new_object = conn.allocate_new_object_with_cb::<#proxy_path, F>(self.version, cb);
+                    let new_object = conn.allocate_new_object_with_cb(self.version, cb);
                     #send_message
                     new_object
                 },

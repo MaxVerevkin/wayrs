@@ -5,9 +5,9 @@ use std::os::unix::io::AsRawFd;
 use std::time::Duration;
 
 use wayrs_client::protocol::wl_keyboard::{EnterArgs, LeaveArgs};
-use wayrs_client::protocol::*;
 use wayrs_client::proxy::Proxy;
 use wayrs_client::Connection;
+use wayrs_client::{protocol::*, EventCtx};
 
 pub use xkbcommon::xkb;
 
@@ -99,15 +99,10 @@ impl RepeatInfo {
     }
 }
 
-fn wl_keyboard_cb<D: KeyboardHandler>(
-    conn: &mut Connection<D>,
-    state: &mut D,
-    wl_keyboard: WlKeyboard,
-    event: wl_keyboard::Event,
-) {
-    let kbd = state.get_keyboard(wl_keyboard);
+fn wl_keyboard_cb<D: KeyboardHandler>(ctx: EventCtx<D, WlKeyboard>) {
+    let kbd = ctx.state.get_keyboard(ctx.proxy);
 
-    match event {
+    match ctx.event {
         wl_keyboard::Event::Keymap(args) if args.format == wl_keyboard::KeymapFormat::XkbV1 => {
             let keymap = unsafe {
                 xkb::Keymap::new_from_fd(
@@ -123,10 +118,10 @@ fn wl_keyboard_cb<D: KeyboardHandler>(
             }
         }
         wl_keyboard::Event::Enter(args) => {
-            state.enter_surface(conn, wl_keyboard, args);
+            ctx.state.enter_surface(ctx.conn, ctx.proxy, args);
         }
         wl_keyboard::Event::Leave(args) => {
-            state.leave_surface(conn, wl_keyboard, args);
+            ctx.state.leave_surface(ctx.conn, ctx.proxy, args);
         }
         wl_keyboard::Event::Key(args) => {
             let Some(xkb_state) = kbd.xkb_state.clone() else {
@@ -152,8 +147,8 @@ fn wl_keyboard_cb<D: KeyboardHandler>(
             };
 
             match args.state {
-                wl_keyboard::KeyState::Released => state.key_released(conn, event),
-                wl_keyboard::KeyState::Pressed => state.key_presed(conn, event),
+                wl_keyboard::KeyState::Released => ctx.state.key_released(ctx.conn, event),
+                wl_keyboard::KeyState::Pressed => ctx.state.key_presed(ctx.conn, event),
                 _ => (),
             }
         }
