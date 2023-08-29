@@ -1,6 +1,7 @@
 # 0.12.0
 
 - Merge callback args into `EventCtx` struct.
+- Update `nix` to v0.27.
 
 Migration example:
 
