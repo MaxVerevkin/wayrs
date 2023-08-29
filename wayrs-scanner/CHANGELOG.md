@@ -1,3 +1,7 @@
+# 0.12.0
+
+- Update for `wayrs-client` v0.12.
+
 # 0.11.1
 
 - Use a `where` clause for `...with_cb` requests (for docs readability).

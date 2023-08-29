@@ -15,7 +15,7 @@ gbm-sys = "0.2"
 libc = "0.2"
 memmap2 = "0.7"
 thiserror = "1.0"
-wayrs-client = { version = "0.11", path = "../wayrs-client" }
+wayrs-client = { version = "0.12", path = "../wayrs-client" }
 wayrs-protocols = { version = "0.11", path = "../wayrs-protocols", features = ["linux-dmabuf-unstable-v1"] }
 
 [dev-dependencies]

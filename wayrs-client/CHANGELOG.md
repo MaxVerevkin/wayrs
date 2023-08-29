@@ -1,3 +1,26 @@
+# 0.12.0
+
+- Merge callback args into `EventCtx` struct.
+
+Migration example:
+
+```rust
+// Before
+fn wl_output_cb(
+    conn: &mut Connection<State>,
+    state: &mut State,
+    output: WlOutput,
+    event: wl_output::Event,
+) {
+    todo!();
+}
+
+// After
+fn wl_output_cb(ctx: EventCtx<State, WlOutput>) {
+    todo!();
+}
+```
+
 # 0.11.1
 
 - Improve `Debug` implementation for `Fixed`.

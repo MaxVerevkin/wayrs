@@ -64,7 +64,7 @@ wlr-screencopy-unstable-v1 = []
 wlr-virtual-pointer-unstable-v1 = []
 
 [dependencies]
-wayrs-client = { version = "0.11", path = "../wayrs-client" }
+wayrs-client = { version = "0.12", path = "../wayrs-client" }
 
 [package.metadata.docs.rs]
 # To build locally:
