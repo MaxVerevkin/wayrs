@@ -16,9 +16,9 @@ libc = "0.2"
 memmap2 = "0.7"
 thiserror = "1.0"
 wayrs-client = { version = "0.12", path = "../wayrs-client" }
-wayrs-protocols = { version = "0.11", path = "../wayrs-protocols", features = ["linux-dmabuf-unstable-v1"] }
+wayrs-protocols = { version = "0.12", path = "../wayrs-protocols", features = ["linux-dmabuf-unstable-v1"] }
 
 [dev-dependencies]
 gles31 = "1.0"
-wayrs-protocols = { version = "0.11", path = "../wayrs-protocols", features = ["xdg-shell"] }
+wayrs-protocols = { version = "0.12", path = "../wayrs-protocols", features = ["xdg-shell"] }
 wayrs-utils = { version = "0.9", path = "../wayrs-utils", features = ["dmabuf_feedback"] }
