@@ -30,6 +30,20 @@ impl PartialEq for Object {
 
 impl Eq for Object {}
 
+impl PartialEq<ObjectId> for Object {
+    #[inline]
+    fn eq(&self, other: &ObjectId) -> bool {
+        self.id == *other
+    }
+}
+
+impl PartialEq<Object> for ObjectId {
+    #[inline]
+    fn eq(&self, other: &Object) -> bool {
+        *self == other.id
+    }
+}
+
 impl PartialOrd for Object {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {

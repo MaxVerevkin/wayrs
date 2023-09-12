@@ -178,7 +178,7 @@ impl<D> Connection<D> {
             .get_object_mut(proxy.id())
             .expect("attempt to set a callback for non-existing object");
 
-        assert_eq!(obj.object, proxy.into(), "object mismatch");
+        assert_eq!(obj.object, proxy.id(), "object mismatch");
         assert!(obj.is_alive, "attempt to set a callback for dead object");
 
         obj.cb = Some(Self::make_generic_cb(cb));
@@ -194,12 +194,12 @@ impl<D> Connection<D> {
 
         loop {
             match self.recv_event(IoMode::Blocking)? {
-                QueuedEvent::Message(m) if m.header.object_id == sync_cb.id() => {
-                    return Ok(());
-                }
+                QueuedEvent::Message(m) if m.header.object_id == sync_cb => break,
                 other => self.event_queue.push_back(other),
             }
         }
+
+        Ok(())
     }
 
     /// Async version of [`blocking_roundtrip`](Self::blocking_roundtrip).
@@ -211,12 +211,12 @@ impl<D> Connection<D> {
 
         loop {
             match self.async_recv_event().await? {
-                QueuedEvent::Message(m) if m.header.object_id == sync_cb.id() => {
-                    return Ok(());
-                }
+                QueuedEvent::Message(m) if m.header.object_id == sync_cb => break,
                 other => self.event_queue.push_back(other),
             }
         }
+
+        Ok(())
     }
 
     #[doc(hidden)]
@@ -277,7 +277,7 @@ impl<D> Connection<D> {
             };
         }
 
-        if event.header.object_id == self.registry.id() {
+        if event.header.object_id == self.registry {
             return Ok(QueuedEvent::RegistryEvent(event.try_into().unwrap()));
         }
 

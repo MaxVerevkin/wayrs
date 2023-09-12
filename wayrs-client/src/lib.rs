@@ -24,7 +24,7 @@ use std::io;
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
     /// Either `$XDG_RUNTIME_DIR` or `$WAYLAND_DISPLAY` was not available.
-    #[error("both $XDG_RUNTIME_DIR and $WAYLAND_DISPLAY must by set")]
+    #[error("both $XDG_RUNTIME_DIR and $WAYLAND_DISPLAY must be set")]
     NotEnoughEnvVars,
     /// Some IO error.
     #[error(transparent)]
@@ -34,7 +34,15 @@ pub enum ConnectError {
 /// The "mode" of an IO operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IoMode {
+    /// Blocking.
+    ///
+    /// The function call may block, but it will never return [WouldBlock](io::ErrorKind::WouldBlock)
+    /// error.
     Blocking,
+    /// Non-blocking.
+    ///
+    /// The function call will not block on IO operations. [WouldBlock](io::ErrorKind::WouldBlock)
+    /// error is returned if the operation cannot be completed immediately.
     NonBlocking,
 }
 

@@ -265,7 +265,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         quote! {
             impl WlDisplay {
                 pub const INSTANCE: Self = Self {
-                    id: _wayrs_client::object::ObjectId::DISPLAY,
+                    id: ObjectId::DISPLAY,
                     version: 1,
                 };
             }
@@ -279,12 +279,13 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         #visibility mod #mod_name {
             use #wayrs_client_path as _wayrs_client;
             use _wayrs_client::proxy::Proxy;
+            use _wayrs_client::object::ObjectId;
             use _wayrs_client::EventCtx;
 
             #mod_doc
             #[derive(Clone, Copy)]
             pub struct #proxy_name {
-                id: _wayrs_client::object::ObjectId,
+                id: ObjectId,
                 version: u32,
             }
 
@@ -301,11 +302,11 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                         requests: &[ #(#requests_desc,)* ],
                     };
 
-                fn new(id: _wayrs_client::object::ObjectId, version: u32) -> Self {
+                fn new(id: ObjectId, version: u32) -> Self {
                     Self { id, version }
                 }
 
-                fn id(&self) -> _wayrs_client::object::ObjectId {
+                fn id(&self) -> ObjectId {
                     self.id
                 }
 
@@ -353,6 +354,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             }
 
             impl ::std::cmp::PartialEq for #proxy_name {
+                #[inline]
                 fn eq(&self, other: &Self) -> bool {
                     self.id == other.id
                 }
@@ -360,19 +362,36 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
 
             impl ::std::cmp::Eq for #proxy_name {}
 
+            impl ::std::cmp::PartialEq<ObjectId> for #proxy_name {
+                #[inline]
+                fn eq(&self, other: &ObjectId) -> bool {
+                    self.id == *other
+                }
+            }
+
+            impl ::std::cmp::PartialEq<#proxy_name> for ObjectId {
+                #[inline]
+                fn eq(&self, other: &#proxy_name) -> bool {
+                    *self == other.id
+                }
+            }
+
             impl ::std::cmp::PartialOrd for #proxy_name {
+                #[inline]
                 fn partial_cmp(&self, other: &Self) -> ::std::option::Option<::std::cmp::Ordering> {
                     ::std::option::Option::Some(::std::cmp::Ord::cmp(self, other))
                 }
             }
 
             impl ::std::cmp::Ord for #proxy_name {
+                #[inline]
                 fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
                     self.id.cmp(&other.id)
                 }
             }
 
             impl ::std::hash::Hash for #proxy_name {
+                #[inline]
                 fn hash<H>(&self, state: &mut H)
                     where H: ::std::hash::Hasher
                 {
@@ -698,8 +717,8 @@ impl ArgExt for Argument {
             "uint" => quote!(u32),
             "fixed" => quote!(_wayrs_client::wire::Fixed),
             "object" => match self.allow_null {
-                false => quote!(_wayrs_client::object::ObjectId),
-                true => quote!(::std::option::Option<_wayrs_client::object::ObjectId>),
+                false => quote!(ObjectId),
+                true => quote!(::std::option::Option<ObjectId>),
             },
             "new_id" => {
                 if let Some(iface) = &self.interface {
