@@ -1,14 +1,14 @@
 [package]
 name = "wayrs-utils"
-description = "A collection of utils and abstractions for wayrs-client"
-repository = "https://github.com/MaxVerevkin/wayrs"
-readme = "../README.md"
 version = "0.10.0"
-edition = "2021"
-rust-version = "1.66"
-license = "MIT"
+description = "A collection of utils and abstractions for wayrs-client"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "client"]
+repository.workspace = true
+readme.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 
 [features]
 seats = []

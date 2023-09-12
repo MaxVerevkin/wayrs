@@ -1,14 +1,14 @@
 [package]
 name = "wayrs-protocols"
-description = "A collection of Wayland protocols to use with wayrs-client"
-repository = "https://github.com/MaxVerevkin/wayrs"
-readme = "../README.md"
 version = "0.12.0"
-edition = "2021"
-rust-version = "1.66"
-license = "MIT"
+description = "A collection of Wayland protocols to use with wayrs-client"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "client"]
+repository.workspace = true
+readme.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 
 [features]
 # wayland-stable

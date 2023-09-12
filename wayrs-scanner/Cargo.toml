@@ -1,14 +1,14 @@
 [package]
 name = "wayrs-scanner"
-description = "Generates code for wayrs-client from xml files"
-repository = "https://github.com/MaxVerevkin/wayrs"
-readme = "../README.md"
 version = "0.12.0"
-edition = "2021"
-rust-version = "1.66"
-license = "MIT"
+description = "Generates code for wayrs-client from xml files"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "client", "scanner"]
+repository.workspace = true
+readme.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 
 [lib]
 proc-macro = true

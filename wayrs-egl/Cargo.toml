@@ -1,14 +1,14 @@
 [package]
 name = "wayrs-egl"
-description = "EGL for wayrs-client"
-repository = "https://github.com/MaxVerevkin/wayrs"
-readme = "../README.md"
 version = "0.3.0"
-edition = "2021"
-rust-version = "1.66"
-license = "MIT"
+description = "EGL for wayrs-client"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "egl", "opengl"]
+repository.workspace = true
+readme.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 
 [dependencies]
 gbm-sys = "0.2"
