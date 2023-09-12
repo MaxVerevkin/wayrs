@@ -2,7 +2,7 @@ use std::env;
 use std::ffi::CString;
 use std::io::{self, IoSlice, IoSliceMut};
 use std::num::NonZeroU32;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 

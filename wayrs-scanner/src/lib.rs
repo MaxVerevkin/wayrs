@@ -701,7 +701,7 @@ impl ArgExt for Argument {
                 true => quote!(#arg_name: ::std::option::Option<::std::ffi::CString>),
             },
             ("array", None, None, false) => quote!(#arg_name: ::std::vec::Vec<u8>),
-            ("fd", None, None, false) => quote!(#arg_name: ::std::os::unix::io::OwnedFd),
+            ("fd", None, None, false) => quote!(#arg_name: ::std::os::fd::OwnedFd),
             _ => unreachable!(),
         };
         Some(retval)
@@ -739,7 +739,7 @@ impl ArgExt for Argument {
                 true => quote!(::std::option::Option<::std::ffi::CString>),
             },
             "array" => quote!(::std::vec::Vec<u8>),
-            "fd" => quote!(::std::os::unix::io::OwnedFd),
+            "fd" => quote!(::std::os::fd::OwnedFd),
             _ => unreachable!(),
         }
     }

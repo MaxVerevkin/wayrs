@@ -1,4 +1,4 @@
-use std::os::unix::io::AsRawFd;
+use std::os::fd::AsRawFd;
 use std::sync::{Arc, Mutex};
 
 use wayrs_client::protocol::*;

@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 use std::io;
 use std::num::NonZeroU32;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, RawFd};
 
 use crate::interface::Interface;
 use crate::object::{Object, ObjectId, ObjectManager};

@@ -1,6 +1,6 @@
 use std::ffi::CString;
 use std::fmt::{self, Debug, Formatter};
-use std::os::unix::io::{AsRawFd, OwnedFd};
+use std::os::fd::{AsRawFd, OwnedFd};
 
 use crate::interface::Interface;
 use crate::object::{Object, ObjectId};

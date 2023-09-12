@@ -1,7 +1,7 @@
 //! A simple "free list" shared memory allocator
 
 use std::fs::File;
-use std::os::unix::io::{BorrowedFd, FromRawFd};
+use std::os::fd::{BorrowedFd, FromRawFd};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
