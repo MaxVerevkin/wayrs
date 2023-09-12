@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::cmp;
 use std::fmt::{self, Debug};
 use std::hash::{Hash, Hasher};
@@ -62,6 +63,12 @@ impl Hash for Object {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
+    }
+}
+
+impl Borrow<ObjectId> for Object {
+    fn borrow(&self) -> &ObjectId {
+        &self.id
     }
 }
 

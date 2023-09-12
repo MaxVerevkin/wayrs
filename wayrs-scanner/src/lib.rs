@@ -399,6 +399,13 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                 }
             }
 
+            impl ::std::borrow::Borrow<ObjectId> for #proxy_name {
+                #[inline]
+                fn borrow(&self) -> &ObjectId {
+                    &self.id
+                }
+            }
+
             #( #event_args_structs )*
             #( #enums )*
 
