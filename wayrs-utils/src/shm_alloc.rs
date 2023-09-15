@@ -1,7 +1,7 @@
 //! A simple "free list" shared memory allocator
 
 use std::fs::File;
-use std::os::fd::{BorrowedFd, FromRawFd};
+use std::os::fd::{AsFd, FromRawFd};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -65,7 +65,7 @@ pub struct Buffer {
 impl ShmAlloc {
     /// Bind `wl_shm` and create new [`ShmAlloc`].
     pub fn bind<D>(conn: &mut Connection<D>, globals: &Globals) -> Result<Self, BindError> {
-        Ok(Self::new(globals.bind(conn, 1..=1)?))
+        Ok(Self::new(globals.bind(conn, 1)?))
     }
 
     /// Create new [`ShmAlloc`].
@@ -145,11 +145,11 @@ impl InitShmPool {
         let file = unsafe { File::from_raw_fd(fd) };
         let mmap = unsafe { MmapMut::map_mut(&file).expect("memory mapping failed") };
 
-        let fd_dup = unsafe {
-            BorrowedFd::borrow_raw(fd)
-                .try_clone_to_owned()
-                .expect("could not duplicate fd")
-        };
+        let fd_dup = file
+            .as_fd()
+            .try_clone_to_owned()
+            .expect("could not duplicate fd");
+
         let pool = wl_shm.create_pool(conn, fd_dup, size as i32);
 
         Self {
