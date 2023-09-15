@@ -16,6 +16,8 @@ use crate::timer::Timer;
 pub trait KeyboardHandler: Sized + 'static {
     /// Get a reference to a [`Keyboard`]. It is guaranteed that the requested keyboard was created
     /// in [`Keyboard::new`].
+    ///
+    /// Returning a reference to a wrong object may cause [`Connection::dispatch_events`] to panic.
     fn get_keyboard(&mut self, wl_keyboard: WlKeyboard) -> &mut Keyboard;
 
     fn key_presed(&mut self, conn: &mut Connection<Self>, event: KeyboardEvent);
@@ -101,6 +103,10 @@ impl RepeatInfo {
 
 fn wl_keyboard_cb<D: KeyboardHandler>(ctx: EventCtx<D, WlKeyboard>) {
     let kbd = ctx.state.get_keyboard(ctx.proxy);
+    assert_eq!(
+        kbd.wl, ctx.proxy,
+        "invalid KeyboardHandler::get_keyboard() implementation"
+    );
 
     match ctx.event {
         wl_keyboard::Event::Keymap(args) if args.format == wl_keyboard::KeymapFormat::XkbV1 => {
