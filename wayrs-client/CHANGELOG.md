@@ -1,3 +1,9 @@
+# 0.12.1
+
+- Proxies and `Object` can now be compared with `ObjectId`.
+- Implement `Borrow<ObjectId>` for proxies and `Object`.
+- MSRV is now 1.66.
+
 # 0.12.0
 
 - Merge callback args into `EventCtx` struct.
