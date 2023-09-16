@@ -113,9 +113,13 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             let struct_name = format_ident!("{}Args", make_pascal_case_ident(&event.name));
             let arg_name = event.args.iter().map(|arg| make_ident(&arg.name));
             let arg_ty = event.args.iter().map(|arg| arg.as_event_ty());
+            let summary = event
+                .args
+                .iter()
+                .map(|arg| arg.summary.as_ref().map(|s| quote!(#[doc = #s])));
             quote! {
                 #[derive(Debug)]
-                pub struct #struct_name { #( pub #arg_name: #arg_ty, )* }
+                pub struct #struct_name { #( #summary pub #arg_name: #arg_ty, )* }
             }
         });
 
@@ -130,7 +134,13 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             }
             [arg] => {
                 let event_ty = arg.as_event_ty();
-                quote! { #doc #event_name(#event_ty) }
+                let arg_name = &arg.name;
+                let name_doc = quote!(#[doc = #arg_name]);
+                let summary = arg
+                    .summary
+                    .as_ref()
+                    .map(|s| quote!(#[doc = "\n"] #[doc = #s]));
+                quote! { #doc #event_name(#name_doc #summary #event_ty) }
             }
         }
     });
