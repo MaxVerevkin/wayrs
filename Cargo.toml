@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 repository = "https://github.com/MaxVerevkin/wayrs"
-readme = "../README.md"
+readme = "README.md"
 edition = "2021"
 rust-version = "1.66"
 license = "MIT"
