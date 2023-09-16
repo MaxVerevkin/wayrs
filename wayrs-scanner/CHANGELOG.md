@@ -1,3 +1,7 @@
+# 0.12.1
+
+- Generate docs for event arguments.
+
 # 0.12.0
 
 - Update for `wayrs-client` v0.12.
