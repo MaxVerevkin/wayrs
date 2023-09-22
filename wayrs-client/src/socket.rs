@@ -450,7 +450,7 @@ mod buf {
         pub fn peek_bytes(&mut self, buf: &mut [u8]) {
             assert!(self.readable_len() >= buf.len());
 
-            if self.head() >= self.offset || N - self.offset >= buf.len() {
+            if self.offset + buf.len() <= N {
                 buf.copy_from_slice(&self.bytes[self.offset..][..buf.len()]);
             } else {
                 let size = N - self.offset;
