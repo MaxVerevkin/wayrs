@@ -1,3 +1,8 @@
+# 0.12.2
+
+- Prevent excessive socket flushes.
+- Use ring buffers for in/out bytes. For reference, ring buffers are also used by `wayland-client`.
+
 # 0.12.1
 
 - Proxies and `Object` can now be compared with `ObjectId`.
