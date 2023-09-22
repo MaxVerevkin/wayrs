@@ -13,6 +13,8 @@ use crate::object::{Object, ObjectId};
 use crate::wire::{ArgType, ArgValue, Fixed, Message, MessageHeader};
 use crate::{ConnectError, IoMode};
 
+use buf::{ArrayBuffer, RingBuffer};
+
 pub const BYTES_OUT_LEN: usize = 4096;
 pub const BYTES_IN_LEN: usize = BYTES_OUT_LEN * 2;
 pub const FDS_OUT_LEN: usize = 28;
@@ -20,8 +22,8 @@ pub const FDS_IN_LEN: usize = FDS_OUT_LEN * 2;
 
 pub struct BufferedSocket {
     socket: UnixStream,
-    bytes_in: ArrayBuffer<u8, BYTES_IN_LEN>,
-    bytes_out: ArrayBuffer<u8, BYTES_OUT_LEN>,
+    bytes_in: RingBuffer<BYTES_IN_LEN>,
+    bytes_out: RingBuffer<BYTES_OUT_LEN>,
     fds_in: ArrayBuffer<RawFd, FDS_IN_LEN>,
     fds_out: ArrayBuffer<RawFd, FDS_OUT_LEN>,
 }
@@ -48,8 +50,8 @@ impl BufferedSocket {
 
         Ok(Self {
             socket: UnixStream::connect(path)?,
-            bytes_in: ArrayBuffer::new(),
-            bytes_out: ArrayBuffer::new(),
+            bytes_in: RingBuffer::new(),
+            bytes_out: RingBuffer::new(),
             fds_in: ArrayBuffer::new(),
             fds_out: ArrayBuffer::new(),
         })
@@ -75,7 +77,7 @@ impl BufferedSocket {
         // Check size and flush if neccessary
         assert!(size as usize <= BYTES_OUT_LEN);
         assert!(fds_cnt <= FDS_OUT_LEN);
-        if (size as usize) > self.bytes_out.get_writable().len()
+        if (size as usize) > self.bytes_out.writable_len()
             || fds_cnt > self.fds_out.get_writable().len()
         {
             if let Err(err) = self.flush(mode) {
@@ -117,11 +119,12 @@ impl BufferedSocket {
     }
 
     pub fn peek_message_header(&mut self, mode: IoMode) -> io::Result<MessageHeader> {
-        while self.bytes_in.get_readable().len() < MessageHeader::size() as usize {
+        while self.bytes_in.readable_len() < MessageHeader::size() as usize {
             self.fill_incoming_buf(mode)?;
         }
 
-        let raw = self.bytes_in.get_readable();
+        let mut raw = [0; MessageHeader::size() as usize];
+        self.bytes_in.peek_bytes(&mut raw);
         let object_id = u32::from_ne_bytes(raw[0..4].try_into().unwrap());
         let size_and_opcode = u32::from_ne_bytes(raw[4..8].try_into().unwrap());
 
@@ -152,14 +155,14 @@ impl BufferedSocket {
             .count();
         assert!(header.size as usize <= BYTES_IN_LEN);
         assert!(fds_cnt <= FDS_IN_LEN);
-        while header.size as usize > self.bytes_in.get_readable().len()
+        while header.size as usize > self.bytes_in.readable_len()
             || fds_cnt > self.fds_in.get_readable().len()
         {
             self.fill_incoming_buf(mode)?;
         }
 
         // Consume header
-        self.bytes_in.consume(MessageHeader::size() as usize);
+        self.bytes_in.move_tail(MessageHeader::size() as usize);
 
         let args = signature
             .iter()
@@ -195,7 +198,7 @@ impl BufferedSocket {
     }
 
     pub fn flush(&mut self, mode: IoMode) -> io::Result<()> {
-        if self.bytes_out.get_readable().is_empty() {
+        if self.bytes_out.is_empty() && self.fds_out.get_readable().is_empty() {
             return Ok(());
         }
 
@@ -213,15 +216,16 @@ impl BufferedSocket {
             }
         };
 
-        let iov = [IoSlice::new(self.bytes_out.get_readable())];
-        let sent = socket::sendmsg::<()>(self.socket.as_raw_fd(), &iov, cmsgs, flags, None)?;
+        let mut iov_buf = [IoSlice::new(&[]), IoSlice::new(&[])];
+        let iov = self.bytes_out.get_readable_iov(&mut iov_buf);
+        let sent = socket::sendmsg::<()>(self.socket.as_raw_fd(), iov, cmsgs, flags, None)?;
 
         for fd in self.fds_out.get_readable() {
             let _ = nix::unistd::close(*fd);
         }
 
-        // Does this have to be thue?
-        assert_eq!(sent, self.bytes_out.get_readable().len());
+        // Does this have to be true?
+        assert_eq!(sent, self.bytes_out.readable_len());
 
         self.bytes_out.clear();
         self.fds_out.clear();
@@ -232,9 +236,8 @@ impl BufferedSocket {
 
 impl BufferedSocket {
     fn fill_incoming_buf(&mut self, mode: IoMode) -> io::Result<()> {
-        self.bytes_in.relocate();
         self.fds_in.relocate();
-        if self.bytes_in.get_writable().is_empty() && self.fds_in.get_writable().is_empty() {
+        if self.bytes_in.is_full() && self.fds_in.get_writable().is_empty() {
             return Ok(());
         }
 
@@ -245,56 +248,58 @@ impl BufferedSocket {
             flags |= socket::MsgFlags::MSG_DONTWAIT;
         }
 
-        let mut iov = [IoSliceMut::new(self.bytes_in.get_writable())];
-        let msg = socket::recvmsg::<()>(self.socket.as_raw_fd(), &mut iov, Some(&mut cmsg), flags)?;
+        let mut iov_buf = [IoSliceMut::new(&mut []), IoSliceMut::new(&mut [])];
+        let iov = self.bytes_in.get_writeable_iov(&mut iov_buf);
+        let msg = socket::recvmsg::<()>(self.socket.as_raw_fd(), iov, Some(&mut cmsg), flags)?;
 
         for cmsg in msg.cmsgs() {
             if let ControlMessageOwned::ScmRights(fds) = cmsg {
-                self.fds_in.write_exact(&fds);
+                self.fds_in.extend(&fds);
             }
         }
 
         let read = msg.bytes;
-        self.bytes_in.advance(read);
 
         if read == 0 {
-            Err(io::Error::new(
+            return Err(io::Error::new(
                 io::ErrorKind::BrokenPipe,
                 "server disconnected",
-            ))
-        } else {
-            Ok(())
+            ));
         }
+
+        self.bytes_in.move_head(read);
+
+        Ok(())
     }
 
     fn send_array(&mut self, array: &[u8]) {
         let len = array.len() as u32;
 
         self.bytes_out.write_uint(len);
-        self.bytes_out.write_exact(array);
+        self.bytes_out.write_bytes(array);
 
         let padding = ((4 - (len % 4)) % 4) as usize;
-        self.bytes_out.write_exact(&[0, 0, 0][..padding]);
+        self.bytes_out.write_bytes(&[0, 0, 0][..padding]);
     }
 
     fn recv_array(&mut self) -> Vec<u8> {
         let len = self.bytes_in.read_uint() as usize;
 
         let mut buf = vec![0; len];
-        self.bytes_in.read_exact(&mut buf);
+        self.bytes_in.read_bytes(&mut buf);
 
         let padding = (4 - (len % 4)) % 4;
-        self.bytes_in.consume(padding);
+        self.bytes_in.move_tail(padding);
 
         buf
     }
 
     fn recv_string_with_len(&mut self, len: u32) -> CString {
         let mut buf = vec![0; len as usize];
-        self.bytes_in.read_exact(&mut buf);
+        self.bytes_in.read_bytes(&mut buf);
 
         let padding = (4 - (len % 4)) % 4;
-        self.bytes_in.consume(padding as usize);
+        self.bytes_in.move_tail(padding as usize);
 
         CString::from_vec_with_nul(buf).expect("received string with internal null bytes")
     }
@@ -305,103 +310,225 @@ impl BufferedSocket {
     }
 }
 
-struct ArrayBuffer<T, const N: usize> {
-    bytes: Box<[T; N]>,
-    offset: usize,
-    len: usize,
-}
+mod buf {
+    use super::*;
 
-impl<T: Default + Copy, const N: usize> ArrayBuffer<T, N> {
-    fn new() -> Self {
-        Self {
-            bytes: Box::new([T::default(); N]),
-            offset: 0,
-            len: 0,
+    pub struct ArrayBuffer<T, const N: usize> {
+        bytes: Box<[T; N]>,
+        offset: usize,
+        len: usize,
+    }
+
+    impl<T: Default + Copy, const N: usize> ArrayBuffer<T, N> {
+        pub fn new() -> Self {
+            Self {
+                bytes: Box::new([T::default(); N]),
+                offset: 0,
+                len: 0,
+            }
+        }
+
+        pub fn clear(&mut self) {
+            self.offset = 0;
+            self.len = 0;
+        }
+
+        pub fn get_writable(&mut self) -> &mut [T] {
+            &mut self.bytes[(self.offset + self.len)..]
+        }
+
+        pub fn get_readable(&self) -> &[T] {
+            &self.bytes[self.offset..][..self.len]
+        }
+
+        pub fn consume(&mut self, cnt: usize) {
+            assert!(cnt <= self.len);
+            self.offset += cnt;
+            self.len -= cnt;
+        }
+
+        pub fn advance(&mut self, cnt: usize) {
+            assert!(self.offset + self.len + cnt <= N);
+            self.len += cnt;
+        }
+
+        pub fn relocate(&mut self) {
+            if self.len > 0 && self.offset > 0 {
+                self.bytes
+                    .copy_within(self.offset..(self.offset + self.len), 0);
+            }
+            self.offset = 0;
+        }
+
+        pub fn write_one(&mut self, elem: T) {
+            let writable = self.get_writable();
+            assert!(!writable.is_empty());
+            writable[0] = elem;
+            self.advance(1);
+        }
+
+        pub fn read_one(&mut self) -> T {
+            let readable = self.get_readable();
+            assert!(!readable.is_empty());
+            let elem = readable[0];
+            self.consume(1);
+            elem
+        }
+
+        pub fn extend(&mut self, src: &[T]) {
+            let writable = &mut self.get_writable()[..src.len()];
+            writable.copy_from_slice(src);
+            self.advance(src.len());
         }
     }
 
-    fn clear(&mut self) {
-        self.offset = 0;
-        self.len = 0;
+    pub struct RingBuffer<const N: usize> {
+        bytes: Box<[u8; N]>,
+        offset: usize,
+        len: usize,
     }
 
-    fn get_writable(&mut self) -> &mut [T] {
-        &mut self.bytes[(self.offset + self.len)..]
-    }
-
-    fn get_readable(&self) -> &[T] {
-        &self.bytes[self.offset..][..self.len]
-    }
-
-    fn consume(&mut self, cnt: usize) {
-        assert!(cnt <= self.len);
-        self.offset += cnt;
-        self.len -= cnt;
-    }
-
-    fn advance(&mut self, cnt: usize) {
-        assert!(self.offset + self.len + cnt <= N);
-        self.len += cnt;
-    }
-
-    fn relocate(&mut self) {
-        if self.len > 0 && self.offset > 0 {
-            self.bytes
-                .copy_within(self.offset..(self.offset + self.len), 0);
+    impl<const N: usize> RingBuffer<N> {
+        pub fn new() -> Self {
+            Self {
+                bytes: Box::new([0; N]),
+                offset: 0,
+                len: 0,
+            }
         }
-        self.offset = 0;
-    }
 
-    fn write_one(&mut self, elem: T) {
-        let writable = self.get_writable();
-        assert!(!writable.is_empty());
-        writable[0] = elem;
-        self.advance(1);
-    }
+        pub fn clear(&mut self) {
+            self.offset = 0;
+            self.len = 0;
+        }
 
-    fn read_one(&mut self) -> T {
-        let readable = self.get_readable();
-        assert!(!readable.is_empty());
-        let elem = readable[0];
-        self.consume(1);
-        elem
-    }
+        pub fn move_head(&mut self, n: usize) {
+            self.len += n;
+        }
 
-    fn write_exact(&mut self, src: &[T]) {
-        let writable = &mut self.get_writable()[..src.len()];
-        writable.copy_from_slice(src);
-        self.advance(src.len());
-    }
+        pub fn move_tail(&mut self, n: usize) {
+            self.offset = (self.offset + n) % N;
+            self.len = self.len.checked_sub(n).unwrap();
+        }
 
-    fn read_exact(&mut self, dst: &mut [T]) {
-        let readable = &self.get_readable()[..dst.len()];
-        dst.copy_from_slice(readable);
-        self.consume(dst.len());
-    }
-}
+        pub fn readable_len(&self) -> usize {
+            self.len
+        }
 
-impl<const N: usize> ArrayBuffer<u8, N> {
-    fn write_int(&mut self, int: i32) {
-        self.write_exact(&int.to_ne_bytes());
-    }
+        pub fn writable_len(&self) -> usize {
+            N - self.len
+        }
 
-    fn write_uint(&mut self, uint: u32) {
-        self.write_exact(&uint.to_ne_bytes());
-    }
+        pub fn is_empty(&self) -> bool {
+            self.len == 0
+        }
 
-    fn read_int(&mut self) -> i32 {
-        let mut buf = [0; 4];
-        self.read_exact(&mut buf);
-        i32::from_ne_bytes(buf)
-    }
+        pub fn is_full(&self) -> bool {
+            self.len == N
+        }
 
-    fn read_uint(&mut self) -> u32 {
-        let mut buf = [0; 4];
-        self.read_exact(&mut buf);
-        u32::from_ne_bytes(buf)
-    }
+        fn head(&self) -> usize {
+            (self.offset + self.len) % N
+        }
 
-    fn read_id(&mut self) -> Option<ObjectId> {
-        NonZeroU32::new(self.read_uint()).map(ObjectId)
+        pub fn write_bytes(&mut self, data: &[u8]) {
+            assert!(self.writable_len() >= data.len());
+
+            let head = self.head();
+            if head + data.len() <= N {
+                self.bytes[head..][..data.len()].copy_from_slice(data);
+            } else {
+                let size = N - head;
+                let rest = data.len() - size;
+                self.bytes[head..][..size].copy_from_slice(&data[..size]);
+                self.bytes[..rest].copy_from_slice(&data[size..]);
+            }
+
+            self.move_head(data.len());
+        }
+
+        pub fn peek_bytes(&mut self, buf: &mut [u8]) {
+            assert!(self.readable_len() >= buf.len());
+
+            if self.head() >= self.offset || N - self.offset >= buf.len() {
+                buf.copy_from_slice(&self.bytes[self.offset..][..buf.len()]);
+            } else {
+                let size = N - self.offset;
+                let rest = buf.len() - size;
+                buf[..size].copy_from_slice(&self.bytes[self.offset..][..size]);
+                buf[size..].copy_from_slice(&self.bytes[..rest]);
+            }
+        }
+
+        pub fn read_bytes(&mut self, buf: &mut [u8]) {
+            self.peek_bytes(buf);
+            self.move_tail(buf.len());
+        }
+
+        pub fn get_writeable_iov<'b, 'a: 'b>(
+            &'a mut self,
+            iov_buf: &'b mut [IoSliceMut<'a>; 2],
+        ) -> &'b mut [IoSliceMut<'a>] {
+            let head = self.head();
+            if self.len == 0 {
+                self.offset = 0;
+                iov_buf[0] = IoSliceMut::new(&mut *self.bytes);
+                &mut iov_buf[0..1]
+            } else if head < self.offset {
+                iov_buf[0] = IoSliceMut::new(&mut self.bytes[head..self.offset]);
+                &mut iov_buf[0..1]
+            } else if self.offset == 0 {
+                iov_buf[0] = IoSliceMut::new(&mut self.bytes[head..N]);
+                &mut iov_buf[0..1]
+            } else {
+                let (left, right) = self.bytes.split_at_mut(head);
+                iov_buf[0] = IoSliceMut::new(right);
+                iov_buf[1] = IoSliceMut::new(&mut left[..self.offset]);
+                &mut iov_buf[0..2]
+            }
+        }
+
+        pub fn get_readable_iov<'b, 'a: 'b>(
+            &'a self,
+            iov_buf: &'b mut [IoSlice<'a>; 2],
+        ) -> &'b [IoSlice<'a>] {
+            let head = self.head();
+            if self.offset < head {
+                iov_buf[0] = IoSlice::new(&self.bytes[self.offset..head]);
+                &iov_buf[0..1]
+            } else if head == 0 {
+                iov_buf[0] = IoSlice::new(&self.bytes[self.offset..]);
+                &iov_buf[0..1]
+            } else {
+                let (left, right) = self.bytes.split_at(self.offset);
+                iov_buf[0] = IoSlice::new(right);
+                iov_buf[1] = IoSlice::new(&left[..head]);
+                &iov_buf[0..2]
+            }
+        }
+
+        pub fn write_int(&mut self, val: i32) {
+            self.write_bytes(&val.to_ne_bytes());
+        }
+
+        pub fn write_uint(&mut self, val: u32) {
+            self.write_bytes(&val.to_ne_bytes());
+        }
+
+        pub fn read_int(&mut self) -> i32 {
+            let mut buf = [0; 4];
+            self.read_bytes(&mut buf);
+            i32::from_ne_bytes(buf)
+        }
+
+        pub fn read_uint(&mut self) -> u32 {
+            let mut buf = [0; 4];
+            self.read_bytes(&mut buf);
+            u32::from_ne_bytes(buf)
+        }
+
+        pub fn read_id(&mut self) -> Option<ObjectId> {
+            NonZeroU32::new(self.read_uint()).map(ObjectId)
+        }
     }
 }
