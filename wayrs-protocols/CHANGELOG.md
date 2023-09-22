@@ -1,3 +1,7 @@
+# 0.12.1
+
+- Release to trigger docs.rs to regenerate the documentation.
+
 # 0.12.0
 
 - Update `wayland-protocols` to [e1d61ce9](https://gitlab.freedesktop.org/wayland/wayland-protocols/-/commit/e1d61ce9402ebd996d758c43f167e6280c1a3568).
