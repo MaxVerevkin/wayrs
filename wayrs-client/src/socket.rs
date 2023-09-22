@@ -75,8 +75,8 @@ impl BufferedSocket {
         // Check size and flush if neccessary
         assert!(size as usize <= BYTES_OUT_LEN);
         assert!(fds_cnt <= FDS_OUT_LEN);
-        if (size as usize) < self.bytes_out.get_writable().len()
-            || fds_cnt < self.fds_out.get_writable().len()
+        if (size as usize) > self.bytes_out.get_writable().len()
+            || fds_cnt > self.fds_out.get_writable().len()
         {
             if let Err(err) = self.flush(mode) {
                 return Err(SendMessageError { msg, err });
