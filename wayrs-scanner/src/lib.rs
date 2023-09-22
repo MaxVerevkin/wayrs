@@ -86,7 +86,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
     let mod_name = syn::Ident::new(&iface.name, Span::call_site());
 
     let proxy_name = make_pascal_case_ident(&iface.name);
-    let proxy_name_str = syn::LitStr::new(&snake_to_pascal(&iface.name), Span::call_site());
+    let proxy_name_str = snake_to_pascal(&iface.name);
 
     let raw_iface_name = &iface.name;
     let iface_version = iface.version;

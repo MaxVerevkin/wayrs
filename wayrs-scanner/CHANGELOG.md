@@ -1,3 +1,7 @@
+# 0.12.2
+
+- Generate "See `Event` for the list of possible events" in docs.
+
 # 0.12.1
 
 - Generate docs for event arguments.
