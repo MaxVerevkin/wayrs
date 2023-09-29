@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Get required packages
         run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@master
@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Get required packages
         run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
@@ -39,10 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
-        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
-      - name: Get required packages
-        run: sudo apt-get install fd-find
-      - uses: actions/checkout@v3
+        run: sudo apt-get update && sudo apt-get install fd-find libxkbcommon-dev libdrm-dev libegl-dev
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
@@ -57,7 +55,7 @@ jobs:
     steps:
       - name: Get required packages
         run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
