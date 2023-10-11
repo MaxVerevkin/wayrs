@@ -1,7 +1,6 @@
 //! wl_keyboard helper
 
 use std::fmt::{self, Debug};
-use std::os::fd::AsRawFd;
 use std::time::Duration;
 
 use wayrs_client::protocol::wl_keyboard::{EnterArgs, LeaveArgs};
@@ -113,7 +112,7 @@ fn wl_keyboard_cb<D: KeyboardHandler>(ctx: EventCtx<D, WlKeyboard>) {
             let keymap = unsafe {
                 xkb::Keymap::new_from_fd(
                     &kbd.xkb_context,
-                    args.fd.as_raw_fd(),
+                    args.fd,
                     args.size as usize,
                     xkb::FORMAT_TEXT_V1,
                     xkb::KEYMAP_COMPILE_NO_FLAGS,
