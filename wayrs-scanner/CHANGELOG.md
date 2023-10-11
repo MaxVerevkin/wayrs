@@ -1,3 +1,7 @@
+# 0.12.3
+
+- Update `proc-macro-crate` dependency.
+
 # 0.12.2
 
 - Generate "See `Event` for the list of possible events" in docs.
