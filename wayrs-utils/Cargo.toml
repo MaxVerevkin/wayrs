@@ -1,6 +1,6 @@
 [package]
 name = "wayrs-utils"
-version = "0.10.0"
+version = "0.11.0"
 description = "A collection of utils and abstractions for wayrs-client"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "client"]

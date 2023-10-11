@@ -1,3 +1,8 @@
+# 0.11.0
+
+- Panic if `KeyboardHandler::get_keyboard` implementation is incorrect.
+- Update `xkbcommon` to v0.7 and `memmap2` to v0.8.
+
 # 0.10.0
 
 - Update `xkbcommon` to v0.6.

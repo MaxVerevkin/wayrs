@@ -20,4 +20,4 @@ wayrs-protocols = { version = "0.12", path = "../wayrs-protocols", features = ["
 [dev-dependencies]
 gles31 = "1.0"
 wayrs-protocols = { version = "0.12", path = "../wayrs-protocols", features = ["xdg-shell"] }
-wayrs-utils = { version = "0.10", path = "../wayrs-utils", features = ["dmabuf_feedback"] }
+wayrs-utils = { version = "0.11", path = "../wayrs-utils", features = ["dmabuf_feedback"] }
