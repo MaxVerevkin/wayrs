@@ -380,6 +380,7 @@ impl DmabufFeedbackHandler for State {
 
         let egl_display = EglDisplay::new(self.linux_dmabuf, render_node).unwrap();
 
+        let format_table = self.surf.dmabuf_feedback.format_table();
         let mut formats = HashMap::<Fourcc, Vec<u64>>::new();
 
         for tranche in &self.surf.dmabuf_feedback.tranches {
@@ -390,7 +391,7 @@ impl DmabufFeedbackHandler for State {
                 continue;
             }
             for &index in tranche.formats.as_ref().expect("tranche.formats") {
-                let fmt = self.surf.dmabuf_feedback.format_table[index as usize];
+                let fmt = format_table[index as usize];
                 if egl_display.is_format_supported(Fourcc(fmt.fourcc), fmt.modifier) {
                     formats
                         .entry(Fourcc(fmt.fourcc))

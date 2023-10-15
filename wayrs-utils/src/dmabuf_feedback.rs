@@ -17,10 +17,10 @@ use wayrs_protocols::linux_dmabuf_unstable_v1::*;
 #[derive(Debug)]
 pub struct DmabufFeedback {
     pub main_device: Option<dev_t>,
-    pub format_table: Vec<FormatTableEntry>,
     pub tranches: Vec<DmabufTranche>,
 
     wl: ZwpLinuxDmabufFeedbackV1,
+    format_table: Option<memmap2::Mmap>,
     tranches_done: bool,
     pending_tranche: DmabufTranche,
 }
@@ -32,9 +32,11 @@ pub struct DmabufTranche {
     pub flags: zwp_linux_dmabuf_feedback_v1::TrancheFlags,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
+#[repr(C)]
 pub struct FormatTableEntry {
     pub fourcc: u32,
+    _padding: u32,
     pub modifier: u64,
 }
 
@@ -56,7 +58,7 @@ impl DmabufFeedback {
         Self {
             wl: linux_dmabuf.get_default_feedback_with_cb(conn, dmabuf_feedback_cb),
             main_device: None,
-            format_table: Vec::new(),
+            format_table: None,
             tranches: Vec::new(),
 
             tranches_done: false,
@@ -72,7 +74,7 @@ impl DmabufFeedback {
         Self {
             wl: linux_dmabuf.get_surface_feedback_with_cb(conn, surface, dmabuf_feedback_cb),
             main_device: None,
-            format_table: Vec::new(),
+            format_table: None,
             tranches: Vec::new(),
 
             tranches_done: false,
@@ -82,6 +84,18 @@ impl DmabufFeedback {
 
     pub fn wl(&self) -> ZwpLinuxDmabufFeedbackV1 {
         self.wl
+    }
+
+    pub fn format_table(&self) -> &[FormatTableEntry] {
+        match &self.format_table {
+            Some(mmap) => unsafe {
+                std::slice::from_raw_parts(
+                    mmap.as_ptr().cast(),
+                    mmap.len() / std::mem::size_of::<FormatTableEntry>(),
+                )
+            },
+            None => &[],
+        }
     }
 
     pub fn destroy<D>(self, conn: &mut Connection<D>) {
@@ -103,20 +117,17 @@ fn dmabuf_feedback_cb<D: DmabufFeedbackHandler>(ctx: EventCtx<D, ZwpLinuxDmabufF
             ctx.state.feedback_done(ctx.conn, ctx.proxy);
         }
         Event::FormatTable(args) => {
-            feedback.format_table.clear();
-            feedback.format_table.reserve((args.size / 16) as usize);
             let mmap = unsafe {
                 memmap2::MmapOptions::new()
                     .len(args.size as usize)
                     .map(&args.fd)
                     .expect("mmap failed")
             };
-            for pair in mmap.chunks_exact(16) {
-                feedback.format_table.push(FormatTableEntry {
-                    fourcc: u32::from_ne_bytes(pair[0..4].try_into().unwrap()),
-                    modifier: u64::from_ne_bytes(pair[8..16].try_into().unwrap()),
-                });
-            }
+            assert!(
+                ptr_is_aligned(mmap.as_ptr().cast::<FormatTableEntry>()),
+                "memory map is not alligned"
+            );
+            feedback.format_table = Some(mmap);
         }
         Event::MainDevice(main_dev) => {
             feedback.main_device = Some(dev_t::from_ne_bytes(
@@ -175,4 +186,8 @@ impl fmt::Debug for FormatTableEntry {
             self.modifier
         )
     }
+}
+
+fn ptr_is_aligned<T>(ptr: *const T) -> bool {
+    (ptr as usize) & (std::mem::align_of::<T>() - 1) == 0
 }
