@@ -16,13 +16,12 @@ use wayrs_protocols::linux_dmabuf_unstable_v1::*;
 
 #[derive(Debug)]
 pub struct DmabufFeedback {
-    pub main_device: Option<dev_t>,
-    pub tranches: Vec<DmabufTranche>,
-
     wl: ZwpLinuxDmabufFeedbackV1,
+    main_device: Option<dev_t>,
     format_table: Option<memmap2::Mmap>,
-    tranches_done: bool,
+    tranches: Vec<DmabufTranche>,
     pending_tranche: DmabufTranche,
+    tranches_done: bool,
 }
 
 #[derive(Debug, Default)]
@@ -60,9 +59,8 @@ impl DmabufFeedback {
             main_device: None,
             format_table: None,
             tranches: Vec::new(),
-
-            tranches_done: false,
             pending_tranche: DmabufTranche::default(),
+            tranches_done: false,
         }
     }
 
@@ -76,14 +74,17 @@ impl DmabufFeedback {
             main_device: None,
             format_table: None,
             tranches: Vec::new(),
-
-            tranches_done: false,
             pending_tranche: DmabufTranche::default(),
+            tranches_done: false,
         }
     }
 
     pub fn wl(&self) -> ZwpLinuxDmabufFeedbackV1 {
         self.wl
+    }
+
+    pub fn main_device(&self) -> Option<dev_t> {
+        self.main_device
     }
 
     pub fn format_table(&self) -> &[FormatTableEntry] {
@@ -96,6 +97,10 @@ impl DmabufFeedback {
             },
             None => &[],
         }
+    }
+
+    pub fn tranches(&self) -> &[DmabufTranche] {
+        &self.tranches
     }
 
     pub fn destroy<D>(self, conn: &mut Connection<D>) {

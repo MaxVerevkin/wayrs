@@ -368,7 +368,7 @@ impl DmabufFeedbackHandler for State {
         let main_dev = self
             .surf
             .dmabuf_feedback
-            .main_device
+            .main_device()
             .expect("dmabuf_feedback: main_device not advertised");
 
         let drm_device =
@@ -383,7 +383,7 @@ impl DmabufFeedbackHandler for State {
         let format_table = self.surf.dmabuf_feedback.format_table();
         let mut formats = HashMap::<Fourcc, Vec<u64>>::new();
 
-        for tranche in &self.surf.dmabuf_feedback.tranches {
+        for tranche in self.surf.dmabuf_feedback.tranches() {
             if tranche
                 .flags
                 .contains(zwp_linux_dmabuf_feedback_v1::TrancheFlags::Scanout)
