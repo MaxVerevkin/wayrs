@@ -1,3 +1,8 @@
+# 0.12.3
+
+- Fix binding of globals with no upper version limit.
+- Add `Connection::clear_callbacks()`.
+
 # 0.12.2
 
 - Prevent excessive socket flushes.
