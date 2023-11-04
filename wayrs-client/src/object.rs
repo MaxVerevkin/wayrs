@@ -146,6 +146,27 @@ impl<D> ObjectManager<D> {
         this
     }
 
+    pub fn clear_callbacks<D2>(self) -> ObjectManager<D2> {
+        let map = |x: ObjectState<D>| ObjectState {
+            object: x.object,
+            is_alive: x.is_alive,
+            cb: None,
+        };
+        ObjectManager {
+            vacant_ids: self.vacant_ids,
+            client_objects: self
+                .client_objects
+                .into_iter()
+                .map(|x| x.map(map))
+                .collect(),
+            server_objects: self
+                .server_objects
+                .into_iter()
+                .map(|x| x.map(map))
+                .collect(),
+        }
+    }
+
     pub fn alloc_client_object(
         &mut self,
         interface: &'static Interface,

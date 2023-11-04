@@ -24,6 +24,9 @@ use tokio::io::unix::AsyncFd;
 ///
 /// Set `WAYLAND_DEBUG=1` environment variable to get debug messages.
 pub struct Connection<D> {
+    #[cfg(feature = "tokio")]
+    async_fd: Option<AsyncFd<RawFd>>,
+
     socket: BufferedSocket,
 
     object_mgr: ObjectManager<D>,
@@ -36,9 +39,6 @@ pub struct Connection<D> {
 
     // This is `None` while dispatching registry events, to prevent mutation from registry callbacks.
     registry_cbs: Option<Vec<RegistryCb<D>>>,
-
-    #[cfg(feature = "tokio")]
-    async_fd: Option<AsyncFd<RawFd>>,
 
     debug: bool,
 }
@@ -67,6 +67,9 @@ impl<D> Connection<D> {
     /// future, considering registries cannot be destroyed.
     pub fn connect() -> Result<Self, ConnectError> {
         let mut this = Self {
+            #[cfg(feature = "tokio")]
+            async_fd: None,
+
             socket: BufferedSocket::connect()?,
 
             object_mgr: ObjectManager::new(),
@@ -77,9 +80,6 @@ impl<D> Connection<D> {
 
             registry: WlRegistry::new(ObjectId::MAX_CLIENT, 1), // Temp dummy object
             registry_cbs: Some(Vec::new()),
-
-            #[cfg(feature = "tokio")]
-            async_fd: None,
 
             debug: std::env::var_os("WAYLAND_DEBUG").is_some(),
         };
@@ -182,6 +182,24 @@ impl<D> Connection<D> {
         assert!(obj.is_alive, "attempt to set a callback for dead object");
 
         obj.cb = Some(Self::make_generic_cb(cb));
+    }
+
+    /// Remove all callbacks.
+    ///
+    /// You can use this function to change the "state type" of a connection.
+    pub fn clear_callbacs<D2>(self) -> Connection<D2> {
+        Connection {
+            #[cfg(feature = "tokio")]
+            async_fd: self.async_fd,
+            socket: self.socket,
+            object_mgr: self.object_mgr.clear_callbacks(),
+            event_queue: self.event_queue,
+            requests_queue: self.requests_queue,
+            break_dispatch: self.break_dispatch,
+            registry: self.registry,
+            registry_cbs: Some(Vec::new()),
+            debug: self.debug,
+        }
     }
 
     /// Perform a blocking roundtrip.
@@ -497,16 +515,6 @@ impl<D> Connection<D> {
             };
             cb(ctx);
         })
-    }
-}
-
-#[cfg(feature = "tokio")]
-impl<D> Drop for Connection<D> {
-    fn drop(&mut self) {
-        // Drop AsyncFd before BufferedSocket
-        if let Some(async_fd) = self.async_fd.take() {
-            let _ = async_fd.into_inner();
-        }
     }
 }
 
