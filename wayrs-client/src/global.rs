@@ -100,10 +100,8 @@ impl GlobalExt for Global {
         }
 
         let reg = conn.registry();
-        let version = match version.upper() {
-            None => self.version,
-            Some(upper) => u32::min(upper, self.version),
-        };
+        let upper = version.upper().unwrap_or(P::INTERFACE.version);
+        let version = u32::min(upper, self.version);
 
         Ok(reg.bind(conn, self.name, version))
     }
