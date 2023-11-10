@@ -1,3 +1,7 @@
+# 0.12.4 [unreleased]
+
+- Update `quick-xml` dependency.
+
 # 0.12.3
 
 - Update `proc-macro-crate` dependency.
