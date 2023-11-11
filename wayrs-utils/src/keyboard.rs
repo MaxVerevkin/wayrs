@@ -3,6 +3,7 @@
 use std::fmt::{self, Debug};
 use std::time::Duration;
 
+use wayrs_client::object::ObjectId;
 use wayrs_client::protocol::wl_keyboard::{EnterArgs, LeaveArgs};
 use wayrs_client::proxy::Proxy;
 use wayrs_client::Connection;
@@ -34,6 +35,7 @@ pub trait KeyboardHandler: Sized + 'static {
 pub struct Keyboard {
     seat: WlSeat,
     wl: WlKeyboard,
+    focused_surface: Option<ObjectId>,
     xkb_context: xkb::Context,
     xkb_state: Option<xkb::State>,
     repeat_info: Option<RepeatInfo>,
@@ -50,6 +52,7 @@ pub struct RepeatInfo {
 pub struct KeyboardEvent {
     pub seat: WlSeat,
     pub keyboard: WlKeyboard,
+    pub surface: ObjectId,
     pub serial: u32,
     pub time: u32,
     pub keycode: xkb::Keycode,
@@ -70,6 +73,7 @@ impl Keyboard {
         Self {
             seat,
             wl: seat.get_keyboard_with_cb(conn, wl_keyboard_cb),
+            focused_surface: None,
             xkb_context: xkb::Context::new(xkb::CONTEXT_NO_FLAGS),
             xkb_state: None,
             repeat_info: None,
@@ -124,13 +128,19 @@ fn wl_keyboard_cb<D: KeyboardHandler>(ctx: EventCtx<D, WlKeyboard>) {
             }
         }
         wl_keyboard::Event::Enter(args) => {
+            kbd.focused_surface = Some(args.surface);
             ctx.state.enter_surface(ctx.conn, ctx.proxy, args);
         }
         wl_keyboard::Event::Leave(args) => {
+            kbd.focused_surface = None;
             ctx.state.leave_surface(ctx.conn, ctx.proxy, args);
+            // TODO: clear modifiers (how?)
         }
         wl_keyboard::Event::Key(args) => {
             let Some(xkb_state) = kbd.xkb_state.clone() else {
+                return;
+            };
+            let Some(surface) = kbd.focused_surface else {
                 return;
             };
 
@@ -145,6 +155,7 @@ fn wl_keyboard_cb<D: KeyboardHandler>(ctx: EventCtx<D, WlKeyboard>) {
             let event = KeyboardEvent {
                 seat: kbd.seat,
                 keyboard: kbd.wl,
+                surface,
                 serial: args.serial,
                 time: args.time,
                 keycode,
