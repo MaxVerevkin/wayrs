@@ -1,3 +1,10 @@
+# 0.12.0
+
+- Keyboard: mark `KeyboardEvent` as `non_exhaustive`.
+- Keyboard: include focused surface id in `KeyboardEvent`.
+- Dmabuf: make all `DmabufFeedback` fields private, add getters.
+- Dmabuf: do not copy format table from memory-map (reinterpret mmap instead).
+
 # 0.11.0
 
 - Panic if `KeyboardHandler::get_keyboard` implementation is incorrect.
