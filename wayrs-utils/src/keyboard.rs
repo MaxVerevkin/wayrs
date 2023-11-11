@@ -46,6 +46,7 @@ pub struct RepeatInfo {
 }
 
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct KeyboardEvent {
     pub seat: WlSeat,
     pub keyboard: WlKeyboard,
