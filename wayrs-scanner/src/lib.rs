@@ -12,6 +12,9 @@ use crate::parser::Parser;
 use crate::types::*;
 use crate::utils::*;
 
+/// These interfaces are frozen at version 1 and will not introduce new events or requests.
+const FROZEN_IFACES: &[&str] = &["wl_callback", "wl_buffer"];
+
 fn wayrs_client_path() -> TokenStream {
     match crate_name("wayrs-client") {
         Ok(FoundCrate::Name(name)) => {
@@ -285,6 +288,9 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         quote!()
     };
 
+    let event_exhaustiveness =
+        (!FROZEN_IFACES.contains(&iface.name.as_str())).then(|| quote! { #[non_exhaustive] });
+
     quote! {
         #mod_doc
         #visibility mod #mod_name {
@@ -425,7 +431,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             #[doc = #proxy_name_str]
             #[doc = "`]"]
             #[derive(Debug)]
-            #[non_exhaustive]
+            #event_exhaustiveness
             pub enum Event {
                 #( #event_enum_options, )*
             }
