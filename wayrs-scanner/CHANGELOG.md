@@ -1,4 +1,9 @@
-# 0.12.4 [unreleased]
+# 0.12.5
+
+- Do not mark `wl_collback::Event` and `wl_buffer::Event` as non-exhaustive. These two interfaces
+  are documented as "frozen", so they will never introduce new events/requests.
+
+# 0.12.4
 
 - Update `quick-xml` dependency.
 
