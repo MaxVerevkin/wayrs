@@ -266,9 +266,7 @@ impl State {
         }
 
         self.surf.frame_cb = Some(self.surf.wl.frame_with_cb(conn, |ctx| {
-            let wl_callback::Event::Done(time) = ctx.event else {
-                unreachable!()
-            };
+            let wl_callback::Event::Done(time) = ctx.event;
             assert_eq!(ctx.state.surf.frame_cb, Some(ctx.proxy));
             ctx.state.surf.frame_cb = None;
             ctx.state.render(ctx.conn, Some(time));
