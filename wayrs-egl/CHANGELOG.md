@@ -1,3 +1,8 @@
+# 0.3.1
+
+- Update `gbm-sys` to v0.3.
+- Remove `memmap2` dependency.
+
 # 0.3.0
 
 - Use `wayrs-client` v0.12.
