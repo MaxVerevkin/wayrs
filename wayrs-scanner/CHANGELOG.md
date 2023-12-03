@@ -1,3 +1,7 @@
+# 0.12.6
+
+- Do not use `concat!()` in generated docs because rust-analyzer doesn't support it.
+
 # 0.12.5
 
 - Do not mark `wl_collback::Event` and `wl_buffer::Event` as non-exhaustive. These two interfaces
