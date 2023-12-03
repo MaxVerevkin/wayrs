@@ -652,19 +652,21 @@ fn map_arg_to_argval(arg: &Argument, is_event: bool) -> TokenStream {
 }
 
 fn gen_doc(desc: Option<&Description>, since: Option<u32>) -> TokenStream {
-    let since = since.map(|ver| quote!(#[doc = concat!("**Since version ", #ver, "**.\n")]));
+    let since = since
+        .map(|ver| format!("**Since version {ver}**.\n"))
+        .map(|ver| quote!(#[doc = #ver]));
 
     let summary = desc
         .and_then(|d| d.summary.as_deref())
-        .map(str::trim)
-        .map(|s| quote!(#[doc = concat!(#s, "\n")]));
+        .map(|s| format!("{}\n", s.trim()))
+        .map(|s| quote!(#[doc = #s]));
 
     let text = desc
         .and_then(|d| d.text.as_deref())
         .into_iter()
         .flat_map(str::lines)
-        .map(str::trim)
-        .map(|s| quote!(#[doc = concat!(#s, "\n")]));
+        .map(|s| format!("{}\n", s.trim()))
+        .map(|s| quote!(#[doc = #s]));
 
     quote! {
         #summary
