@@ -1,3 +1,7 @@
+# 0.12.4
+
+- Fixed typo in `Connection::clear_callbacks()` (`clear_callbacs` is deprecated).
+
 # 0.12.3
 
 - Fix binding of globals with no upper version limit.
