@@ -187,7 +187,7 @@ impl<D> Connection<D> {
     /// Remove all callbacks.
     ///
     /// You can use this function to change the "state type" of a connection.
-    pub fn clear_callbacs<D2>(self) -> Connection<D2> {
+    pub fn clear_callbacks<D2>(self) -> Connection<D2> {
         Connection {
             #[cfg(feature = "tokio")]
             async_fd: self.async_fd,
@@ -200,6 +200,12 @@ impl<D> Connection<D> {
             registry_cbs: Some(Vec::new()),
             debug: self.debug,
         }
+    }
+
+    #[doc(hidden)]
+    #[deprecated = "use clear_callbacks"]
+    pub fn clear_callbacs<D2>(self) -> Connection<D2> {
+        self.clear_callbacks()
     }
 
     /// Perform a blocking roundtrip.
