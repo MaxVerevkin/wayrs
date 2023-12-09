@@ -104,6 +104,18 @@ impl From<u32> for Fixed {
     }
 }
 
+impl From<f32> for Fixed {
+    fn from(value: f32) -> Self {
+        Self((value * 256.0) as i32)
+    }
+}
+
+impl From<f64> for Fixed {
+    fn from(value: f64) -> Self {
+        Self((value * 256.0) as i32)
+    }
+}
+
 impl Fixed {
     pub fn as_f64(self) -> f64 {
         self.0 as f64 / 256.0
