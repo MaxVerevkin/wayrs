@@ -1,3 +1,9 @@
+# 1.0.0
+
+- Drog `..` and `a..` support from `Global::bind`. Provide the upper bound.
+- Rename `wayrs_client::scanner::generate!` to `wayrs_client::generate!`.
+- Impl From<{f32,f64}> for `Fixed`.
+
 # 0.12.4
 
 - Fixed typo in `Connection::clear_callbacks()` (`clear_callbacs` is deprecated).
