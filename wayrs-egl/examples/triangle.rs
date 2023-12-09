@@ -218,9 +218,11 @@ void main() {
 
 fn main() {
     let (mut conn, globals) = Connection::connect_and_collect_globals().unwrap();
-    let linux_dmabuf: ZwpLinuxDmabufV1 = globals.bind(&mut conn, 2..).unwrap();
-    let wl_compositor: WlCompositor = globals.bind(&mut conn, ..).unwrap();
-    let xdg_wm_base: XdgWmBase = globals.bind_with_cb(&mut conn, .., xdg_wm_base_cb).unwrap();
+    let linux_dmabuf: ZwpLinuxDmabufV1 = globals.bind(&mut conn, 4).unwrap();
+    let wl_compositor: WlCompositor = globals.bind(&mut conn, ..=6).unwrap();
+    let xdg_wm_base: XdgWmBase = globals
+        .bind_with_cb(&mut conn, ..=4, xdg_wm_base_cb)
+        .unwrap();
 
     let mut state = State {
         time: 0.0,
