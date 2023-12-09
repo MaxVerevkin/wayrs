@@ -1,3 +1,7 @@
+# 0.12.7
+
+- Update docs.
+
 # 0.12.6
 
 - Do not use `concat!()` in generated docs because rust-analyzer doesn't support it.
