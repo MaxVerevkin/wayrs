@@ -13,7 +13,9 @@ mod connection;
 mod socket;
 
 pub use connection::Connection;
-pub use wayrs_scanner as scanner;
+
+#[doc(hidden)]
+pub use wayrs_scanner;
 
 use proxy::Proxy;
 use std::ffi::CStr;
@@ -54,6 +56,14 @@ macro_rules! cstr {
         const X: &'static ::std::ffi::CStr = $crate::cstr(concat!($str, "\0"));
         X
     }};
+}
+
+/// Generate glue code from .xml protocol file. The path is relative to your project root.
+#[macro_export]
+macro_rules! generate {
+    ($path:literal) => {
+        $crate::wayrs_scanner::generate!($path);
+    };
 }
 
 // TODO: remove when MSRV is at least 1.72

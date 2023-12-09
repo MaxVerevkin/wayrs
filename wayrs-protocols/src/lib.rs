@@ -10,7 +10,7 @@ macro_rules! gen {
         #[cfg_attr(docsrs, doc(cfg(feature = $feat)))]
         pub mod $mod {
             $(gen!(@dep $dep);)*
-            wayrs_client::scanner::generate!($file);
+            wayrs_client::generate!($file);
         }
     };
     (@dep core) => {
