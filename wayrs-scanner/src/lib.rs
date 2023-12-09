@@ -1,3 +1,7 @@
+//! Generate glue code from .xml files for `wayrs-client`.
+//!
+//! **Do not use directly in your projcets. Call `wayrs_client::generate!()` instead.**
+
 mod parser;
 mod types;
 mod utils;
@@ -26,6 +30,7 @@ fn wayrs_client_path() -> TokenStream {
     }
 }
 
+#[doc(hidden)]
 #[proc_macro]
 pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let path = syn::parse_macro_input!(input as syn::LitStr).value();
