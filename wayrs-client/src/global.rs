@@ -28,8 +28,6 @@ pub trait GlobalExt {
     ///
     /// The version argmuent can be a:
     /// - Number - require a specific version
-    /// - Full range (`..` - bind any version)
-    /// - Range from (`a..` - require a version of at least `a`)
     /// - Range to inclusive (`..=b` - bind a version in range `[1, b]`)
     /// - Range inclusive (`a..=b` - bind a version in range `[a, b]`)
     fn bind<P: Proxy, D>(
@@ -72,8 +70,6 @@ impl GlobalExt for Global {
     ///
     /// The version argmuent can be a:
     /// - Number - require a specific version
-    /// - Full range (`..` - bind any version)
-    /// - Range from (`a..` - require a version of at least `a`)
     /// - Range to inclusive (`..=b` - bind a version in range `[1, b]`)
     /// - Range inclusive (`a..=b` - bind a version in range `[a, b]`)
     fn bind<P: Proxy, D>(
@@ -88,9 +84,7 @@ impl GlobalExt for Global {
             });
         }
 
-        if let Some(upper) = version.upper() {
-            assert!(upper <= P::INTERFACE.version);
-        }
+        assert!(version.upper() <= P::INTERFACE.version);
 
         if self.version < version.lower() {
             return Err(BindError::UnsupportedVersion {
@@ -100,8 +94,7 @@ impl GlobalExt for Global {
         }
 
         let reg = conn.registry();
-        let upper = version.upper().unwrap_or(P::INTERFACE.version);
-        let version = u32::min(upper, self.version);
+        let version = u32::min(version.upper(), self.version);
 
         Ok(reg.bind(conn, self.name, version))
     }
@@ -120,9 +113,7 @@ impl GlobalExt for Global {
             });
         }
 
-        if let Some(upper) = version.upper() {
-            assert!(upper <= P::INTERFACE.version);
-        }
+        assert!(version.upper() <= P::INTERFACE.version);
 
         if self.version < version.lower() {
             return Err(BindError::UnsupportedVersion {
@@ -132,10 +123,7 @@ impl GlobalExt for Global {
         }
 
         let reg = conn.registry();
-        let version = match version.upper() {
-            None => self.version,
-            Some(upper) => u32::min(upper, self.version),
-        };
+        let version = u32::min(version.upper(), self.version);
 
         Ok(reg.bind_with_cb(conn, self.name, version, cb))
     }
@@ -170,7 +158,7 @@ impl GlobalsExt for Globals {
 
 pub trait VersionBounds: private::Sealed {
     fn lower(&self) -> u32;
-    fn upper(&self) -> Option<u32>;
+    fn upper(&self) -> u32;
 }
 
 mod private {
@@ -185,7 +173,7 @@ macro_rules! impl_version_bounds {
                 fn lower(&$self) -> u32 {
                     $lower
                 }
-                fn upper(&$self) -> Option<u32> {
+                fn upper(&$self) -> u32 {
                     $upper
                 }
             }
@@ -194,9 +182,7 @@ macro_rules! impl_version_bounds {
 }
 
 impl_version_bounds! [
-    u32 => (self) => *self, Some(*self);
-    ops::RangeFull => (self) => 1, None;
-    ops::RangeFrom<u32> => (self) => self.start, None;
-    ops::RangeToInclusive<u32> => (self) => 1, Some(self.end);
-    ops::RangeInclusive<u32> => (self) => *self.start(), Some(*self.end());
+    u32 => (self) => *self, *self;
+    ops::RangeToInclusive<u32> => (self) => 1, self.end;
+    ops::RangeInclusive<u32> => (self) => *self.start(), *self.end();
 ];
