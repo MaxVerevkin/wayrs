@@ -1,6 +1,6 @@
 [package]
 name = "wayrs-egl"
-version = "0.3.1"
+version = "0.4.0"
 description = "EGL for wayrs-client"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "egl", "opengl"]
@@ -15,9 +15,9 @@ gbm-sys = "0.3"
 libc = "0.2"
 thiserror = "1.0"
 wayrs-client = { version = "1.0", path = "../wayrs-client" }
-wayrs-protocols = { version = "0.12", path = "../wayrs-protocols", features = ["linux-dmabuf-unstable-v1"] }
+wayrs-protocols = { version = "0.13", path = "../wayrs-protocols", features = ["linux-dmabuf-unstable-v1"] }
 
 [dev-dependencies]
 gles31 = "1.0"
-wayrs-protocols = { version = "0.12", path = "../wayrs-protocols", features = ["xdg-shell"] }
-wayrs-utils = { version = "0.12", path = "../wayrs-utils", features = ["dmabuf_feedback"] }
+wayrs-protocols = { version = "0.13", path = "../wayrs-protocols", features = ["xdg-shell"] }
+wayrs-utils = { version = "0.13", path = "../wayrs-utils", features = ["dmabuf_feedback"] }

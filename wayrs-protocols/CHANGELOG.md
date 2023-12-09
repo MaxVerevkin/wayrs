@@ -1,3 +1,7 @@
+# 0.13.0
+
+- Update to `wayrs-client` to v1.
+
 # 0.12.1
 
 - Release to trigger docs.rs to regenerate the documentation.

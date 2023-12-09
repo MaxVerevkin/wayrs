@@ -1,3 +1,7 @@
+# 0.13.0
+
+- Update to `wayrs-cilent` v1.
+
 # 0.12.0
 
 - Keyboard: mark `KeyboardEvent` as `non_exhaustive`.

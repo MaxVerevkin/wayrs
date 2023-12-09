@@ -1,3 +1,7 @@
+# 0.4.0
+
+- Update `wayrs-client` to v1.
+
 # 0.3.1
 
 - Update `gbm-sys` to v0.3.
