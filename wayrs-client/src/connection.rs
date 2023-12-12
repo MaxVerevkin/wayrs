@@ -244,6 +244,11 @@ impl<D> Connection<D> {
     }
 
     #[doc(hidden)]
+    pub fn alloc_msg_args(&mut self) -> Vec<ArgValue> {
+        self.socket.free_msg_args.pop().unwrap_or(Vec::new())
+    }
+
+    #[doc(hidden)]
     pub fn send_request(&mut self, iface: &'static Interface, request: Message) {
         let obj = self
             .object_mgr

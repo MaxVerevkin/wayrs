@@ -28,6 +28,7 @@ pub struct BufferedSocket {
     fds_out: ArrayBuffer<RawFd, FDS_OUT_LEN>,
 
     cmsg: Vec<u8>,
+    pub free_msg_args: Vec<Vec<ArgValue>>,
 }
 
 impl AsRawFd for BufferedSocket {
@@ -58,6 +59,7 @@ impl BufferedSocket {
             fds_out: ArrayBuffer::new(),
 
             cmsg: nix::cmsg_space!([RawFd; FDS_OUT_LEN]),
+            free_msg_args: Vec::new(),
         })
     }
 
@@ -95,7 +97,8 @@ impl BufferedSocket {
             .write_uint((size as u32) << 16 | msg.header.opcode as u32);
 
         // Args
-        for arg in msg.args.into_iter() {
+        let mut msg = msg;
+        for arg in msg.args.drain(..) {
             match arg {
                 ArgValue::Uint(x) => self.bytes_out.write_uint(x),
                 ArgValue::Int(x) | ArgValue::Fixed(Fixed(x)) => self.bytes_out.write_int(x),
@@ -118,6 +121,7 @@ impl BufferedSocket {
                 ArgValue::NewIdEvent(_) => panic!("NewIdEvent in request"),
             }
         }
+        self.free_msg_args.push(msg.args);
 
         Ok(())
     }
@@ -168,35 +172,33 @@ impl BufferedSocket {
         // Consume header
         self.bytes_in.move_tail(MessageHeader::size() as usize);
 
-        let args = signature
-            .iter()
-            .map(|arg_type| match arg_type {
-                ArgType::Int => ArgValue::Int(self.bytes_in.read_int()),
-                ArgType::Uint => ArgValue::Uint(self.bytes_in.read_uint()),
-                ArgType::Fixed => ArgValue::Fixed(Fixed(self.bytes_in.read_int())),
-                ArgType::Object => {
-                    ArgValue::Object(self.bytes_in.read_id().expect("unexpected null object id"))
-                }
-                ArgType::OptObject => ArgValue::OptObject(self.bytes_in.read_id()),
-                ArgType::NewId(interface) => ArgValue::NewIdEvent(Object {
-                    id: self.bytes_in.read_id().expect("unexpected null new_id"),
-                    interface,
-                    version,
-                }),
-                ArgType::AnyNewId => unimplemented!(),
-                ArgType::String => ArgValue::String(self.recv_string()),
-                ArgType::OptString => ArgValue::OptString(match self.bytes_in.read_uint() {
-                    0 => None,
-                    len => Some(self.recv_string_with_len(len)),
-                }),
-                ArgType::Array => ArgValue::Array(self.recv_array()),
-                ArgType::Fd => {
-                    let fd = self.fds_in.read_one();
-                    assert_ne!(fd, -1);
-                    ArgValue::Fd(unsafe { OwnedFd::from_raw_fd(fd) })
-                }
-            })
-            .collect();
+        let mut args = self.free_msg_args.pop().unwrap_or(Vec::new());
+        args.extend(signature.iter().map(|arg_type| match arg_type {
+            ArgType::Int => ArgValue::Int(self.bytes_in.read_int()),
+            ArgType::Uint => ArgValue::Uint(self.bytes_in.read_uint()),
+            ArgType::Fixed => ArgValue::Fixed(Fixed(self.bytes_in.read_int())),
+            ArgType::Object => {
+                ArgValue::Object(self.bytes_in.read_id().expect("unexpected null object id"))
+            }
+            ArgType::OptObject => ArgValue::OptObject(self.bytes_in.read_id()),
+            ArgType::NewId(interface) => ArgValue::NewIdEvent(Object {
+                id: self.bytes_in.read_id().expect("unexpected null new_id"),
+                interface,
+                version,
+            }),
+            ArgType::AnyNewId => unimplemented!(),
+            ArgType::String => ArgValue::String(self.recv_string()),
+            ArgType::OptString => ArgValue::OptString(match self.bytes_in.read_uint() {
+                0 => None,
+                len => Some(self.recv_string_with_len(len)),
+            }),
+            ArgType::Array => ArgValue::Array(self.recv_array()),
+            ArgType::Fd => {
+                let fd = self.fds_in.read_one();
+                assert_ne!(fd, -1);
+                ArgValue::Fd(unsafe { OwnedFd::from_raw_fd(fd) })
+            }
+        }));
 
         Ok(Message { header, args })
     }

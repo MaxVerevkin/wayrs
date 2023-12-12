@@ -506,6 +506,8 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
     });
 
     let send_message = quote! {
+        let mut _args_vec = conn.alloc_msg_args();
+        #( _args_vec.push(#msg_args); )*
         conn.send_request(
             Self::INTERFACE,
             _wayrs_client::wire::Message {
@@ -514,7 +516,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                     size: 0,
                     opcode: #opcode,
                 },
-                args: vec![ #( #msg_args, )* ],
+                args: _args_vec,
             }
         );
     };
