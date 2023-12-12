@@ -172,7 +172,7 @@ impl BufferedSocket {
         // Consume header
         self.bytes_in.move_tail(MessageHeader::size() as usize);
 
-        let mut args = self.free_msg_args.pop().unwrap_or(Vec::new());
+        let mut args = self.free_msg_args.pop().unwrap_or_default();
         args.extend(signature.iter().map(|arg_type| match arg_type {
             ArgType::Int => ArgValue::Int(self.bytes_in.read_int()),
             ArgType::Uint => ArgValue::Uint(self.bytes_in.read_uint()),
