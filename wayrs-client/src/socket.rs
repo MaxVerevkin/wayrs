@@ -26,6 +26,8 @@ pub struct BufferedSocket {
     bytes_out: RingBuffer<BYTES_OUT_LEN>,
     fds_in: ArrayBuffer<RawFd, FDS_IN_LEN>,
     fds_out: ArrayBuffer<RawFd, FDS_OUT_LEN>,
+
+    cmsg: Vec<u8>,
 }
 
 impl AsRawFd for BufferedSocket {
@@ -54,6 +56,8 @@ impl BufferedSocket {
             bytes_out: RingBuffer::new(),
             fds_in: ArrayBuffer::new(),
             fds_out: ArrayBuffer::new(),
+
+            cmsg: nix::cmsg_space!([RawFd; FDS_OUT_LEN]),
         })
     }
 
@@ -241,7 +245,7 @@ impl BufferedSocket {
             return Ok(());
         }
 
-        let mut cmsg = nix::cmsg_space!([RawFd; FDS_OUT_LEN]);
+        self.cmsg.clear();
 
         let mut flags = socket::MsgFlags::MSG_CMSG_CLOEXEC | socket::MsgFlags::MSG_NOSIGNAL;
         if mode == IoMode::NonBlocking {
@@ -250,7 +254,7 @@ impl BufferedSocket {
 
         let mut iov_buf = [IoSliceMut::new(&mut []), IoSliceMut::new(&mut [])];
         let iov = self.bytes_in.get_writeable_iov(&mut iov_buf);
-        let msg = socket::recvmsg::<()>(self.socket.as_raw_fd(), iov, Some(&mut cmsg), flags)?;
+        let msg = socket::recvmsg::<()>(self.socket.as_raw_fd(), iov, Some(&mut self.cmsg), flags)?;
 
         for cmsg in msg.cmsgs() {
             if let ControlMessageOwned::ScmRights(fds) = cmsg {
