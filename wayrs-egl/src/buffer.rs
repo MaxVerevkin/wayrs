@@ -221,19 +221,17 @@ impl Drop for Buffer {
 
 /// A pool of `N` buffers.
 pub struct BufferPool<const N: usize> {
+    fourcc: Fourcc,
+    modifiers: Vec<u64>,
     buffers: [Option<Buffer>; N],
-}
-
-impl<const N: usize> Default for BufferPool<N> {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl<const N: usize> BufferPool<N> {
     /// Create a new buffer pool.
-    pub fn new() -> Self {
+    pub fn new(fourcc: Fourcc, modifiers: Vec<u64>) -> Self {
         Self {
+            fourcc,
+            modifiers,
             buffers: std::array::from_fn(|_| None),
         }
     }
@@ -247,18 +245,11 @@ impl<const N: usize> BufferPool<N> {
         conn: &mut Connection<D>,
         width: u32,
         height: u32,
-        fourcc: Fourcc,
-        modifiers: &[u64],
     ) -> Result<Option<&Buffer>> {
         // Try to find a free, compatible buffer.
         for (i, buf) in self.buffers.iter().enumerate() {
             if let Some(buf) = buf {
-                if buf.is_available()
-                    && buf.width() == width
-                    && buf.height() == height
-                    && buf.fourcc() == fourcc
-                    && modifiers.contains(&buf.modifier())
-                {
+                if buf.is_available() && buf.width() == width && buf.height() == height {
                     return Ok(Some(self.buffers[i].as_ref().unwrap()));
                 }
             }
@@ -278,9 +269,13 @@ impl<const N: usize> BufferPool<N> {
             old_buf.destroy(conn);
         }
 
-        Ok(Some(self.buffers[buf_i].insert(
-            egl_display.alloc_buffer(conn, width, height, fourcc, modifiers)?,
-        )))
+        Ok(Some(self.buffers[buf_i].insert(egl_display.alloc_buffer(
+            conn,
+            width,
+            height,
+            self.fourcc,
+            &self.modifiers,
+        )?)))
     }
 
     /// Destroy all buffers in this pool.

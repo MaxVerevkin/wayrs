@@ -15,8 +15,6 @@ use wayrs_utils::dmabuf_feedback::*;
 const BUFFERS: usize = 3;
 
 struct Renderer {
-    format: Fourcc,
-    modifiers: Vec<u64>,
     buffers: BufferPool<BUFFERS>,
     rbo: u32,
     screensize_loc: i32,
@@ -155,9 +153,7 @@ void main() {
         }
 
         Self {
-            format,
-            modifiers,
-            buffers: BufferPool::new(),
+            buffers: BufferPool::new(format, modifiers),
             rbo,
             screensize_loc,
             time_loc,
@@ -176,14 +172,7 @@ void main() {
     ) -> Option<&Buffer> {
         let buf = self
             .buffers
-            .get_buffer(
-                &self.egl_display,
-                conn,
-                width,
-                height,
-                self.format,
-                &self.modifiers,
-            )
+            .get_buffer(&self.egl_display, conn, width, height)
             .unwrap()?;
 
         unsafe {
