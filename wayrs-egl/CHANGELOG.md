@@ -1,3 +1,7 @@
+# 0.5.0
+
+- Store buffer format and modifiers in `BufferPool`.
+
 # 0.4.0
 
 - Update `wayrs-client` to v1.
