@@ -1,3 +1,8 @@
+# 1.0.1
+
+- Reduce memory allocations.
+- Update core protocol.
+
 # 1.0.0
 
 - Drog `..` and `a..` support from `Global::bind`. Provide the upper bound.
