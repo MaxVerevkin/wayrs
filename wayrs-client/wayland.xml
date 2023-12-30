@@ -884,7 +884,7 @@
 	The icon surface is an optional (can be NULL) surface that
 	provides an icon to be moved around with the cursor.  Initially,
 	the top-left corner of the icon surface is placed at the cursor
-	hotspot, but subsequent wl_surface.attach request can move the
+	hotspot, but subsequent wl_surface.offset requests can move the
 	relative position. Attach requests must be confirmed with
 	wl_surface.commit as usual. The icon surface is given the role of
 	a drag-and-drop icon. If the icon surface already has another role,
@@ -1826,6 +1826,9 @@
 	This event indicates the preferred buffer scale for this surface. It is
 	sent whenever the compositor's preference changes.
 
+	Before receiving this event the preferred buffer scale for this surface
+	is 1.
+
 	It is intended that scaling aware clients use this event to scale their
 	content and use wl_surface.set_buffer_scale to indicate the scale they
 	have rendered with. This allows clients to supply a higher detail
@@ -1838,6 +1841,9 @@
       <description summary="preferred buffer transform for the surface">
 	This event indicates the preferred buffer transform for this surface.
 	It is sent whenever the compositor's preference changes.
+
+	Before receiving this event the preferred buffer transform for this
+	surface is normal.
 
 	It is intended that transform aware clients use this event to apply the
 	transform to their content and use wl_surface.set_buffer_transform to
@@ -3072,6 +3078,8 @@
 
       If the parent wl_surface object is destroyed, the sub-surface is
       unmapped.
+
+      A sub-surface never has the keyboard focus of any seat.
     </description>
 
     <request name="destroy" type="destructor">
@@ -3097,9 +3105,7 @@
 	surface area. Negative values are allowed.
 
 	The scheduled coordinates will take effect whenever the state of the
-	parent surface is applied. When this happens depends on whether the
-	parent surface is in synchronized mode or not. See
-	wl_subsurface.set_sync and wl_subsurface.set_desync for details.
+	parent surface is applied.
 
 	If more than one set_position request is invoked by the client before
 	the commit of the parent surface, the position of a new request always
@@ -3122,9 +3128,7 @@
 	The z-order is double-buffered. Requests are handled in order and
 	applied immediately to a pending state. The final pending state is
 	copied to the active state the next time the state of the parent
-	surface is applied. When this happens depends on whether the parent
-	surface is in synchronized mode or not. See wl_subsurface.set_sync and
-	wl_subsurface.set_desync for details.
+	surface is applied.
 
 	A new sub-surface is initially added as the top-most in the stack
 	of its siblings and parent.
