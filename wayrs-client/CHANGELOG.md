@@ -1,3 +1,7 @@
+# 1.0.2
+
+- Update for `wayrs-scanner` v0.13.
+
 # 1.0.1
 
 - Reduce memory allocations.
