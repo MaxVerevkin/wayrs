@@ -11,7 +11,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-wayrs-scanner = { version = "0.12", path = "../wayrs-scanner" }
+wayrs-scanner = { version = "0.13", path = "../wayrs-scanner" }
 thiserror = "1.0"
 
 [dependencies.nix]

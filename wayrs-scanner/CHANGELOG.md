@@ -1,3 +1,9 @@
+# 0.13.0
+
+- Update `proc-macro-crate` dependency.
+- Delegate protocol parsing to `wayrs-proto-parser`.
+- Generate code which uses new API available in `wayrs-client` v1.0.1.
+
 # 0.12.7
 
 - Update docs.
