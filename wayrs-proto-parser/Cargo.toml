@@ -1,0 +1,14 @@
+[package]
+name = "wayrs-proto-parser"
+version = "1.0.0"
+description = "Parser for wayland protocol xml files"
+authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
+keywords = ["wayland", "protocol", "parser", "xml"]
+repository.workspace = true
+readme.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+quick-xml = "0.31"

@@ -14,9 +14,9 @@ license.workspace = true
 proc-macro = true
 
 [dependencies]
+wayrs-proto-parser = { version = "1.0", path = "../wayrs-proto-parser" }
 proc-macro2 = "1.0"
 proc-macro-crate = "2"
-quick-xml = "0.31"
 quote = "1.0"
 
 [dependencies.syn]

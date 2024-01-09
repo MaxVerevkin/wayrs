@@ -2,18 +2,14 @@
 //!
 //! **Do not use directly in your projcets. Call `wayrs_client::generate!()` instead.**
 
-mod parser;
-mod types;
-mod utils;
-
 use std::path::PathBuf;
 
 use proc_macro2::{Span, TokenStream};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{format_ident, quote};
+use wayrs_proto_parser::*;
 
-use crate::parser::Parser;
-use crate::types::*;
+mod utils;
 use crate::utils::*;
 
 /// These interfaces are frozen at version 1 and will not introduce new events or requests.
@@ -44,8 +40,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     };
 
     let file = std::fs::read_to_string(path).expect("could not read the file");
-    let parser = Parser::new(&file);
-    let protocol = parser.get_grotocol();
+    let protocol = parse_protocol(&file);
 
     let wayrs_client_path = wayrs_client_path();
     let modules = protocol

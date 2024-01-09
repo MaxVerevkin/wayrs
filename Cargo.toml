@@ -1,5 +1,12 @@
 [workspace]
-members = ["wayrs-client", "wayrs-scanner", "wayrs-protocols", "wayrs-utils", "wayrs-egl"]
+members = [
+  "wayrs-client",
+  "wayrs-scanner",
+  "wayrs-protocols",
+  "wayrs-utils",
+  "wayrs-egl",
+  "wayrs-proto-parser",
+]
 resolver = "2"
 
 [workspace.package]
