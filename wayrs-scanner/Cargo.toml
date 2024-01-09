@@ -16,7 +16,7 @@ proc-macro = true
 [dependencies]
 wayrs-proto-parser = { version = "1.0", path = "../wayrs-proto-parser" }
 proc-macro2 = "1.0"
-proc-macro-crate = "2"
+proc-macro-crate = "3"
 quote = "1.0"
 
 [dependencies.syn]
