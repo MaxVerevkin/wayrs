@@ -13,11 +13,12 @@ A simple Rust implementation of Wayland client library.
 
 The project is split into multiple crates:
 
-- `wayrs-client`: The main crate which implements Wayland wire protocol. Provides `Connection` type which represents open Wayland socket.
-- `wayrs-scanner`: Provides `generate!` macro that generates glue code from `.xml` files. Generated code for the core protocol is already included in `wayrs-client`. Reexported as `wayrs_client::scanner`.
+- `wayrs-client`: The main crate which implements Wayland wire protocol. Provides `Connection` type which represents open Wayland socket, manages objects and handles callbacks.
 - `wayrs-protocols`: A collection of Wayland protocols to use with `wayrs-client`.
 - `wayrs-utils`: A collection of utils and abstractions for `wayrs-client`. Includes a shared memory allocator and more.
 - `wayrs-egl`: Brings OpenGL(-ES) to `wayrs`. Based on `EGL_KHR_platform_gbm`.
+- `wayrs-scanner`: Implements the `wayrs_client:::generate!` macro that generates glue code from `.xml` files. Generated code for the core protocol is already included in `wayrs-client::protocol`. Do not use this crate directly.
+- `wayrs-proto-parser`: Parses wayland `.xml` files. Used by `wayrs-scanner`.
 
 ## Projects using `wayrs`
 
