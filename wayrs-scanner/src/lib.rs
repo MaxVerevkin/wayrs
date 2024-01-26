@@ -211,7 +211,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         if en.is_bitfield {
             quote! {
                 #doc
-                #[derive(Debug, Default, Clone, Copy)]
+                #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
                 pub struct #name(u32);
                 impl From<#name> for u32 {
                     fn from(val: #name) -> Self {
@@ -241,6 +241,11 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                     type Output = Self;
                     fn bitor(self, rhs: Self) -> Self {
                         Self(self.0 | rhs.0)
+                    }
+                }
+                impl ::std::ops::BitOrAssign for #name {
+                    fn bitor_assign(&mut self, rhs: Self) {
+                        self.0 |= rhs.0;
                     }
                 }
             }
