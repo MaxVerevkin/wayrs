@@ -1,6 +1,6 @@
 [package]
 name = "wayrs-scanner"
-version = "0.13.0"
+version = "0.13.1"
 description = "Generates code for wayrs-client from xml files"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "client", "scanner"]

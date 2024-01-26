@@ -1,3 +1,8 @@
+# 0.13.1
+
+- Derive `PartialEq` and `Eq` for bitfield enums.
+- Implement `BitOrAssign` for bitfield enums.
+
 # 0.13.0
 
 - Update `proc-macro-crate` dependency.
