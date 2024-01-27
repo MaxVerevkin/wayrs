@@ -1,3 +1,7 @@
+# 0.13.2
+
+- Update `wayrs-proto-parser`.
+
 # 0.13.1
 
 - Derive `PartialEq` and `Eq` for bitfield enums.
