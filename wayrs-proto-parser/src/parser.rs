@@ -1,8 +1,32 @@
 use crate::types::*;
 use quick_xml::events::{BytesStart, Event as XmlEvent};
+use std::str;
 
 pub struct Parser<'a> {
     reader: quick_xml::Reader<&'a [u8]>,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum Error {
+    #[error("unexpected tag: {0}")]
+    UnexpectedTag(String),
+    #[error("unexpected argument type: {0}")]
+    UnexpectedArgType(String),
+    #[error("unexpeced end of file")]
+    UnexpectedEof,
+    #[error("protocol does not have a name")]
+    ProtocolWithoutName,
+    #[error("xml parsing error: {0}")]
+    XmlError(String),
+    #[error(transparent)]
+    NonUtf8Data(#[from] str::Utf8Error),
+}
+
+impl From<quick_xml::Error> for Error {
+    fn from(value: quick_xml::Error) -> Self {
+        Self::XmlError(value.to_string())
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -12,59 +36,52 @@ impl<'a> Parser<'a> {
         Self { reader }
     }
 
-    pub fn get_grotocol(mut self) -> Protocol<'a> {
+    pub fn get_grotocol(mut self) -> Result<Protocol<'a>, Error> {
         loop {
-            match self.reader.read_event().unwrap() {
-                XmlEvent::Eof => panic!("unexpeced EOF"),
+            match self.reader.read_event()? {
+                XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Start(start) => match start.name().as_ref() {
                     b"protocol" => return self.parse_protocol(start),
-                    x => {
-                        let tag_name = std::str::from_utf8(x).unwrap();
-                        panic!("unexpeced tag: {tag_name}");
-                    }
+                    other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
                 _ => (),
             }
         }
     }
 
-    fn parse_protocol(&mut self, tag: BytesStart<'a>) -> Protocol<'a> {
+    fn parse_protocol(&mut self, tag: BytesStart<'a>) -> Result<Protocol<'a>, Error> {
         let mut protocol = Protocol {
             name: tag
                 .try_get_attribute("name")
-                .unwrap()
-                .unwrap()
-                .unescape_value()
-                .unwrap()
+                .ok()
+                .flatten()
+                .ok_or(Error::ProtocolWithoutName)?
+                .unescape_value()?
                 .into_owned(),
             description: None,
             interfaces: Vec::new(),
         };
 
         loop {
-            match self.reader.read_event().unwrap() {
-                XmlEvent::Eof => panic!("unexpeced EOF"),
+            match self.reader.read_event()? {
+                XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Start(start) => match start.name().as_ref() {
-                    b"protocol" => panic!("nested protocol"),
-                    b"description" => protocol.description = Some(self.parse_description(start)),
-                    b"interface" => protocol.interfaces.push(self.parse_interface(start)),
+                    b"description" => protocol.description = Some(self.parse_description(start)?),
+                    b"interface" => protocol.interfaces.push(self.parse_interface(start)?),
                     b"copyright" => {
                         // TODO?
                     }
-                    x => {
-                        let tag_name = std::str::from_utf8(x).unwrap();
-                        panic!("unexpeced tag: {tag_name}");
-                    }
+                    other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
                 XmlEvent::End(end) if end.name() == tag.name() => break,
                 _ => (),
             }
         }
 
-        protocol
+        Ok(protocol)
     }
 
-    fn parse_interface(&mut self, tag: BytesStart<'a>) -> Interface<'a> {
+    fn parse_interface(&mut self, tag: BytesStart<'a>) -> Result<Interface<'a>, Error> {
         let mut interface = Interface {
             name: tag
                 .try_get_attribute("name")
@@ -89,27 +106,23 @@ impl<'a> Parser<'a> {
 
         loop {
             match self.reader.read_event().unwrap() {
-                XmlEvent::Eof => panic!("unexpeced EOF"),
+                XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Start(start) => match start.name().as_ref() {
-                    b"interface" => panic!("nested interface"),
-                    b"description" => interface.description = Some(self.parse_description(start)),
-                    b"request" => interface.requests.push(self.parse_message(start)),
-                    b"event" => interface.events.push(self.parse_message(start)),
-                    b"enum" => interface.enums.push(self.parse_enum(start)),
-                    x => {
-                        let tag_name = std::str::from_utf8(x).unwrap();
-                        panic!("unexpeced tag: {tag_name}");
-                    }
+                    b"description" => interface.description = Some(self.parse_description(start)?),
+                    b"request" => interface.requests.push(self.parse_message(start)?),
+                    b"event" => interface.events.push(self.parse_message(start)?),
+                    b"enum" => interface.enums.push(self.parse_enum(start)?),
+                    other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
                 XmlEvent::End(end) if end.name().as_ref() == b"interface" => break,
                 _ => (),
             }
         }
 
-        interface
+        Ok(interface)
     }
 
-    fn parse_message(&mut self, tag: BytesStart<'a>) -> Message<'a> {
+    fn parse_message(&mut self, tag: BytesStart<'a>) -> Result<Message<'a>, Error> {
         let mut name = None;
         let mut kind = None;
         let mut since = 1;
@@ -134,16 +147,13 @@ impl<'a> Parser<'a> {
 
         loop {
             match self.reader.read_event().unwrap() {
-                XmlEvent::Eof => panic!("unexpeced EOF"),
+                XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Start(start) => match start.name().as_ref() {
-                    b"description" => message.description = Some(self.parse_description(start)),
-                    other => {
-                        let tag_name = std::str::from_utf8(other).unwrap();
-                        panic!("unhandled tag: {tag_name}");
-                    }
+                    b"description" => message.description = Some(self.parse_description(start)?),
+                    other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
                 XmlEvent::Empty(empty) => match empty.name().as_ref() {
-                    b"arg" => message.args.push(Self::parse_arg(empty)),
+                    b"arg" => message.args.push(Self::parse_arg(empty)?),
                     b"description" => {
                         let summary = empty
                             .try_get_attribute("summary")
@@ -154,20 +164,17 @@ impl<'a> Parser<'a> {
                             text: None,
                         });
                     }
-                    other => {
-                        let tag_name = std::str::from_utf8(other).unwrap();
-                        panic!("unhandled tag: {tag_name}");
-                    }
+                    other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
                 XmlEvent::End(end) if end.name() == tag.name() => break,
                 _ => (),
             }
         }
 
-        message
+        Ok(message)
     }
 
-    fn parse_enum(&mut self, tag: BytesStart<'a>) -> Enum<'a> {
+    fn parse_enum(&mut self, tag: BytesStart<'a>) -> Result<Enum<'a>, Error> {
         let mut en = Enum {
             name: tag
                 .try_get_attribute("name")
@@ -186,31 +193,25 @@ impl<'a> Parser<'a> {
 
         loop {
             match self.reader.read_event().unwrap() {
-                XmlEvent::Eof => panic!("unexpeced EOF"),
+                XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Empty(empty) => match empty.name().as_ref() {
-                    b"entry" => en.items.push(self.parse_enum_item(empty, false)),
-                    other => {
-                        let tag_name = std::str::from_utf8(other).unwrap();
-                        panic!("unhandled tag: {tag_name}");
-                    }
+                    b"entry" => en.items.push(self.parse_enum_item(empty, false)?),
+                    other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
                 XmlEvent::Start(start) => match start.name().as_ref() {
-                    b"description" => en.description = Some(self.parse_description(start)),
-                    b"entry" => en.items.push(self.parse_enum_item(start, true)),
-                    other => {
-                        let tag_name = std::str::from_utf8(other).unwrap();
-                        panic!("unhandled tag: {tag_name}");
-                    }
+                    b"description" => en.description = Some(self.parse_description(start)?),
+                    b"entry" => en.items.push(self.parse_enum_item(start, true)?),
+                    other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
                 XmlEvent::End(end) if end.name() == tag.name() => break,
                 _ => (),
             }
         }
 
-        en
+        Ok(en)
     }
 
-    fn parse_description(&mut self, tag: BytesStart<'a>) -> Description<'a> {
+    fn parse_description(&mut self, tag: BytesStart<'a>) -> Result<Description<'a>, Error> {
         let mut description = Description {
             summary: tag
                 .try_get_attribute("summary")
@@ -221,17 +222,17 @@ impl<'a> Parser<'a> {
 
         loop {
             match self.reader.read_event().unwrap() {
-                XmlEvent::Eof => panic!("unexpeced EOF"),
+                XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Text(text) => description.text = Some(text.unescape().unwrap()),
                 XmlEvent::End(end) if end.name() == tag.name() => break,
                 _ => (),
             }
         }
 
-        description
+        Ok(description)
     }
 
-    fn parse_arg(arg: BytesStart<'a>) -> Argument {
+    fn parse_arg(arg: BytesStart<'a>) -> Result<Argument, Error> {
         let mut name = None;
         let mut arg_type = None;
         let mut allow_null = false;
@@ -242,17 +243,17 @@ impl<'a> Parser<'a> {
         for attr in arg.attributes().with_checks(false) {
             let attr = attr.unwrap();
             match attr.key.as_ref() {
-                b"name" => name = Some(attr.unescape_value().unwrap().into_owned()),
-                b"type" => arg_type = Some(attr.unescape_value().unwrap().into_owned()),
-                b"enum" => enum_ty = Some(attr.unescape_value().unwrap().into_owned()),
-                b"interface" => iface = Some(attr.unescape_value().unwrap().into_owned()),
-                b"summary" => summary = Some(attr.unescape_value().unwrap().into_owned()),
-                b"allow-null" => allow_null = attr.unescape_value().unwrap() == "true",
+                b"name" => name = Some(attr.unescape_value()?.into_owned()),
+                b"type" => arg_type = Some(attr.unescape_value()?.into_owned()),
+                b"enum" => enum_ty = Some(attr.unescape_value()?.into_owned()),
+                b"interface" => iface = Some(attr.unescape_value()?.into_owned()),
+                b"summary" => summary = Some(attr.unescape_value()?.into_owned()),
+                b"allow-null" => allow_null = attr.unescape_value()? == "true",
                 _ => (),
             }
         }
 
-        Argument {
+        Ok(Argument {
             name: name.unwrap(),
             arg_type: match arg_type.unwrap().as_str() {
                 "int" | "uint" if enum_ty.is_some() => ArgType::Enum(enum_ty.unwrap()),
@@ -264,13 +265,17 @@ impl<'a> Parser<'a> {
                 "new_id" => ArgType::NewId { iface },
                 "array" => ArgType::Array,
                 "fd" => ArgType::Fd,
-                _ => unreachable!(),
+                other => return Err(Error::UnexpectedArgType(other.into())),
             },
             summary,
-        }
+        })
     }
 
-    fn parse_enum_item(&mut self, arg: BytesStart<'a>, non_empty_tag: bool) -> EnumItem {
+    fn parse_enum_item(
+        &mut self,
+        arg: BytesStart<'a>,
+        non_empty_tag: bool,
+    ) -> Result<EnumItem, Error> {
         let mut name = None;
         let mut value = None;
         let mut summary = None;
@@ -279,10 +284,10 @@ impl<'a> Parser<'a> {
         for attr in arg.attributes().with_checks(false) {
             let attr = attr.unwrap();
             match attr.key.as_ref() {
-                b"name" => name = Some(attr.unescape_value().unwrap().into_owned()),
-                b"value" => value = Some(attr.unescape_value().unwrap().into_owned()),
-                b"since" => since = attr.unescape_value().unwrap().parse().unwrap(),
-                b"summary" => summary = Some(attr.unescape_value().unwrap().into_owned()),
+                b"name" => name = Some(attr.unescape_value()?.into_owned()),
+                b"value" => value = Some(attr.unescape_value()?.into_owned()),
+                b"since" => since = attr.unescape_value()?.parse().unwrap(),
+                b"summary" => summary = Some(attr.unescape_value()?.into_owned()),
                 _ => (),
             }
         }
@@ -290,7 +295,7 @@ impl<'a> Parser<'a> {
         if non_empty_tag {
             loop {
                 match self.reader.read_event().unwrap() {
-                    XmlEvent::Eof => panic!("unexpeced EOF"),
+                    XmlEvent::Eof => return Err(Error::UnexpectedEof),
                     // TODO
                     // XmlEvent::Text(text) => description.text = Some(text.unescape().unwrap()),
                     XmlEvent::End(end) if end.name() == arg.name() => break,
@@ -307,7 +312,7 @@ impl<'a> Parser<'a> {
             }
         });
 
-        EnumItem {
+        Ok(EnumItem {
             name: name.unwrap(),
             value: value.unwrap(),
             since,
@@ -315,6 +320,6 @@ impl<'a> Parser<'a> {
                 summary: Some(summary),
                 text: None,
             }),
-        }
+        })
     }
 }

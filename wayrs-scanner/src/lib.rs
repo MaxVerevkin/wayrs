@@ -40,7 +40,13 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     };
 
     let file = std::fs::read_to_string(path).expect("could not read the file");
-    let protocol = parse_protocol(&file);
+    let protocol = match parse_protocol(&file) {
+        Ok(protocol) => protocol,
+        Err(err) => {
+            let err = format!("error parsing the protocol file: {err}");
+            return quote!(compile_error!(#err);).into();
+        }
+    };
 
     let wayrs_client_path = wayrs_client_path();
     let modules = protocol
