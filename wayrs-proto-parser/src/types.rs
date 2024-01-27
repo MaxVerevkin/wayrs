@@ -43,11 +43,36 @@ pub struct Description<'a> {
 #[derive(Debug, Clone)]
 pub struct Argument {
     pub name: String,
-    pub arg_type: String,
-    pub allow_null: bool,
-    pub enum_type: Option<String>,
-    pub interface: Option<String>,
+    pub arg_type: ArgType,
     pub summary: Option<String>,
+}
+
+/// The types of wayland message argumests
+///
+/// Spec: <https://wayland.freedesktop.org/docs/html/ch04.html>
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArgType {
+    /// 32-bit signed integer.
+    Int,
+    /// 32-bit unsigend integer.
+    Uint,
+    /// 32-bit integer referencing a value of a given enum.
+    Enum(String),
+    /// Sigend 24.8 decimal number.
+    Fixed,
+    /// Length-prefixed null-terimnated string.
+    String { allow_null: bool },
+    /// 32-bit unsigned integer referring to an object.
+    Object {
+        allow_null: bool,
+        iface: Option<String>,
+    },
+    /// 32-bit unsigned integer informing about object creation.
+    NewId { iface: Option<String> },
+    /// Length-prefixed array.
+    Array,
+    /// A file descriptor in the ancillary data.
+    Fd,
 }
 
 #[derive(Debug, Clone)]

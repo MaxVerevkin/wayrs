@@ -48,22 +48,12 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .iter()
         .map(|i| gen_interface(i, &wayrs_client_path));
 
-    let expanded = quote! { #(#modules)* };
-
-    // let mut rustfmt = std::process::Command::new("rustfmt")
-    //     .stdin(std::process::Stdio::piped())
-    //     .stdout(std::process::Stdio::inherit())
-    //     .spawn()
-    //     .unwrap();
-    // let mut rustfmt_in = rustfmt.stdin.take().unwrap();
-    // use std::io::Write;
-    // write!(rustfmt_in, "{}", expanded).unwrap();
-    // drop(rustfmt_in);
-    // let formated = rustfmt.wait_with_output().unwrap().stdout;
-    // let formated = String::from_utf8(formated).unwrap();
-    // eprintln!("  {formated}");
-
-    expanded.into()
+    let x = quote! { #(#modules)* };
+    // {
+    //     let mut file = std::fs::File::create("/tmp/test.rs").unwrap();
+    //     std::io::Write::write_all(&mut file, x.to_string().as_bytes()).unwrap();
+    // }
+    x.into()
 }
 
 fn make_ident(name: impl AsRef<str>) -> syn::Ident {
@@ -156,8 +146,8 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         let arg_names = event.args.iter().map(|arg| make_ident(&arg.name));
         let arg_decode = event.args.iter().map(|arg| {
             let arg_name = make_ident(&arg.name);
-            match (arg.arg_type.as_str(), arg.enum_type.is_some()) {
-                ("new_id", _) | ("int" | "uint", true) => quote! {
+            match &arg.arg_type {
+                ArgType::NewId{..} | ArgType::Enum(_) => quote! {
                     match #arg_name.try_into() {
                         Ok(val) => val,
                         Err(_) => return Err(_wayrs_client::proxy::BadMessage),
@@ -474,18 +464,17 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
         request
             .args
             .iter()
-            .filter(|x| x.arg_type == "new_id")
+            .filter(|x| matches!(x.arg_type, ArgType::NewId { .. }))
             .count()
             <= 1,
         "{} has more than one new_id argument",
         request.name,
     );
 
-    let new_id_interface = request
-        .args
-        .iter()
-        .find(|x| x.arg_type == "new_id")
-        .map(|x| x.interface.as_deref());
+    let new_id_interface = request.args.iter().find_map(|x| match &x.arg_type {
+        ArgType::NewId { iface } => Some(iface.as_deref()),
+        _ => None,
+    });
 
     let mut fn_args = vec![
         quote!(self),
@@ -496,9 +485,13 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
     let msg_args = request.args.iter().map(|arg| {
         let arg_name = make_ident(&arg.name);
         let arg_ty = map_arg_to_argval(arg, false);
-        match arg.arg_type.as_str() {
-            "new_id" => quote! { _wayrs_client::wire::ArgValue::#arg_ty(new_object.into()) },
-            "object" if arg.allow_null => {
+        match arg.arg_type {
+            ArgType::NewId { .. } => {
+                quote! { _wayrs_client::wire::ArgValue::#arg_ty(new_object.into()) }
+            }
+            ArgType::Object {
+                allow_null: true, ..
+            } => {
                 quote! { _wayrs_client::wire::ArgValue::#arg_ty(#arg_name.map(Into::into)) }
             }
             _ => quote! { _wayrs_client::wire::ArgValue::#arg_ty(#arg_name.into()) },
@@ -604,57 +597,49 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
 }
 
 fn map_arg_to_argtype(arg: &Argument) -> TokenStream {
-    match arg.arg_type.as_str() {
-        "int" if arg.enum_type.is_some() => quote!(Uint),
-        "int" => quote!(Int),
-        "uint" => quote!(Uint),
-        "fixed" => quote!(Fixed),
-        "object" => match arg.allow_null {
-            false => quote!(Object),
-            true => quote!(OptObject),
-        },
-        "new_id" => match &arg.interface {
-            Some(iface) => {
-                let proxy_name = make_proxy_path(iface);
-                quote!(NewId(#proxy_name::INTERFACE))
-            }
-            None => quote!(AnyNewId),
-        },
-        "string" => match arg.allow_null {
-            false => quote!(String),
-            true => quote!(OptString),
-        },
-        "array" => quote!(Array),
-        "fd" => quote!(Fd),
-        _ => unreachable!(),
+    match &arg.arg_type {
+        ArgType::Int => quote!(Int),
+        ArgType::Uint | ArgType::Enum(_) => quote!(Uint),
+        ArgType::Fixed => quote!(Fixed),
+        ArgType::Object {
+            allow_null: false, ..
+        } => quote!(Object),
+        ArgType::Object {
+            allow_null: true, ..
+        } => quote!(OptObject),
+        ArgType::NewId { iface: None } => quote!(AnyNewId),
+        ArgType::NewId { iface: Some(iface) } => {
+            let proxy_name = make_proxy_path(iface);
+            quote!(NewId(#proxy_name::INTERFACE))
+        }
+        ArgType::String { allow_null: false } => quote!(String),
+        ArgType::String { allow_null: true } => quote!(OptString),
+        ArgType::Array => quote!(Array),
+        ArgType::Fd => quote!(Fd),
     }
 }
 
 fn map_arg_to_argval(arg: &Argument, is_event: bool) -> TokenStream {
-    match arg.arg_type.as_str() {
-        "int" if arg.enum_type.is_some() => quote!(Uint),
-        "int" => quote!(Int),
-        "uint" => quote!(Uint),
-        "fixed" => quote!(Fixed),
-        "object" => match arg.allow_null {
-            false => quote!(Object),
-            true => quote!(OptObject),
-        },
-        "new_id" if is_event => match arg.interface.as_deref() {
+    match &arg.arg_type {
+        ArgType::Int => quote!(Int),
+        ArgType::Uint | ArgType::Enum(_) => quote!(Uint),
+        ArgType::Fixed => quote!(Fixed),
+        ArgType::Object {
+            allow_null: false, ..
+        } => quote!(Object),
+        ArgType::Object {
+            allow_null: true, ..
+        } => quote!(OptObject),
+        ArgType::NewId { iface } if is_event => match iface.as_deref() {
             Some(_) => quote!(NewIdEvent),
             None => unimplemented!(),
         },
-        "new_id" if !is_event => match arg.interface.as_deref() {
-            Some(_) => quote!(NewIdRequest),
-            None => quote!(AnyNewIdRequest),
-        },
-        "string" => match arg.allow_null {
-            false => quote!(String),
-            true => quote!(OptString),
-        },
-        "array" => quote!(Array),
-        "fd" => quote!(Fd),
-        _ => unreachable!(),
+        ArgType::NewId { iface: None } => quote!(AnyNewIdRequest),
+        ArgType::NewId { iface: Some(_) } => quote!(NewIdRequest),
+        ArgType::String { allow_null: false } => quote!(String),
+        ArgType::String { allow_null: true } => quote!(OptString),
+        ArgType::Array => quote!(Array),
+        ArgType::Fd => quote!(Fd),
     }
 }
 
@@ -693,15 +678,10 @@ trait ArgExt {
 impl ArgExt for Argument {
     fn as_request_fn_arg(&self) -> Option<TokenStream> {
         let arg_name = make_ident(&self.name);
-        let retval = match (
-            self.arg_type.as_str(),
-            self.interface.as_deref(),
-            self.enum_type.as_deref(),
-            self.allow_null,
-        ) {
-            ("int", None, None, false) => quote!(#arg_name: i32),
-            ("uint", None, None, false) => quote!(#arg_name: u32),
-            ("int" | "uint", None, Some(enum_ty), false) => {
+        let retval = match &self.arg_type {
+            ArgType::Int => quote!(#arg_name: i32),
+            ArgType::Uint => quote!(#arg_name: u32),
+            ArgType::Enum(enum_ty) => {
                 if let Some((iface, name)) = enum_ty.split_once('.') {
                     let iface_name = syn::Ident::new(iface, Span::call_site());
                     let enum_name = make_pascal_case_ident(name);
@@ -711,65 +691,63 @@ impl ArgExt for Argument {
                     quote!(#arg_name: #enum_name)
                 }
             }
-            ("fixed", None, None, false) => quote!(#arg_name: _wayrs_client::wire::Fixed),
-            ("object", None, None, allow_null) => match allow_null {
+            ArgType::Fixed => quote!(#arg_name: _wayrs_client::wire::Fixed),
+            ArgType::Object {
+                allow_null,
+                iface: None,
+            } => match allow_null {
                 false => quote!(#arg_name: _wayrs_client::object::Object),
                 true => quote!(#arg_name: ::std::option::Option<_wayrs_client::object::Object>),
             },
-            ("object", Some(iface), None, allow_null) => {
+            ArgType::Object {
+                allow_null,
+                iface: Some(iface),
+            } => {
                 let proxy_path = make_proxy_path(iface);
                 match allow_null {
                     false => quote!(#arg_name: #proxy_path),
                     true => quote!(#arg_name: ::std::option::Option<#proxy_path>),
                 }
             }
-            ("new_id", None, None, false) => quote!(version: u32),
-            ("new_id", Some(_), None, false) => return None,
-            ("string", None, None, allow_null) => match allow_null {
+            ArgType::NewId { iface: None } => quote!(version: u32),
+            ArgType::NewId { iface: Some(_) } => return None,
+            ArgType::String { allow_null } => match allow_null {
                 false => quote!(#arg_name: ::std::ffi::CString),
                 true => quote!(#arg_name: ::std::option::Option<::std::ffi::CString>),
             },
-            ("array", None, None, false) => quote!(#arg_name: ::std::vec::Vec<u8>),
-            ("fd", None, None, false) => quote!(#arg_name: ::std::os::fd::OwnedFd),
-            _ => unreachable!(),
+            ArgType::Array => quote!(#arg_name: ::std::vec::Vec<u8>),
+            ArgType::Fd => quote!(#arg_name: ::std::os::fd::OwnedFd),
         };
         Some(retval)
     }
 
     fn as_event_ty(&self) -> TokenStream {
-        match self.arg_type.as_str() {
-            "int" | "uint" if self.enum_type.is_some() => {
-                let enum_type = self.enum_type.as_deref().unwrap();
-                if let Some((iface, name)) = enum_type.split_once('.') {
+        match &self.arg_type {
+            ArgType::Int => quote!(i32),
+            ArgType::Uint => quote!(u32),
+            ArgType::Enum(enum_ty) => {
+                if let Some((iface, name)) = enum_ty.split_once('.') {
                     let iface_name = syn::Ident::new(iface, Span::call_site());
                     let enum_name = make_pascal_case_ident(name);
                     quote!(super::#iface_name::#enum_name)
                 } else {
-                    let enum_name = make_pascal_case_ident(enum_type);
+                    let enum_name = make_pascal_case_ident(enum_ty);
                     quote!(#enum_name)
                 }
             }
-            "int" => quote!(i32),
-            "uint" => quote!(u32),
-            "fixed" => quote!(_wayrs_client::wire::Fixed),
-            "object" => match self.allow_null {
+            ArgType::Fixed => quote!(_wayrs_client::wire::Fixed),
+            ArgType::Object { allow_null, .. } => match allow_null {
                 false => quote!(ObjectId),
                 true => quote!(::std::option::Option<ObjectId>),
             },
-            "new_id" => {
-                if let Some(iface) = &self.interface {
-                    make_proxy_path(iface)
-                } else {
-                    quote!(_wayrs_client::object::Object)
-                }
-            }
-            "string" => match self.allow_null {
+            ArgType::NewId { iface: None } => quote!(_wayrs_client::object::Object),
+            ArgType::NewId { iface: Some(iface) } => make_proxy_path(iface),
+            ArgType::String { allow_null } => match allow_null {
                 false => quote!(::std::ffi::CString),
                 true => quote!(::std::option::Option<::std::ffi::CString>),
             },
-            "array" => quote!(::std::vec::Vec<u8>),
-            "fd" => quote!(::std::os::fd::OwnedFd),
-            _ => unreachable!(),
+            ArgType::Array => quote!(::std::vec::Vec<u8>),
+            ArgType::Fd => quote!(::std::os::fd::OwnedFd),
         }
     }
 }

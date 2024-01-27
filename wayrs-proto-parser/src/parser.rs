@@ -235,8 +235,8 @@ impl<'a> Parser<'a> {
         let mut name = None;
         let mut arg_type = None;
         let mut allow_null = false;
-        let mut enum_type = None;
-        let mut interface = None;
+        let mut enum_ty = None;
+        let mut iface = None;
         let mut summary = None;
 
         for attr in arg.attributes().with_checks(false) {
@@ -244,8 +244,8 @@ impl<'a> Parser<'a> {
             match attr.key.as_ref() {
                 b"name" => name = Some(attr.unescape_value().unwrap().into_owned()),
                 b"type" => arg_type = Some(attr.unescape_value().unwrap().into_owned()),
-                b"enum" => enum_type = Some(attr.unescape_value().unwrap().into_owned()),
-                b"interface" => interface = Some(attr.unescape_value().unwrap().into_owned()),
+                b"enum" => enum_ty = Some(attr.unescape_value().unwrap().into_owned()),
+                b"interface" => iface = Some(attr.unescape_value().unwrap().into_owned()),
                 b"summary" => summary = Some(attr.unescape_value().unwrap().into_owned()),
                 b"allow-null" => allow_null = attr.unescape_value().unwrap() == "true",
                 _ => (),
@@ -254,10 +254,18 @@ impl<'a> Parser<'a> {
 
         Argument {
             name: name.unwrap(),
-            arg_type: arg_type.unwrap(),
-            allow_null,
-            enum_type,
-            interface,
+            arg_type: match arg_type.unwrap().as_str() {
+                "int" | "uint" if enum_ty.is_some() => ArgType::Enum(enum_ty.unwrap()),
+                "int" => ArgType::Int,
+                "uint" => ArgType::Uint,
+                "fixed" => ArgType::Fixed,
+                "string" => ArgType::String { allow_null },
+                "object" => ArgType::Object { allow_null, iface },
+                "new_id" => ArgType::NewId { iface },
+                "array" => ArgType::Array,
+                "fd" => ArgType::Fd,
+                _ => unreachable!(),
+            },
             summary,
         }
     }
