@@ -22,9 +22,16 @@ macro_rules! gen {
 }
 
 gen! {
-    mod: xdg_shell,
-    feat: "xdg-shell",
-    file: "wayland-protocols/stable/xdg-shell/xdg-shell.xml",
+    mod: linux_dmabuf_v1,
+    feat: "linux-dmabuf-v1",
+    file: "wayland-protocols/stable/linux-dmabuf/linux-dmabuf-v1.xml",
+    deps: [core],
+}
+
+gen! {
+    mod: presentation_time,
+    feat: "presentation-time",
+    file: "wayland-protocols/stable/presentation-time/presentation-time.xml",
     deps: [core],
 }
 
@@ -36,9 +43,9 @@ gen! {
 }
 
 gen! {
-    mod: presentation_time,
-    feat: "presentation-time",
-    file: "wayland-protocols/stable/presentation-time/presentation-time.xml",
+    mod: xdg_shell,
+    feat: "xdg-shell",
+    file: "wayland-protocols/stable/xdg-shell/xdg-shell.xml",
     deps: [core],
 }
 
@@ -82,6 +89,13 @@ gen! {
     feat: "ext-session-lock-v1",
     file: "wayland-protocols/staging/ext-session-lock/ext-session-lock-v1.xml",
     deps: [core],
+}
+
+gen! {
+    mod: ext_transient_seat_v1,
+    feat: "ext-transient-seat-v1",
+    file: "wayland-protocols/staging/ext-transient-seat/ext-transient-seat-v1.xml",
+    deps: [],
 }
 
 gen! {

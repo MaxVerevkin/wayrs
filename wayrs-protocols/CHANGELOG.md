@@ -1,3 +1,9 @@
+# 0.13.1 [unreleased]
+
+- Update `wayland-protocols` to v1.33.
+- Adds `ext-transient-seat-v1`.
+- Adds `linux-dmabuf-v1` (supersedes `linux-dmabuf-unstable-v1`).
+
 # 0.13.0
 
 - Update to `wayrs-client` to v1.
