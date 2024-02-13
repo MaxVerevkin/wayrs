@@ -9,6 +9,10 @@ A simple Rust implementation of Wayland client library.
 - No `libwayland` compatibility
 - Support blocking, non-blocking and async IO
 
+## Project status
+
+- The main crate, `wayrs-client`, is feature complete and stable.
+
 ## Project structure
 
 The project is split into multiple crates:
