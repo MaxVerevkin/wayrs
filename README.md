@@ -40,4 +40,4 @@ The following projects use `wayrs` and may serve as additional usage examples:
 
 ## MSRV
 
-1.67
+1.69
