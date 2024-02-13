@@ -1,4 +1,4 @@
-# 0.13.1 [unreleased]
+# 0.13.1
 
 - Update `wayland-protocols` to v1.33.
 - Adds `ext-transient-seat-v1`.
