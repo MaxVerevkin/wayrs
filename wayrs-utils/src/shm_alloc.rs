@@ -141,8 +141,8 @@ impl Drop for Buffer {
 
 impl InitShmPool {
     fn new<D>(conn: &mut Connection<D>, wl_shm: WlShm, size: usize) -> InitShmPool {
-        let fd = shmemfdrs::create_shmem(wayrs_client::cstr!("/wayrs_shm_pool"), size);
-        let file = unsafe { File::from_raw_fd(fd) };
+        let file = shmemfdrs2::create_shmem(wayrs_client::cstr!("/wayrs_shm_pool")).unwrap();
+        file.set_len(size as u64).unwrap();
         let mmap = unsafe { MmapMut::map_mut(&file).expect("memory mapping failed") };
 
         let fd_dup = file

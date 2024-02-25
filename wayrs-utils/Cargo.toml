@@ -12,15 +12,15 @@ license.workspace = true
 
 [features]
 seats = []
-shm_alloc = ["memmap2", "shmemfdrs"]
-cursor = ["shm_alloc", "xcursor", "wayrs-protocols/cursor-shape-v1"]
-keyboard = ["xkbcommon"]
-dmabuf_feedback = ["libc", "memmap2", "wayrs-protocols/linux-dmabuf-unstable-v1"]
+shm_alloc = ["dep:memmap2", "dep:shmemfdrs2"]
+cursor = ["shm_alloc", "dep:xcursor", "wayrs-protocols/cursor-shape-v1"]
+keyboard = ["dep:xkbcommon"]
+dmabuf_feedback = ["dep:memmap2", "wayrs-protocols/linux-dmabuf-unstable-v1"]
 
 [dependencies]
-libc = { version = "0.2", optional = true }
+libc = "0.2"
 memmap2 = { version = "0.8", optional = true }
-shmemfdrs = { version = "0.1", optional = true }
+shmemfdrs2 = { version = "1.0", optional = true }
 thiserror = "1.0"
 wayrs-client = { version = "1.0", path = "../wayrs-client" }
 wayrs-protocols = { version = "0.13", path = "../wayrs-protocols", optional = true }
