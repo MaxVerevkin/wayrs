@@ -1,6 +1,7 @@
 //! A simple "free list" shared memory allocator
 
 use std::fs::File;
+use std::io;
 use std::os::fd::AsFd;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -80,10 +81,15 @@ impl ShmAlloc {
         &mut self,
         conn: &mut Connection<D>,
         spec: BufferSpec,
-    ) -> (Buffer, &mut [u8]) {
-        self.pool
-            .get_or_insert_with(|| InitShmPool::new(conn, self.wl_shm, spec.size()))
-            .alloc_buffer(conn, spec)
+    ) -> io::Result<(Buffer, &mut [u8])> {
+        // Note: if let Some(poll) = &mut self.poll doesn't work because Rust's borrow checker is
+        // too dumb.
+        if self.pool.is_some() {
+            return self.pool.as_mut().unwrap().alloc_buffer(conn, spec);
+        }
+
+        let pool = InitShmPool::new(conn, self.wl_shm, spec.size())?;
+        self.pool.insert(pool).alloc_buffer(conn, spec)
     }
 }
 
@@ -137,10 +143,10 @@ impl Drop for Buffer {
 }
 
 impl InitShmPool {
-    fn new<D>(conn: &mut Connection<D>, wl_shm: WlShm, size: usize) -> InitShmPool {
-        let file = shmemfdrs2::create_shmem(wayrs_client::cstr!("/wayrs_shm_pool")).unwrap();
-        file.set_len(size as u64).unwrap();
-        let mmap = unsafe { MmapMut::map_mut(&file).expect("memory mapping failed") };
+    fn new<D>(conn: &mut Connection<D>, wl_shm: WlShm, size: usize) -> io::Result<InitShmPool> {
+        let file = shmemfdrs2::create_shmem(wayrs_client::cstr!("/wayrs_shm_pool"))?;
+        file.set_len(size as u64)?;
+        let mmap = unsafe { MmapMut::map_mut(&file)? };
 
         let fd_dup = file
             .as_fd()
@@ -149,7 +155,7 @@ impl InitShmPool {
 
         let pool = wl_shm.create_pool(conn, fd_dup, size as i32);
 
-        Self {
+        Ok(Self {
             pool,
             len: size,
             file,
@@ -160,15 +166,15 @@ impl InitShmPool {
                 refcnt: Arc::new(AtomicU32::new(0)),
                 buffer: None,
             }],
-        }
+        })
     }
 
     fn alloc_buffer<D>(
         &mut self,
         conn: &mut Connection<D>,
         spec: BufferSpec,
-    ) -> (Buffer, &mut [u8]) {
-        let segment_index = self.alloc_segment(conn, spec);
+    ) -> io::Result<(Buffer, &mut [u8])> {
+        let segment_index = self.alloc_segment(conn, spec)?;
         let segment = &mut self.segments[segment_index];
 
         let (wl, spec) = *segment.buffer.get_or_insert_with(|| {
@@ -188,7 +194,7 @@ impl InitShmPool {
             (wl, spec)
         });
 
-        (
+        Ok((
             Buffer {
                 spec,
                 wl,
@@ -197,7 +203,7 @@ impl InitShmPool {
                 offset: segment.offset,
             },
             &mut self.mmap[segment.offset..][..segment.len],
-        )
+        ))
     }
 
     fn defragment<D>(&mut self, conn: &mut Connection<D>) {
@@ -226,13 +232,14 @@ impl InitShmPool {
     }
 
     /// Resize the memmap, at least doubling the size.
-    fn resize<D>(&mut self, conn: &mut Connection<D>, new_len: usize) {
+    fn resize<D>(&mut self, conn: &mut Connection<D>, new_len: usize) -> io::Result<()> {
         if new_len > self.len {
             self.len = usize::max(self.len * 2, new_len);
-            self.file.set_len(self.len as u64).unwrap();
+            self.file.set_len(self.len as u64)?;
             self.pool.resize(conn, self.len as i32);
-            self.mmap = unsafe { MmapMut::map_mut(&self.file).expect("memory mapping failed") };
+            self.mmap = unsafe { MmapMut::map_mut(&self.file)? };
         }
+        Ok(())
     }
 
     /// Returns segment index, does not resize
@@ -295,16 +302,20 @@ impl InitShmPool {
     }
 
     // Returns segment index
-    fn alloc_segment<D>(&mut self, conn: &mut Connection<D>, spec: BufferSpec) -> usize {
+    fn alloc_segment<D>(
+        &mut self,
+        conn: &mut Connection<D>,
+        spec: BufferSpec,
+    ) -> io::Result<usize> {
         let len = spec.size();
 
         if let Some(index) = self.try_alloc_in_place(conn, len, spec) {
-            return index;
+            return Ok(index);
         }
 
         self.defragment(conn);
         if let Some(index) = self.try_alloc_in_place(conn, len, spec) {
-            return index;
+            return Ok(index);
         }
 
         let segments_len = match self.segments.last_mut() {
@@ -319,12 +330,12 @@ impl InitShmPool {
                 }
                 segment.len = len;
                 let new_size = segment.offset + segment.len;
-                self.resize(conn, new_size);
+                self.resize(conn, new_size)?;
                 new_size
             }
             _ => {
                 let offset = self.len;
-                self.resize(conn, self.len + len);
+                self.resize(conn, self.len + len)?;
                 self.segments.push(Segment {
                     offset,
                     len,
@@ -345,6 +356,6 @@ impl InitShmPool {
             });
         }
 
-        self.segments.len() - 1
+        Ok(self.segments.len() - 1)
     }
 }

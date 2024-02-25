@@ -200,15 +200,17 @@ impl ThemedPointer {
                     }
                 };
 
-                let (buffer, canvas) = shm.alloc_buffer(
-                    conn,
-                    BufferSpec {
-                        width: image.width,
-                        height: image.height,
-                        stride: image.width * 4,
-                        format: wl_shm::Format::Argb8888,
-                    },
-                );
+                let (buffer, canvas) = shm
+                    .alloc_buffer(
+                        conn,
+                        BufferSpec {
+                            width: image.width,
+                            height: image.height,
+                            stride: image.width * 4,
+                            format: wl_shm::Format::Argb8888,
+                        },
+                    )
+                    .expect("could not allocate frame shm buffer");
 
                 assert_eq!(image.pixels_rgba.len(), canvas.len());
                 canvas.copy_from_slice(&image.pixels_rgba);
