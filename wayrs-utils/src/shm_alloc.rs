@@ -1,7 +1,7 @@
 //! A simple "free list" shared memory allocator
 
 use std::fs::File;
-use std::os::fd::{AsFd, FromRawFd};
+use std::os::fd::AsFd;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -10,9 +10,6 @@ use memmap2::MmapMut;
 use wayrs_client::global::{BindError, Globals, GlobalsExt};
 use wayrs_client::protocol::*;
 use wayrs_client::Connection;
-
-use wl_shm::{Format, WlShm};
-use wl_shm_pool::WlShmPool;
 
 /// A simple "free list" shared memory allocator
 #[derive(Debug)]
@@ -43,7 +40,7 @@ pub struct BufferSpec {
     pub width: u32,
     pub height: u32,
     pub stride: u32,
-    pub format: Format,
+    pub format: wl_shm::Format,
 }
 
 impl BufferSpec {
