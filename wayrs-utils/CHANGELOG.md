@@ -1,3 +1,7 @@
+# 0.14.0
+
+- `ShmAlloc::alloc_buffer` now returns `io::Result` and does not panic.
+
 # 0.13.0
 
 - Update to `wayrs-cilent` v1.
