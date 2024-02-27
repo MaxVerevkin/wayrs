@@ -1,3 +1,7 @@
+# 1.0.3
+
+- Update `nix` to v0.28.
+
 # 1.0.2
 
 - Update for `wayrs-scanner` v0.13.
