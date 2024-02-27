@@ -15,7 +15,7 @@ wayrs-scanner = { version = "0.13", path = "../wayrs-scanner" }
 thiserror = "1.0"
 
 [dependencies.nix]
-version = "0.27"
+version = "0.28"
 default-features = false
 features = ["socket", "uio"]
 
