@@ -1,17 +1,17 @@
 //! Wayland connection
 
 use std::collections::VecDeque;
-use std::env;
 use std::io;
 use std::num::NonZeroU32;
 use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::net::UnixStream;
-use std::path::PathBuf;
 
 use crate::debug_message::DebugMessage;
 use crate::object::{Object, ObjectManager, Proxy};
 use crate::protocol::wl_registry::GlobalArgs;
 use crate::protocol::*;
+use crate::proxy::Proxy;
+use crate::ClientTransport;
 use crate::EventCtx;
 
 use wayrs_core::transport::{BufferedSocket, PeekHeaderError, RecvMessageError, SendMessageError};
@@ -37,14 +37,15 @@ pub enum ConnectError {
 /// and dispatches object events.
 ///
 /// Set `WAYLAND_DEBUG=1` environment variable to get debug messages.
-pub struct Connection<D> {
+pub struct Connection<D, T: ClientTransport = UnixStream> {
     #[cfg(feature = "tokio")]
     async_fd: Option<AsyncFd<RawFd>>,
 
-    socket: BufferedSocket<UnixStream>,
+    socket: BufferedSocket,
+    socket: BufferedSocket<T>,
     msg_buffers_pool: MessageBuffersPool,
 
-    object_mgr: ObjectManager<D>,
+    object_mgr: ObjectManager<D, T>,
 
     event_queue: VecDeque<QueuedEvent>,
     requests_queue: VecDeque<Message>,
@@ -53,7 +54,7 @@ pub struct Connection<D> {
     registry: WlRegistry,
 
     // This is `None` while dispatching registry events, to prevent mutation from registry callbacks.
-    registry_cbs: Option<Vec<RegistryCb<D>>>,
+    registry_cbs: Option<Vec<RegistryCb<D, T>>>,
 
     debug: bool,
 }
@@ -64,35 +65,29 @@ enum QueuedEvent {
     Message(Message),
 }
 
-pub(crate) type GenericCallback<D> =
-    Box<dyn FnMut(&mut Connection<D>, &mut D, Object, Message) + Send>;
+pub(crate) type GenericCallback<D, T> =
+    Box<dyn FnMut(&mut Connection<D, T>, &mut D, Object, Message) + Send>;
 
-type RegistryCb<D> = Box<dyn FnMut(&mut Connection<D>, &mut D, &wl_registry::Event) + Send>;
+type RegistryCb<D, T> =
+    Box<dyn FnMut(&mut Connection<D, T>, &mut D, &wl_registry::Event) + Send>;
 
-impl<D> AsRawFd for Connection<D> {
+impl<D, T: ClientTransport> AsRawFd for Connection<D, T> {
     fn as_raw_fd(&self) -> RawFd {
         self.socket.as_raw_fd()
     }
 }
 
-impl<D> Connection<D> {
+impl<D, T: ClientTransport> Connection<D, T> {
     /// Connect to a Wayland socket at `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` and create a registry.
     ///
     /// At the moment, only a single registry can be created. This might or might not change in the
     /// future, considering registries cannot be destroyed.
     pub fn connect() -> Result<Self, ConnectError> {
-        let runtime_dir = env::var_os("XDG_RUNTIME_DIR").ok_or(ConnectError::NotEnoughEnvVars)?;
-        let wayland_disp = env::var_os("WAYLAND_DISPLAY").ok_or(ConnectError::NotEnoughEnvVars)?;
-
-        let mut path = PathBuf::new();
-        path.push(runtime_dir);
-        path.push(wayland_disp);
-
         let mut this = Self {
             #[cfg(feature = "tokio")]
             async_fd: None,
 
-            socket: BufferedSocket::from(UnixStream::connect(path)?),
+            socket: BufferedSocket::from(T::connect()?),
             msg_buffers_pool: MessageBuffersPool::default(),
 
             object_mgr: ObjectManager::new(),
@@ -162,7 +157,7 @@ impl<D> Connection<D> {
     ///
     /// This method panics if called from the context of a registry callback.
     pub fn add_registry_cb<
-        F: FnMut(&mut Connection<D>, &mut D, &wl_registry::Event) + Send + 'static,
+        F: FnMut(&mut Connection<D, T>, &mut D, &wl_registry::Event) + Send + 'static,
     >(
         &mut self,
         cb: F,
@@ -185,7 +180,7 @@ impl<D> Connection<D> {
     ///
     /// Calling this function on a destroyed object will most likely panic, but this is not
     /// guarantied due to id-reuse.
-    pub fn set_callback_for<P: Proxy, F: FnMut(EventCtx<D, P>) + Send + 'static>(
+    pub fn set_callback_for<P: Proxy, F: FnMut(EventCtx<D, P, T>) + Send + 'static>(
         &mut self,
         proxy: P,
         cb: F,
@@ -210,7 +205,7 @@ impl<D> Connection<D> {
     /// Remove all callbacks.
     ///
     /// You can use this function to change the "state type" of a connection.
-    pub fn clear_callbacks<D2>(self) -> Connection<D2> {
+    pub fn clear_callbacks<D2>(self) -> Connection<D2, T> {
         Connection {
             #[cfg(feature = "tokio")]
             async_fd: self.async_fd,
@@ -562,7 +557,7 @@ impl<D> Connection<D> {
     /// Allocate a new object and set callback. Returned object must be sent in a request as a
     /// "new_id" argument.
     #[doc(hidden)]
-    pub fn allocate_new_object_with_cb<P: Proxy, F: FnMut(EventCtx<D, P>) + Send + 'static>(
+    pub fn allocate_new_object_with_cb<P: Proxy, F: FnMut(EventCtx<D, P, T>) + Send + 'static>(
         &mut self,
         version: u32,
         cb: F,
@@ -572,9 +567,9 @@ impl<D> Connection<D> {
         P::new(state.object.id, version)
     }
 
-    fn make_generic_cb<P: Proxy, F: FnMut(EventCtx<D, P>) + Send + 'static>(
+    fn make_generic_cb<P: Proxy, F: FnMut(EventCtx<D, P, T>) + Send + 'static>(
         mut cb: F,
-    ) -> GenericCallback<D> {
+    ) -> GenericCallback<D, T> {
         // Note: if `F` does not capture anything, this `Box::new` will not allocate.
         Box::new(move |conn, state, object, event| {
             let proxy: P = object.try_into().unwrap();

@@ -18,8 +18,37 @@ pub use wayrs_core as core;
 pub use wayrs_core::{Fixed, IoMode};
 
 use std::ffi::CStr;
-use std::fmt;
+use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
+use std::{env, fmt};
 
+pub use wayrs_core::{Fixed, IoMode};
+
+pub use wayrs_core::transport::Transport;
+pub use wayrs_core::{Fixed, IoMode};
+
+pub trait ClientTransport: Transport {
+    fn connect() -> Result<Self, ConnectError>
+    where
+        Self: Sized;
+}
+
+impl ClientTransport for UnixStream {
+    fn connect() -> Result<Self, ConnectError>
+    where
+        Self: Sized,
+    {
+        let runtime_dir = env::var_os("XDG_RUNTIME_DIR").ok_or(ConnectError::NotEnoughEnvVars)?;
+        let wayland_disp = env::var_os("WAYLAND_DISPLAY").ok_or(ConnectError::NotEnoughEnvVars)?;
+
+        let mut path = PathBuf::new();
+        path.push(runtime_dir);
+        path.push(wayland_disp);
+
+        Ok(UnixStream::connect(path)?)
+    }
+}
+>>>>>>> ed9c1cf (Add client transport abstraction)
 /// Generate glue code from .xml protocol file. The path is relative to your project root.
 #[macro_export]
 macro_rules! generate {
@@ -57,14 +86,14 @@ pub const fn _private_cstr(string: &str) -> &CStr {
 
 /// Event callback context.
 #[non_exhaustive]
-pub struct EventCtx<'a, D, P: object::Proxy> {
-    pub conn: &'a mut Connection<D>,
+pub struct EventCtx<'a, D, P: object::Proxy, T: ClientTransport = UnixStream> {
+    pub conn: &'a mut Connection<D, T>,
     pub state: &'a mut D,
     pub proxy: P,
     pub event: P::Event,
 }
 
-impl<'a, D, P: object::Proxy> fmt::Debug for EventCtx<'a, D, P>
+impl<'a, D, P: object::Proxy, T: ClientTransport> fmt::Debug for EventCtx<'a, D, P, T>
 where
     P: fmt::Debug,
     P::Event: fmt::Debug,

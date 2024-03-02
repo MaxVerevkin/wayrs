@@ -308,6 +308,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             use #wayrs_client_path as _wayrs_client;
             use _wayrs_client::object::Proxy;
             use _wayrs_client::EventCtx;
+            use _wayrs_client::ClientTransport;
 
             #mod_doc
             #[doc = "See [`Event`] for the list of possible events."]
@@ -493,7 +494,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
 
     let mut fn_args = vec![
         quote!(self),
-        quote!(conn: &mut _wayrs_client::Connection<D>),
+        quote!(conn: &mut _wayrs_client::Connection<D, T>),
     ];
     fn_args.extend(request.args.iter().flat_map(|arg| arg.as_request_fn_arg()));
 
@@ -544,7 +545,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
         None => gen_pub_fn(
             &doc,
             &request.name,
-            &[quote!(D)],
+            &[quote!(D), quote!(T: ClientTransport)],
             &fn_args,
             quote!(()),
             None,
@@ -554,7 +555,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             let no_cb = gen_pub_fn(
                 &doc,
                 &request.name,
-                &[quote!(P: Proxy), quote!(D)],
+                &[quote!(P: Proxy), quote!(D), quote!(T: ClientTransport)],
                 &fn_args,
                 quote!(P),
                 None,
@@ -564,11 +565,11 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                     new_object
                 },
             );
-            fn_args.push(quote!(cb: impl FnMut(EventCtx<D, P>) + Send + 'static));
+            fn_args.push(quote!(cb: impl FnMut(EventCtx<D, P, T>) + Send + 'static));
             let cb = gen_pub_fn(
                 &doc,
                 &format!("{}_with_cb", request.name),
-                &[quote!(P: Proxy), quote!(D)],
+                &[quote!(P: Proxy), quote!(D), quote!(T: ClientTransport)],
                 &fn_args,
                 quote!(P),
                 None,
@@ -588,7 +589,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             let no_cb = gen_pub_fn(
                 &doc,
                 &request.name,
-                &[quote!(D)],
+                &[quote!(D), quote!(T: ClientTransport)],
                 &fn_args,
                 proxy_path.clone(),
                 None,
@@ -598,11 +599,11 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
                     new_object
                 },
             );
-            fn_args.push(quote!(cb: impl FnMut(EventCtx<D, #proxy_path>) + Send + 'static));
+            fn_args.push(quote!(cb: impl FnMut(EventCtx<D, #proxy_path, T>) + Send + 'static));
             let cb = gen_pub_fn(
                 &doc,
                 &format!("{}_with_cb", request.name),
-                &[quote!(D)],
+                &[quote!(D), quote!(T: ClientTransport)],
                 &fn_args,
                 proxy_path.clone(),
                 None,

@@ -9,9 +9,10 @@
 
 use libc::dev_t;
 use std::fmt;
+use std::os::unix::net::UnixStream;
 
 use wayrs_client::protocol::WlSurface;
-use wayrs_client::{Connection, EventCtx};
+use wayrs_client::{ClientTransport, Connection, EventCtx};
 use wayrs_protocols::linux_dmabuf_unstable_v1::*;
 
 #[derive(Debug)]
@@ -39,19 +40,24 @@ pub struct FormatTableEntry {
     pub modifier: u64,
 }
 
-pub trait DmabufFeedbackHandler: Sized + 'static {
+pub trait DmabufFeedbackHandler<T: ClientTransport = UnixStream>: Sized + 'static {
     /// Get a reference to a [`DmabufFeedback`] associated with `wl`.
     ///
     /// Returning a reference to a wrong object may cause [`Connection::dispatch_events`] to panic.
     fn get_dmabuf_feedback(&mut self, wl: ZwpLinuxDmabufFeedbackV1) -> &mut DmabufFeedback;
 
     /// A feedback for `wl` is received/updated.
-    fn feedback_done(&mut self, conn: &mut Connection<Self>, wl: ZwpLinuxDmabufFeedbackV1);
+    fn feedback_done(
+        &mut self,
+        conn: &mut Connection<Self, T>,
+        wl: ZwpLinuxDmabufFeedbackV1,
+        );
 }
 
+
 impl DmabufFeedback {
-    pub fn get_default<D: DmabufFeedbackHandler>(
-        conn: &mut Connection<D>,
+    pub fn get_default<D: DmabufFeedbackHandler<T>, T: ClientTransport + 'static>(
+        conn: &mut Connection<D, T>,
         linux_dmabuf: ZwpLinuxDmabufV1,
     ) -> Self {
         Self {
@@ -64,8 +70,8 @@ impl DmabufFeedback {
         }
     }
 
-    pub fn get_for_surface<D: DmabufFeedbackHandler>(
-        conn: &mut Connection<D>,
+    pub fn get_for_surface<D: DmabufFeedbackHandler<T>, T: ClientTransport + 'static>(
+        conn: &mut Connection<D, T>,
         linux_dmabuf: ZwpLinuxDmabufV1,
         surface: WlSurface,
     ) -> Self {
@@ -103,12 +109,14 @@ impl DmabufFeedback {
         &self.tranches
     }
 
-    pub fn destroy<D>(self, conn: &mut Connection<D>) {
+    pub fn destroy<D, T: ClientTransport>(self, conn: &mut Connection<D, T>) {
         self.wl.destroy(conn);
     }
 }
 
-fn dmabuf_feedback_cb<D: DmabufFeedbackHandler>(ctx: EventCtx<D, ZwpLinuxDmabufFeedbackV1>) {
+fn dmabuf_feedback_cb<D: DmabufFeedbackHandler<T>, T: ClientTransport>(
+    ctx: EventCtx<D, ZwpLinuxDmabufFeedbackV1, T>,
+) {
     let feedback = ctx.state.get_dmabuf_feedback(ctx.proxy);
     assert_eq!(
         feedback.wl, ctx.proxy,
