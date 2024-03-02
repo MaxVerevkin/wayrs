@@ -27,22 +27,14 @@ impl Transport for UnixStream {
         assert!(controllen <= cmsg.len());
 
         let mhdr = {
-            let cmsg_ptr = if controllen > 0 {
-                cmsg.as_mut_ptr()
-            } else {
-                std::ptr::null_mut()
-            };
-
-            let mhdr = {
-                let mut mhdr = unsafe { std::mem::zeroed::<libc::msghdr>() };
-                mhdr.msg_iov = bytes.as_ptr().cast_mut().cast();
-                mhdr.msg_iovlen = bytes.len() as _;
-                mhdr.msg_control = cmsg_ptr.cast();
-                mhdr.msg_controllen = controllen as _;
-                mhdr
-            };
+            let mut mhdr = unsafe { std::mem::zeroed::<libc::msghdr>() };
+            mhdr.msg_iov = bytes.as_ptr().cast_mut().cast();
+            mhdr.msg_iovlen = bytes.len() as _;
 
             if !fds.is_empty() {
+                mhdr.msg_control = cmsg.as_mut_ptr().cast();
+                mhdr.msg_controllen = controllen as _;
+
                 let pmhdr = unsafe { libc::CMSG_FIRSTHDR(&mhdr).as_mut().unwrap() };
                 pmhdr.cmsg_level = libc::SOL_SOCKET;
                 pmhdr.cmsg_type = libc::SCM_RIGHTS;
