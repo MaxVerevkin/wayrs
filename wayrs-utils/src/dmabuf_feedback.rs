@@ -125,7 +125,7 @@ fn dmabuf_feedback_cb<D: DmabufFeedbackHandler>(ctx: EventCtx<D, ZwpLinuxDmabufF
             let mmap = unsafe {
                 memmap2::MmapOptions::new()
                     .len(args.size as usize)
-                    .map(&args.fd)
+                    .map_copy_read_only(&args.fd)
                     .expect("mmap failed")
             };
             assert!(
