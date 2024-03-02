@@ -15,10 +15,8 @@ use crate::protocol::*;
 use crate::proxy::Proxy;
 use crate::EventCtx;
 
-use wayrs_core::{
-    ArgType, ArgValue, BufferedSocket, Interface, IoMode, Message, MessageBuffersPool, ObjectId,
-    SendMessageError,
-};
+use wayrs_core::transport::{BufferedSocket, SendMessageError};
+use wayrs_core::{ArgType, ArgValue, Interface, IoMode, Message, MessageBuffersPool, ObjectId};
 
 #[cfg(feature = "tokio")]
 use tokio::io::unix::AsyncFd;
@@ -91,13 +89,11 @@ impl<D> Connection<D> {
         path.push(runtime_dir);
         path.push(wayland_disp);
 
-        let socket = BufferedSocket::from(UnixStream::connect(path)?);
-
         let mut this = Self {
             #[cfg(feature = "tokio")]
             async_fd: None,
 
-            socket,
+            socket: BufferedSocket::new(UnixStream::connect(path)?),
             msg_buffers_pool: MessageBuffersPool::default(),
 
             object_mgr: ObjectManager::new(),
