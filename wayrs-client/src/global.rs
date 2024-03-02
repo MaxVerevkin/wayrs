@@ -32,32 +32,32 @@ pub trait GlobalExt {
     /// - Number - require a specific version
     /// - Range to inclusive (`..=b` - bind a version in range `[1, b]`)
     /// - Range inclusive (`a..=b` - bind a version in range `[a, b]`)
-    fn bind<P: Proxy, D>(
+    fn bind<P: Proxy, D, T>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         version: impl VersionBounds,
     ) -> Result<P, BindError>;
 
     /// Same as [`bind`](Self::bind) but also sets the callback
-    fn bind_with_cb<P: Proxy, D, F: FnMut(EventCtx<D, P>) + Send + 'static>(
+    fn bind_with_cb<P: Proxy, D, T, F: FnMut(EventCtx<D, P, T>) + Send + 'static>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         version: impl VersionBounds,
         cb: F,
     ) -> Result<P, BindError>;
 }
 
 pub trait GlobalsExt {
-    fn bind<P: Proxy, D>(
+    fn bind<P: Proxy, D, T>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         version: impl VersionBounds,
     ) -> Result<P, BindError>;
 
     /// Same as [`bind`](Self::bind) but also sets the callback
-    fn bind_with_cb<P: Proxy, D, F: FnMut(EventCtx<D, P>) + Send + 'static>(
+    fn bind_with_cb<P: Proxy, D, T, F: FnMut(EventCtx<D, P, T>) + Send + 'static>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         version: impl VersionBounds,
         cb: F,
     ) -> Result<P, BindError>;
@@ -74,9 +74,9 @@ impl GlobalExt for Global {
     /// - Number - require a specific version
     /// - Range to inclusive (`..=b` - bind a version in range `[1, b]`)
     /// - Range inclusive (`a..=b` - bind a version in range `[a, b]`)
-    fn bind<P: Proxy, D>(
+    fn bind<P: Proxy, D, T>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         version: impl VersionBounds,
     ) -> Result<P, BindError> {
         if !self.is::<P>() {
@@ -102,9 +102,9 @@ impl GlobalExt for Global {
     }
 
     /// Same as [`bind`](Self::bind) but also sets the callback
-    fn bind_with_cb<P: Proxy, D, F: FnMut(EventCtx<D, P>) + Send + 'static>(
+    fn bind_with_cb<P: Proxy, D, T, F: FnMut(EventCtx<D, P, T>) + Send + 'static>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         version: impl VersionBounds,
         cb: F,
     ) -> Result<P, BindError> {
@@ -132,9 +132,9 @@ impl GlobalExt for Global {
 }
 
 impl GlobalsExt for Globals {
-    fn bind<P: Proxy, D>(
+    fn bind<P: Proxy, D, T>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         version: impl VersionBounds,
     ) -> Result<P, BindError> {
         let global = self
@@ -144,9 +144,9 @@ impl GlobalsExt for Globals {
         global.bind(conn, version)
     }
 
-    fn bind_with_cb<P: Proxy, D, F: FnMut(EventCtx<D, P>) + Send + 'static>(
+    fn bind_with_cb<P: Proxy, D, T, F: FnMut(EventCtx<D, P, T>) + Send + 'static>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         version: impl VersionBounds,
         cb: F,
     ) -> Result<P, BindError> {

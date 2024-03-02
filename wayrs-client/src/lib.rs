@@ -9,15 +9,55 @@ pub mod protocol;
 mod connection;
 mod debug_message;
 
-pub use connection::{ConnectError, Connection};
+pub use connection::Connection;
 
 #[doc(hidden)]
 pub use wayrs_scanner as _private_scanner;
 
 pub use wayrs_core as core;
+pub use wayrs_core::transport::Transport;
 pub use wayrs_core::{Fixed, IoMode};
 
-use std::fmt;
+use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
+use std::{env, fmt, io};
+
+pub trait ClientTransport: Transport {
+    type ConnectError: From<io::Error>;
+
+    fn connect() -> Result<Self, Self::ConnectError>
+    where
+        Self: Sized;
+}
+
+/// An error that can occur while connecting to a Wayland socket.
+#[derive(Debug, thiserror::Error)]
+pub enum ConnectError {
+    /// Either `$XDG_RUNTIME_DIR` or `$WAYLAND_DISPLAY` was not available.
+    #[error("both $XDG_RUNTIME_DIR and $WAYLAND_DISPLAY must be set")]
+    NotEnoughEnvVars,
+    /// Some IO error.
+    #[error(transparent)]
+    Io(#[from] io::Error),
+}
+
+impl ClientTransport for UnixStream {
+    type ConnectError = ConnectError;
+
+    fn connect() -> Result<Self, ConnectError>
+    where
+        Self: Sized,
+    {
+        let runtime_dir = env::var_os("XDG_RUNTIME_DIR").ok_or(ConnectError::NotEnoughEnvVars)?;
+        let wayland_disp = env::var_os("WAYLAND_DISPLAY").ok_or(ConnectError::NotEnoughEnvVars)?;
+
+        let mut path = PathBuf::new();
+        path.push(runtime_dir);
+        path.push(wayland_disp);
+
+        Ok(UnixStream::connect(path)?)
+    }
+}
 
 /// Generate glue code from .xml protocol file. The path is relative to your project root.
 #[macro_export]
@@ -44,14 +84,14 @@ macro_rules! cstr {
 
 /// Event callback context.
 #[non_exhaustive]
-pub struct EventCtx<'a, D, P: object::Proxy> {
-    pub conn: &'a mut Connection<D>,
+pub struct EventCtx<'a, D, P: object::Proxy, T = UnixStream> {
+    pub conn: &'a mut Connection<D, T>,
     pub state: &'a mut D,
     pub proxy: P,
     pub event: P::Event,
 }
 
-impl<'a, D, P: object::Proxy> fmt::Debug for EventCtx<'a, D, P>
+impl<'a, D, P: object::Proxy, T> fmt::Debug for EventCtx<'a, D, P, T>
 where
     P: fmt::Debug,
     P::Event: fmt::Debug,

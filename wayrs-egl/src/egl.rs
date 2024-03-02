@@ -160,9 +160,9 @@ impl EglDisplay {
     }
 
     /// Allocate a new buffer
-    pub fn alloc_buffer<D>(
+    pub fn alloc_buffer<D, T>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         width: u32,
         height: u32,
         fourcc: Fourcc,
