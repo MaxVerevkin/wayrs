@@ -13,7 +13,6 @@ use crate::{
 };
 
 mod unix;
-pub use unix::Unix;
 
 pub const BYTES_OUT_LEN: usize = 4096;
 pub const BYTES_IN_LEN: usize = BYTES_OUT_LEN * 2;
@@ -23,7 +22,7 @@ pub const FDS_IN_LEN: usize = FDS_OUT_LEN * 2;
 /// A buffered Wayland socket
 ///
 /// Handles message marshalling and unmarshalling.
-pub struct BufferedSocket<T: Transport = Unix> {
+pub struct BufferedSocket<T: Transport = UnixStream> {
     socket: T,
     bytes_in: RingBuffer<BYTES_IN_LEN>,
     bytes_out: RingBuffer<BYTES_OUT_LEN>,
@@ -33,12 +32,7 @@ pub struct BufferedSocket<T: Transport = Unix> {
 
 /// An abstraction over Wayland transport methods
 pub trait Transport: AsRawFd {
-    fn send(
-        &mut self,
-        bytes: &[IoSlice],
-        fds: &VecDeque<OwnedFd>,
-        mode: IoMode,
-    ) -> io::Result<usize>;
+    fn send(&mut self, bytes: &[IoSlice], fds: &[OwnedFd], mode: IoMode) -> io::Result<usize>;
 
     fn recv(
         &mut self,
@@ -70,13 +64,6 @@ impl<T: Transport> From<T> for BufferedSocket<T> {
 pub struct SendMessageError {
     pub msg: Message,
     pub err: io::Error,
-}
-
-impl BufferedSocket<Unix> {
-    /// Create a new buffered socket backed by a unix stream.
-    pub fn new(stream: UnixStream) -> Self {
-        Self::from(Unix::from(stream))
-    }
 }
 
 impl<T: Transport> BufferedSocket<T> {
@@ -227,7 +214,9 @@ impl<T: Transport> BufferedSocket<T> {
         let mut iov_buf = [IoSlice::new(&[]), IoSlice::new(&[])];
         let iov = self.bytes_out.get_readable_iov(&mut iov_buf);
 
-        let sent = self.socket.send(iov, &self.fds_out, mode)?;
+        let sent = self
+            .socket
+            .send(iov, self.fds_out.make_contiguous(), mode)?;
         self.bytes_out.move_tail(sent);
         self.fds_out.clear();
 

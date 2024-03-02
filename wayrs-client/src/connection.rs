@@ -93,7 +93,7 @@ impl<D> Connection<D> {
             #[cfg(feature = "tokio")]
             async_fd: None,
 
-            socket: BufferedSocket::new(UnixStream::connect(path)?),
+            socket: BufferedSocket::from(UnixStream::connect(path)?),
             msg_buffers_pool: MessageBuffersPool::default(),
 
             object_mgr: ObjectManager::new(),

@@ -11,8 +11,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-thiserror = "1.0"
-nix = { version = "0.28", default-features = false, features = ["socket", "uio"] }
+libc = "0.2"
 
 [package.metadata.docs.rs]
 # To build locally:

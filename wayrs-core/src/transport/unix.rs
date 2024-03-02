@@ -1,62 +1,66 @@
+//! Wayland transport over unix domain socket
+//!
+//! This is the most commonly used Wayland transport method.
+
 use std::collections::VecDeque;
 use std::io::{self, IoSlice, IoSliceMut};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::os::unix::net::UnixStream;
 
-use nix::sys::socket::{self, ControlMessage, ControlMessageOwned};
-
-use super::{Transport, FDS_OUT_LEN};
+use super::{Transport, FDS_IN_LEN, FDS_OUT_LEN};
 use crate::IoMode;
 
-/// Wayland transport over unix domain socket
-///
-/// This is the most commonly used Wayland transport method.
-pub struct Unix {
-    socket: UnixStream,
-    cmsg: Vec<u8>,
-}
-
-impl AsRawFd for Unix {
-    fn as_raw_fd(&self) -> RawFd {
-        self.socket.as_raw_fd()
-    }
-}
-
-impl From<UnixStream> for Unix {
-    fn from(socket: UnixStream) -> Self {
-        Self {
-            socket,
-            cmsg: nix::cmsg_space!([RawFd; FDS_OUT_LEN]),
-        }
-    }
-}
-
-impl Transport for Unix {
-    fn send(
-        &mut self,
-        bytes: &[IoSlice],
-        fds: &VecDeque<OwnedFd>,
-        mode: IoMode,
-    ) -> io::Result<usize> {
-        let mut flags = socket::MsgFlags::MSG_NOSIGNAL;
+impl Transport for UnixStream {
+    fn send(&mut self, bytes: &[IoSlice], fds: &[OwnedFd], mode: IoMode) -> io::Result<usize> {
+        let mut flags = libc::MSG_NOSIGNAL;
         if mode == IoMode::NonBlocking {
-            flags |= socket::MsgFlags::MSG_DONTWAIT;
+            flags |= libc::MSG_DONTWAIT;
         }
 
-        let b;
-        let mut fds_array = [0; FDS_OUT_LEN];
-        for (i, fd) in fds.iter().enumerate() {
-            fds_array[i] = fd.as_raw_fd();
-        }
-        let cmsgs: &[ControlMessage] = if fds.is_empty() {
-            &[]
+        let fds_size = std::mem::size_of_val(fds);
+        let mut cmsg = [0u8; cmsg_space(std::mem::size_of::<[OwnedFd; FDS_OUT_LEN]>())];
+        let controllen = if fds.is_empty() {
+            0
         } else {
-            b = [ControlMessage::ScmRights(&fds_array[..fds.len()])];
-            &b
+            cmsg_space(fds_size)
+        };
+        assert!(controllen <= cmsg.len());
+
+        let mhdr = {
+            let cmsg_ptr = if controllen > 0 {
+                cmsg.as_mut_ptr()
+            } else {
+                std::ptr::null_mut()
+            };
+
+            let mhdr = {
+                let mut mhdr = unsafe { std::mem::zeroed::<libc::msghdr>() };
+                mhdr.msg_iov = bytes.as_ptr().cast_mut().cast();
+                mhdr.msg_iovlen = bytes.len() as _;
+                mhdr.msg_control = cmsg_ptr.cast();
+                mhdr.msg_controllen = controllen as _;
+                mhdr
+            };
+
+            if !fds.is_empty() {
+                let pmhdr = unsafe { libc::CMSG_FIRSTHDR(&mhdr).as_mut().unwrap() };
+                pmhdr.cmsg_level = libc::SOL_SOCKET;
+                pmhdr.cmsg_type = libc::SCM_RIGHTS;
+                pmhdr.cmsg_len = unsafe { libc::CMSG_LEN(fds_size as libc::c_uint) } as usize;
+                let dst_ptr = unsafe { libc::CMSG_DATA(pmhdr) };
+                let src_ptr = fds.as_ptr().cast();
+                unsafe { std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, fds_size) };
+            }
+
+            mhdr
         };
 
-        let sent = socket::sendmsg::<()>(self.socket.as_raw_fd(), bytes, cmsgs, flags, None)?;
-        Ok(sent)
+        let ret = unsafe { libc::sendmsg(self.as_raw_fd(), &mhdr, flags) };
+        if ret == -1 {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok(ret as usize)
     }
 
     fn recv(
@@ -65,26 +69,61 @@ impl Transport for Unix {
         fds: &mut VecDeque<OwnedFd>,
         mode: IoMode,
     ) -> io::Result<usize> {
-        self.cmsg.clear();
+        let mut cmsg = [0u8; cmsg_space(std::mem::size_of::<[RawFd; FDS_IN_LEN]>())];
 
-        let mut flags = socket::MsgFlags::MSG_CMSG_CLOEXEC | socket::MsgFlags::MSG_NOSIGNAL;
+        let mut flags = libc::MSG_CMSG_CLOEXEC | libc::MSG_NOSIGNAL;
         if mode == IoMode::NonBlocking {
-            flags |= socket::MsgFlags::MSG_DONTWAIT;
+            flags |= libc::MSG_DONTWAIT;
         }
 
-        let msg =
-            socket::recvmsg::<()>(self.socket.as_raw_fd(), bytes, Some(&mut self.cmsg), flags)?;
+        let (read, mut cmsghdr, mhdr) = {
+            let (msg_control, msg_controllen) = (cmsg.as_mut_ptr(), cmsg.len());
+            let mut mhdr = {
+                let mut mhdr = unsafe { std::mem::zeroed::<libc::msghdr>() };
+                mhdr.msg_iov = bytes.as_mut_ptr().cast();
+                mhdr.msg_iovlen = bytes.len() as _;
+                mhdr.msg_control = msg_control.cast();
+                mhdr.msg_controllen = msg_controllen as _;
+                mhdr
+            };
 
-        for cmsg in msg.cmsgs() {
-            if let ControlMessageOwned::ScmRights(fds_vec) = cmsg {
-                for fd in fds_vec {
+            let ret = unsafe { libc::recvmsg(self.as_raw_fd(), &mut mhdr, flags) };
+            if ret == -1 {
+                return Err(io::Error::last_os_error());
+            }
+
+            // The cast is not unnecessary on all platforms.
+            #[allow(clippy::unnecessary_cast)]
+            let cmsghdr = {
+                let ptr = if mhdr.msg_controllen > 0 {
+                    assert!(!mhdr.msg_control.is_null());
+                    assert!(msg_controllen >= mhdr.msg_controllen as usize);
+                    unsafe { libc::CMSG_FIRSTHDR(&mhdr) }
+                } else {
+                    std::ptr::null()
+                };
+                unsafe { ptr.as_ref() }
+            };
+
+            (ret as usize, cmsghdr, mhdr)
+        };
+
+        while let Some(hdr) = cmsghdr {
+            let p = unsafe { libc::CMSG_DATA(hdr) };
+            // The cast is not unnecessary on all platforms.
+            #[allow(clippy::unnecessary_cast)]
+            let len = hdr as *const _ as usize + hdr.cmsg_len as usize - p as usize;
+            if hdr.cmsg_level == libc::SOL_SOCKET && hdr.cmsg_type == libc::SCM_RIGHTS {
+                let n = len / std::mem::size_of::<RawFd>();
+                let p = p.cast::<RawFd>();
+                for i in 0..n {
+                    let fd = unsafe { p.add(i).read_unaligned() };
                     assert_ne!(fd, -1);
                     fds.push_back(unsafe { OwnedFd::from_raw_fd(fd) });
                 }
             }
+            cmsghdr = unsafe { libc::CMSG_NXTHDR(&mhdr, hdr).as_ref() };
         }
-
-        let read = msg.bytes;
 
         if read == 0 {
             return Err(io::Error::new(
@@ -95,4 +134,8 @@ impl Transport for Unix {
 
         Ok(read)
     }
+}
+
+const fn cmsg_space(len: usize) -> usize {
+    unsafe { libc::CMSG_SPACE(len as libc::c_uint) as usize }
 }
