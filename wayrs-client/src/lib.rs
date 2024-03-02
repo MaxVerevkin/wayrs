@@ -2,50 +2,33 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+pub mod debug_message;
 pub mod global;
-pub mod interface;
 pub mod object;
 pub mod protocol;
 pub mod proxy;
-pub mod wire;
 
 mod connection;
-mod socket;
 
-pub use connection::Connection;
+pub use connection::{ConnectError, Connection};
 
+#[doc(hidden)]
+pub use wayrs_core as core;
 #[doc(hidden)]
 pub use wayrs_scanner;
 
 use proxy::Proxy;
 use std::ffi::CStr;
 use std::fmt;
-use std::io;
 
-/// An error that can occur while connecting to a Wayland socket.
-#[derive(Debug, thiserror::Error)]
-pub enum ConnectError {
-    /// Either `$XDG_RUNTIME_DIR` or `$WAYLAND_DISPLAY` was not available.
-    #[error("both $XDG_RUNTIME_DIR and $WAYLAND_DISPLAY must be set")]
-    NotEnoughEnvVars,
-    /// Some IO error.
-    #[error(transparent)]
-    Io(#[from] io::Error),
-}
+pub use wayrs_core::{Fixed, IoMode};
 
-/// The "mode" of an IO operation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IoMode {
-    /// Blocking.
-    ///
-    /// The function call may block, but it will never return [WouldBlock](io::ErrorKind::WouldBlock)
-    /// error.
-    Blocking,
-    /// Non-blocking.
-    ///
-    /// The function call will not block on IO operations. [WouldBlock](io::ErrorKind::WouldBlock)
-    /// error is returned if the operation cannot be completed immediately.
-    NonBlocking,
+/// Generate glue code from .xml protocol file. The path is relative to your project root.
+#[macro_export]
+macro_rules! generate {
+    ($path:literal) => {
+        $crate::wayrs_scanner::generate!($path);
+    };
 }
 
 /// Create a `&'static CStr` from a string literal. Panics at compile time if given string literal
@@ -56,14 +39,6 @@ macro_rules! cstr {
         const X: &'static ::std::ffi::CStr = $crate::cstr(concat!($str, "\0"));
         X
     }};
-}
-
-/// Generate glue code from .xml protocol file. The path is relative to your project root.
-#[macro_export]
-macro_rules! generate {
-    ($path:literal) => {
-        $crate::wayrs_scanner::generate!($path);
-    };
 }
 
 // TODO: remove when MSRV is at least 1.72

@@ -6,6 +6,7 @@ members = [
   "wayrs-utils",
   "wayrs-egl",
   "wayrs-proto-parser",
+  "wayrs-core",
 ]
 resolver = "2"
 

@@ -1,6 +1,6 @@
-use crate::interface::Interface;
-use crate::object::{Object, ObjectId};
-use crate::wire::Message;
+use crate::object::Object;
+
+use wayrs_core::{Interface, Message, ObjectId};
 
 #[derive(Debug)]
 pub struct BadMessage;
@@ -12,12 +12,15 @@ pub struct WrongObject;
 ///
 /// This trait is implemented automatically for generated proxies, do not implement it yourself.
 pub trait Proxy: TryFrom<Object, Error = WrongObject> + Copy {
-    type Event: TryFrom<Message, Error = BadMessage>;
+    type Event;
 
     const INTERFACE: &'static Interface;
 
     #[doc(hidden)]
     fn new(id: ObjectId, version: u32) -> Self;
+
+    #[doc(hidden)]
+    fn parse_event(event: Message, version: u32) -> Result<Self::Event, BadMessage>;
 
     fn id(&self) -> ObjectId;
 
@@ -31,11 +34,5 @@ impl<P: Proxy> From<P> for Object {
             interface: P::INTERFACE,
             version: value.version(),
         }
-    }
-}
-
-impl<P: Proxy> From<P> for ObjectId {
-    fn from(value: P) -> Self {
-        value.id()
     }
 }

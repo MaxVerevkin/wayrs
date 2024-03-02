@@ -1,35 +1,259 @@
+//! Core Wayland functionality
+//!
+//! It can be used on both client and server side.
+
 use std::collections::VecDeque;
-use std::env;
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
+use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::io::{self, IoSlice, IoSliceMut};
 use std::num::NonZeroU32;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::os::unix::net::UnixStream;
-use std::path::PathBuf;
 
 use nix::sys::socket::{self, ControlMessage, ControlMessageOwned};
 
-use crate::interface::Interface;
-use crate::object::{Object, ObjectId};
-use crate::wire::{ArgType, ArgValue, Fixed, Message, MessageHeader};
-use crate::{ConnectError, IoMode};
+/// The "mode" of an IO operation
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IoMode {
+    /// Blocking.
+    ///
+    /// The function call may block, but it will never return [WouldBlock](io::ErrorKind::WouldBlock)
+    /// error.
+    Blocking,
+    /// Non-blocking.
+    ///
+    /// The function call will not block on IO operations. [WouldBlock](io::ErrorKind::WouldBlock)
+    /// error is returned if the operation cannot be completed immediately.
+    NonBlocking,
+}
 
-use buf::RingBuffer;
+/// A Wayland object ID.
+///
+/// Uniquely identifies an object at each point of time. Note that an ID may have a limited
+/// lifetime. Also an ID which once pointed to a certain object, may point to a different object in
+/// the future, due to ID reuse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ObjectId(pub NonZeroU32);
+
+impl ObjectId {
+    pub const DISPLAY: Self = Self(unsafe { NonZeroU32::new_unchecked(1) });
+    pub const MAX_CLIENT: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFEFFFFFF) });
+    pub const MIN_SERVER: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFF000000) });
+
+    /// Returns the numeric representation of the ID
+    pub fn as_u32(self) -> u32 {
+        self.0.get()
+    }
+
+    /// Whether the object with this ID was created by the server
+    pub fn created_by_server(self) -> bool {
+        self >= Self::MIN_SERVER
+    }
+
+    /// Whether the object with this ID was created by the client
+    pub fn created_by_client(self) -> bool {
+        self <= Self::MAX_CLIENT
+    }
+}
+
+/// A header of a Wayland message
+#[derive(Debug, Clone, Copy)]
+pub struct MessageHeader {
+    /// The ID of the associated object
+    pub object_id: ObjectId,
+    /// Size of the message in bytes, including the header
+    pub size: u16,
+    /// The opcode of the message
+    pub opcode: u16,
+}
+
+impl MessageHeader {
+    /// The size of the header in bytes
+    pub const SIZE: usize = 8;
+}
+
+/// A Wayland message
+#[derive(Debug)]
+pub struct Message {
+    pub header: MessageHeader,
+    pub args: Vec<ArgValue>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ArgType {
+    Int,
+    Uint,
+    Fixed,
+    Object,
+    OptObject,
+    NewId(&'static Interface),
+    AnyNewId,
+    String,
+    OptString,
+    Array,
+    Fd,
+}
+
+#[derive(Debug)]
+pub enum ArgValue {
+    Int(i32),
+    Uint(u32),
+    Fixed(Fixed),
+    Object(ObjectId),
+    OptObject(Option<ObjectId>),
+    NewId(ObjectId),
+    AnyNewId(CString, u32, ObjectId),
+    String(CString),
+    OptString(Option<CString>),
+    Array(Vec<u8>),
+    Fd(OwnedFd),
+}
+
+impl ArgValue {
+    /// The size of the argument in bytes.
+    pub fn size(&self) -> usize {
+        fn len_with_padding(len: usize) -> usize {
+            let padding = (4 - (len % 4)) % 4;
+            4 + len + padding
+        }
+
+        match self {
+            Self::Int(_)
+            | Self::Uint(_)
+            | Self::Fixed(_)
+            | Self::Object(_)
+            | Self::OptObject(_)
+            | Self::NewId(_)
+            | Self::OptString(None) => 4,
+            Self::AnyNewId(iface, _version, _id) => {
+                len_with_padding(iface.to_bytes_with_nul().len()) + 8
+            }
+            Self::String(string) | Self::OptString(Some(string)) => {
+                len_with_padding(string.to_bytes_with_nul().len())
+            }
+            Self::Array(array) => len_with_padding(array.len()),
+            Self::Fd(_) => 0,
+        }
+    }
+}
+
+/// Signed 24.8 decimal number
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Fixed(pub i32);
+
+impl From<i32> for Fixed {
+    fn from(value: i32) -> Self {
+        Self(value * 256)
+    }
+}
+
+impl From<u32> for Fixed {
+    fn from(value: u32) -> Self {
+        Self(value as i32 * 256)
+    }
+}
+
+impl From<f32> for Fixed {
+    fn from(value: f32) -> Self {
+        Self((value * 256.0) as i32)
+    }
+}
+
+impl From<f64> for Fixed {
+    fn from(value: f64) -> Self {
+        Self((value * 256.0) as i32)
+    }
+}
+
+impl Fixed {
+    pub fn as_f64(self) -> f64 {
+        self.0 as f64 / 256.0
+    }
+
+    pub fn as_f32(self) -> f32 {
+        self.0 as f32 / 256.0
+    }
+
+    pub fn as_int(self) -> i32 {
+        self.0 / 256
+    }
+}
+
+impl fmt::Debug for Fixed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_f64().fmt(f)
+    }
+}
+
+/// A Wayland interface, usually generated from the XML files
+pub struct Interface {
+    pub name: &'static CStr,
+    pub version: u32,
+    pub events: &'static [MessageDesc],
+    pub requests: &'static [MessageDesc],
+}
+
+/// A "description" of a single Wayland event or request
+#[derive(Debug, Clone, Copy)]
+pub struct MessageDesc {
+    pub name: &'static str,
+    pub is_destructor: bool,
+    pub signature: &'static [ArgType],
+}
+
+impl PartialEq for &'static Interface {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for &'static Interface {}
+
+impl Hash for &'static Interface {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
+impl fmt::Debug for Interface {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Interface").field(&self.name).finish()
+    }
+}
+
+/// A pool of resources reusable between messages
+#[derive(Default)]
+pub struct MessageBuffersPool {
+    pool: Vec<Vec<ArgValue>>,
+}
+
+impl MessageBuffersPool {
+    pub fn reuse_args(&mut self, mut buf: Vec<ArgValue>) {
+        buf.clear();
+        self.pool.push(buf);
+    }
+
+    pub fn get_args(&mut self) -> Vec<ArgValue> {
+        self.pool.pop().unwrap_or_default()
+    }
+}
 
 pub const BYTES_OUT_LEN: usize = 4096;
 pub const BYTES_IN_LEN: usize = BYTES_OUT_LEN * 2;
 pub const FDS_OUT_LEN: usize = 28;
 pub const FDS_IN_LEN: usize = FDS_OUT_LEN * 2;
 
+/// A buffered Wayland socket
+///
+/// Handles message marshalling and unmarshalling.
 pub struct BufferedSocket {
     socket: UnixStream,
-    bytes_in: RingBuffer<BYTES_IN_LEN>,
-    bytes_out: RingBuffer<BYTES_OUT_LEN>,
+    bytes_in: buf::RingBuffer<BYTES_IN_LEN>,
+    bytes_out: buf::RingBuffer<BYTES_OUT_LEN>,
     fds_in: VecDeque<OwnedFd>,
     fds_out: VecDeque<OwnedFd>,
-
     cmsg: Vec<u8>,
-    pub free_msg_args: Vec<Vec<ArgValue>>,
 }
 
 impl AsRawFd for BufferedSocket {
@@ -38,32 +262,26 @@ impl AsRawFd for BufferedSocket {
     }
 }
 
+impl From<UnixStream> for BufferedSocket {
+    fn from(socket: UnixStream) -> Self {
+        Self {
+            socket,
+            bytes_in: buf::RingBuffer::new(),
+            bytes_out: buf::RingBuffer::new(),
+            fds_in: VecDeque::new(),
+            fds_out: VecDeque::new(),
+            cmsg: nix::cmsg_space!([RawFd; FDS_OUT_LEN]),
+        }
+    }
+}
+
+/// An error occurred while sending a message
 pub struct SendMessageError {
     pub msg: Message,
     pub err: io::Error,
 }
 
 impl BufferedSocket {
-    pub fn connect() -> Result<Self, ConnectError> {
-        let runtime_dir = env::var_os("XDG_RUNTIME_DIR").ok_or(ConnectError::NotEnoughEnvVars)?;
-        let wayland_disp = env::var_os("WAYLAND_DISPLAY").ok_or(ConnectError::NotEnoughEnvVars)?;
-
-        let mut path = PathBuf::new();
-        path.push(runtime_dir);
-        path.push(wayland_disp);
-
-        Ok(Self {
-            socket: UnixStream::connect(path)?,
-            bytes_in: RingBuffer::new(),
-            bytes_out: RingBuffer::new(),
-            fds_in: VecDeque::new(),
-            fds_out: VecDeque::new(),
-
-            cmsg: nix::cmsg_space!([RawFd; FDS_OUT_LEN]),
-            free_msg_args: Vec::new(),
-        })
-    }
-
     /// Write a single Wayland message into the intevnal buffer.
     ///
     /// Flushes the buffer if neccessary. On failure, ownership of the message is returned.
@@ -72,9 +290,14 @@ impl BufferedSocket {
     ///
     /// This function panics if the message size is larger than `BYTES_OUT_LEN` or it contains more
     /// than `FDS_OUT_LEN` file descriptors.
-    pub fn write_message(&mut self, msg: Message, mode: IoMode) -> Result<(), SendMessageError> {
+    pub fn write_message(
+        &mut self,
+        msg: Message,
+        msg_pool: &mut MessageBuffersPool,
+        mode: IoMode,
+    ) -> Result<(), SendMessageError> {
         // Calc size
-        let size = MessageHeader::size() + msg.args.iter().map(ArgValue::size).sum::<u16>();
+        let size = MessageHeader::SIZE + msg.args.iter().map(ArgValue::size).sum::<usize>();
         let fds_cnt = msg
             .args
             .iter()
@@ -82,11 +305,9 @@ impl BufferedSocket {
             .count();
 
         // Check size and flush if neccessary
-        assert!(size as usize <= BYTES_OUT_LEN);
+        assert!(size <= BYTES_OUT_LEN);
         assert!(fds_cnt <= FDS_OUT_LEN);
-        while (size as usize) > self.bytes_out.writable_len()
-            || fds_cnt + self.fds_out.len() > FDS_OUT_LEN
-        {
+        while size > self.bytes_out.writable_len() || fds_cnt + self.fds_out.len() > FDS_OUT_LEN {
             if let Err(err) = self.flush(mode) {
                 return Err(SendMessageError { msg, err });
             }
@@ -105,34 +326,35 @@ impl BufferedSocket {
                 ArgValue::Int(x) | ArgValue::Fixed(Fixed(x)) => self.bytes_out.write_int(x),
                 ArgValue::Object(ObjectId(x))
                 | ArgValue::OptObject(Some(ObjectId(x)))
-                | ArgValue::NewIdRequest(ObjectId(x)) => self.bytes_out.write_uint(x.get()),
+                | ArgValue::NewId(ObjectId(x)) => self.bytes_out.write_uint(x.get()),
                 ArgValue::OptObject(None) | ArgValue::OptString(None) => {
                     self.bytes_out.write_uint(0)
                 }
-                ArgValue::AnyNewIdRequest(obj) => {
-                    self.send_array(obj.interface.name.to_bytes_with_nul());
-                    self.bytes_out.write_uint(obj.version);
-                    self.bytes_out.write_uint(obj.id.0.get());
+                ArgValue::AnyNewId(iface, version, id) => {
+                    self.send_array(iface.to_bytes_with_nul());
+                    self.bytes_out.write_uint(version);
+                    self.bytes_out.write_uint(id.0.get());
                 }
                 ArgValue::String(string) | ArgValue::OptString(Some(string)) => {
                     self.send_array(string.to_bytes_with_nul())
                 }
                 ArgValue::Array(array) => self.send_array(&array),
                 ArgValue::Fd(fd) => self.fds_out.push_back(fd),
-                ArgValue::NewIdEvent(_) => panic!("NewIdEvent in request"),
             }
         }
-        self.free_msg_args.push(msg.args);
-
+        msg_pool.reuse_args(msg.args);
         Ok(())
     }
 
+    /// Peek the next message header.
+    ///
+    /// Fills the internal buffer if needed and keeps the header in the buffer.
     pub fn peek_message_header(&mut self, mode: IoMode) -> io::Result<MessageHeader> {
-        while self.bytes_in.readable_len() < MessageHeader::size() as usize {
+        while self.bytes_in.readable_len() < MessageHeader::SIZE {
             self.fill_incoming_buf(mode)?;
         }
 
-        let mut raw = [0; MessageHeader::size() as usize];
+        let mut raw = [0; MessageHeader::SIZE];
         self.bytes_in.peek_bytes(&mut raw);
         let object_id = u32::from_ne_bytes(raw[0..4].try_into().unwrap());
         let size_and_opcode = u32::from_ne_bytes(raw[4..8].try_into().unwrap());
@@ -144,19 +366,17 @@ impl BufferedSocket {
         })
     }
 
+    /// Receive the entire next message.
+    ///
+    /// Fills the internal buffer if needed. `header` must be the value returned by
+    /// [`Self::peek_message_header`] right before calling this function.
     pub fn recv_message(
         &mut self,
         header: MessageHeader,
-        iface: &'static Interface,
-        version: u32,
+        signature: &[ArgType],
+        msg_pool: &mut MessageBuffersPool,
         mode: IoMode,
     ) -> io::Result<Message> {
-        let signature = iface
-            .events
-            .get(header.opcode as usize)
-            .expect("incorrect opcode")
-            .signature;
-
         // Check size and fill buffer if necessary
         let fds_cnt = signature
             .iter()
@@ -169,9 +389,9 @@ impl BufferedSocket {
         }
 
         // Consume header
-        self.bytes_in.move_tail(MessageHeader::size() as usize);
+        self.bytes_in.move_tail(MessageHeader::SIZE);
 
-        let mut args = self.free_msg_args.pop().unwrap_or_default();
+        let mut args = msg_pool.get_args();
         args.extend(signature.iter().map(|arg_type| match arg_type {
             ArgType::Int => ArgValue::Int(self.bytes_in.read_int()),
             ArgType::Uint => ArgValue::Uint(self.bytes_in.read_uint()),
@@ -180,12 +400,14 @@ impl BufferedSocket {
                 ArgValue::Object(self.bytes_in.read_id().expect("unexpected null object id"))
             }
             ArgType::OptObject => ArgValue::OptObject(self.bytes_in.read_id()),
-            ArgType::NewId(interface) => ArgValue::NewIdEvent(Object {
-                id: self.bytes_in.read_id().expect("unexpected null new_id"),
-                interface,
-                version,
-            }),
-            ArgType::AnyNewId => unimplemented!(),
+            ArgType::NewId(_interface) => {
+                ArgValue::NewId(self.bytes_in.read_id().expect("unexpected null new_id"))
+            }
+            ArgType::AnyNewId => ArgValue::AnyNewId(
+                self.recv_string(),
+                self.bytes_in.read_uint(),
+                self.bytes_in.read_id().expect("unexpected null new_id"),
+            ),
             ArgType::String => ArgValue::String(self.recv_string()),
             ArgType::OptString => ArgValue::OptString(match self.bytes_in.read_uint() {
                 0 => None,
@@ -198,6 +420,7 @@ impl BufferedSocket {
         Ok(Message { header, args })
     }
 
+    /// Flush all pending messages.
     pub fn flush(&mut self, mode: IoMode) -> io::Result<()> {
         if self.bytes_out.is_empty() && self.fds_out.is_empty() {
             return Ok(());

@@ -1,21 +1,38 @@
 //! Wayland connection
 
 use std::collections::VecDeque;
+use std::env;
 use std::io;
 use std::num::NonZeroU32;
 use std::os::fd::{AsRawFd, RawFd};
+use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
 
-use crate::interface::Interface;
-use crate::object::{Object, ObjectId, ObjectManager};
+use crate::debug_message::DebugMessage;
+use crate::object::{Object, ObjectManager};
 use crate::protocol::wl_registry::GlobalArgs;
+use crate::protocol::*;
 use crate::proxy::Proxy;
-use crate::socket::{BufferedSocket, SendMessageError};
-use crate::wire::{ArgValue, DebugMessage, Message};
-use crate::{protocol::*, EventCtx};
-use crate::{ConnectError, IoMode};
+use crate::EventCtx;
+
+use wayrs_core::{
+    ArgType, ArgValue, BufferedSocket, Interface, IoMode, Message, MessageBuffersPool, ObjectId,
+    SendMessageError,
+};
 
 #[cfg(feature = "tokio")]
 use tokio::io::unix::AsyncFd;
+
+/// An error that can occur while connecting to a Wayland socket.
+#[derive(Debug, thiserror::Error)]
+pub enum ConnectError {
+    /// Either `$XDG_RUNTIME_DIR` or `$WAYLAND_DISPLAY` was not available.
+    #[error("both $XDG_RUNTIME_DIR and $WAYLAND_DISPLAY must be set")]
+    NotEnoughEnvVars,
+    /// Some IO error.
+    #[error(transparent)]
+    Io(#[from] io::Error),
+}
 
 /// Wayland connection state.
 ///
@@ -28,6 +45,7 @@ pub struct Connection<D> {
     async_fd: Option<AsyncFd<RawFd>>,
 
     socket: BufferedSocket,
+    msg_buffers_pool: MessageBuffersPool,
 
     object_mgr: ObjectManager<D>,
 
@@ -66,11 +84,21 @@ impl<D> Connection<D> {
     /// At the moment, only a single registry can be created. This might or might not change in the
     /// future, considering registries cannot be destroyed.
     pub fn connect() -> Result<Self, ConnectError> {
+        let runtime_dir = env::var_os("XDG_RUNTIME_DIR").ok_or(ConnectError::NotEnoughEnvVars)?;
+        let wayland_disp = env::var_os("WAYLAND_DISPLAY").ok_or(ConnectError::NotEnoughEnvVars)?;
+
+        let mut path = PathBuf::new();
+        path.push(runtime_dir);
+        path.push(wayland_disp);
+
+        let socket = BufferedSocket::from(UnixStream::connect(path)?);
+
         let mut this = Self {
             #[cfg(feature = "tokio")]
             async_fd: None,
 
-            socket: BufferedSocket::connect()?,
+            socket,
+            msg_buffers_pool: MessageBuffersPool::default(),
 
             object_mgr: ObjectManager::new(),
 
@@ -192,6 +220,7 @@ impl<D> Connection<D> {
             #[cfg(feature = "tokio")]
             async_fd: self.async_fd,
             socket: self.socket,
+            msg_buffers_pool: self.msg_buffers_pool,
             object_mgr: self.object_mgr.clear_callbacks(),
             event_queue: self.event_queue,
             requests_queue: self.requests_queue,
@@ -200,12 +229,6 @@ impl<D> Connection<D> {
             registry_cbs: Some(Vec::new()),
             debug: self.debug,
         }
-    }
-
-    #[doc(hidden)]
-    #[deprecated = "use clear_callbacks"]
-    pub fn clear_callbacs<D2>(self) -> Connection<D2> {
-        self.clear_callbacks()
     }
 
     /// Perform a blocking roundtrip.
@@ -245,7 +268,7 @@ impl<D> Connection<D> {
 
     #[doc(hidden)]
     pub fn alloc_msg_args(&mut self) -> Vec<ArgValue> {
-        self.socket.free_msg_args.pop().unwrap_or_default()
+        self.msg_buffers_pool.get_args()
     }
 
     #[doc(hidden)]
@@ -280,16 +303,22 @@ impl<D> Connection<D> {
             .get_object_mut(header.object_id)
             .expect("received event for non-existing object");
         let object = obj.object;
+        let signature = object
+            .interface
+            .events
+            .get(header.opcode as usize)
+            .expect("incorrect opcode")
+            .signature;
 
-        let event = self
-            .socket
-            .recv_message(header, object.interface, object.version, mode)?;
+        let event =
+            self.socket
+                .recv_message(header, signature, &mut self.msg_buffers_pool, mode)?;
         if self.debug {
             eprintln!("[wayrs] {:?}", DebugMessage::new(&event, true, object));
         }
 
         if event.header.object_id == ObjectId::DISPLAY {
-            return match wl_display::Event::try_from(event).unwrap() {
+            return match WlDisplay::parse_event(event, 1).unwrap() {
                 // Catch protocol error as early as possible
                 wl_display::Event::Error(err) => Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -307,13 +336,31 @@ impl<D> Connection<D> {
         }
 
         if event.header.object_id == self.registry {
-            return Ok(QueuedEvent::RegistryEvent(event.try_into().unwrap()));
+            let event = WlRegistry::parse_event(event, 1).unwrap();
+            return Ok(QueuedEvent::RegistryEvent(event));
         }
 
         // Allocate objects if necessary
-        for arg in &event.args {
-            if let ArgValue::NewIdEvent(new_obj) = *arg {
-                self.object_mgr.register_server_object(new_obj);
+        let signature = object
+            .interface
+            .events
+            .get(header.opcode as usize)
+            .expect("incorrect opcode")
+            .signature;
+        for (arg, arg_ty) in event.args.iter().zip(signature) {
+            match arg {
+                ArgValue::NewId(id) => {
+                    let ArgType::NewId(interface) = arg_ty else {
+                        unreachable!()
+                    };
+                    self.object_mgr.register_server_object(Object {
+                        id: *id,
+                        interface,
+                        version: object.version,
+                    });
+                }
+                ArgValue::AnyNewId(_, _, _) => unimplemented!(),
+                _ => (),
             }
         }
 
@@ -385,7 +432,10 @@ impl<D> Connection<D> {
     pub fn flush(&mut self, mode: IoMode) -> io::Result<()> {
         // Send pending messages
         while let Some(msg) = self.requests_queue.pop_front() {
-            if let Err(SendMessageError { msg, err }) = self.socket.write_message(msg, mode) {
+            if let Err(SendMessageError { msg, err }) =
+                self.socket
+                    .write_message(msg, &mut self.msg_buffers_pool, mode)
+            {
                 self.requests_queue.push_front(msg);
                 return Err(err);
             }
@@ -517,7 +567,7 @@ impl<D> Connection<D> {
         // Note: if `F` does not capture anything, this `Box::new` will not allocate.
         Box::new(move |conn, state, object, event| {
             let proxy: P = object.try_into().unwrap();
-            let event = event.try_into().unwrap();
+            let event = P::parse_event(event, object.version).unwrap();
             let ctx = EventCtx {
                 conn,
                 state,

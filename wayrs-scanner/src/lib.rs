@@ -95,10 +95,10 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         let name = &msg.name;
         let is_destructor = msg.kind.as_deref() == Some("destructor");
         quote! {
-            _wayrs_client::interface::MessageDesc {
+            _wayrs_client::core::MessageDesc {
                 name: #name,
                 is_destructor: #is_destructor,
-                signature: &[ #( _wayrs_client::wire::ArgType::#args, )* ]
+                signature: &[ #( _wayrs_client::core::ArgType::#args, )* ]
             }
         }
     };
@@ -153,7 +153,13 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         let arg_decode = event.args.iter().map(|arg| {
             let arg_name = make_ident(&arg.name);
             match &arg.arg_type {
-                ArgType::NewId{..} | ArgType::Enum(_) => quote! {
+                ArgType::NewId{iface: Some(iface)} => {
+                    let proxy_name = make_proxy_path(iface);
+                    quote! {
+                        <#proxy_name as Proxy>::new(#arg_name, __self_version)
+                    }
+                },
+                ArgType::Enum(_) => quote! {
                     match #arg_name.try_into() {
                         Ok(val) => val,
                         Err(_) => return Err(_wayrs_client::proxy::BadMessage),
@@ -178,7 +184,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                     return Err(_wayrs_client::proxy::BadMessage);
                 }
                 let mut args = event.args.into_iter();
-                #( let Some(_wayrs_client::wire::ArgValue::#arg_ty(#arg_names)) = args.next() else { return Err(_wayrs_client::proxy::BadMessage) }; )*
+                #( let Some(_wayrs_client::core::ArgValue::#arg_ty(#arg_names)) = args.next() else { return Err(_wayrs_client::proxy::BadMessage) }; )*
                 Ok(#retval)
             }
         }
@@ -280,7 +286,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         quote! {
             impl WlDisplay {
                 pub const INSTANCE: Self = Self {
-                    id: ObjectId::DISPLAY,
+                    id: _wayrs_client::core::ObjectId::DISPLAY,
                     version: 1,
                 };
             }
@@ -297,14 +303,13 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         #visibility mod #mod_name {
             use #wayrs_client_path as _wayrs_client;
             use _wayrs_client::proxy::Proxy;
-            use _wayrs_client::object::ObjectId;
             use _wayrs_client::EventCtx;
 
             #mod_doc
             #[doc = "See [`Event`] for the list of possible events."]
             #[derive(Clone, Copy)]
             pub struct #proxy_name {
-                id: ObjectId,
+                id: _wayrs_client::core::ObjectId,
                 version: u32,
             }
 
@@ -313,35 +318,31 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             impl Proxy for #proxy_name {
                 type Event = Event;
 
-                const INTERFACE: &'static _wayrs_client::interface::Interface
-                    = &_wayrs_client::interface::Interface {
+                const INTERFACE: &'static _wayrs_client::core::Interface
+                    = &_wayrs_client::core::Interface {
                         name: _wayrs_client::cstr!(#raw_iface_name),
                         version: #iface_version,
                         events: &[ #(#events_desc,)* ],
                         requests: &[ #(#requests_desc,)* ],
                     };
 
-                fn new(id: ObjectId, version: u32) -> Self {
+                fn new(id: _wayrs_client::core::ObjectId, version: u32) -> Self {
                     Self { id, version }
                 }
 
-                fn id(&self) -> ObjectId {
+                fn parse_event(event: _wayrs_client::core::Message, __self_version: u32) -> ::std::result::Result<Event, _wayrs_client::proxy::BadMessage> {
+                    match event.header.opcode {
+                        #( #event_decoding )*
+                        _ => Err(_wayrs_client::proxy::BadMessage),
+                    }
+                }
+
+                fn id(&self) -> _wayrs_client::core::ObjectId {
                     self.id
                 }
 
                 fn version(&self) -> u32 {
                     self.version
-                }
-            }
-
-            impl TryFrom<_wayrs_client::wire::Message> for Event {
-                type Error = _wayrs_client::proxy::BadMessage;
-
-                fn try_from(event: _wayrs_client::wire::Message) -> ::std::result::Result<Self, _wayrs_client::proxy::BadMessage> {
-                    match event.header.opcode {
-                        #( #event_decoding )*
-                        _ => Err(_wayrs_client::proxy::BadMessage),
-                    }
                 }
             }
 
@@ -381,14 +382,14 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
 
             impl ::std::cmp::Eq for #proxy_name {}
 
-            impl ::std::cmp::PartialEq<ObjectId> for #proxy_name {
+            impl ::std::cmp::PartialEq<_wayrs_client::core::ObjectId> for #proxy_name {
                 #[inline]
-                fn eq(&self, other: &ObjectId) -> bool {
+                fn eq(&self, other: &_wayrs_client::core::ObjectId) -> bool {
                     self.id == *other
                 }
             }
 
-            impl ::std::cmp::PartialEq<#proxy_name> for ObjectId {
+            impl ::std::cmp::PartialEq<#proxy_name> for _wayrs_client::core::ObjectId {
                 #[inline]
                 fn eq(&self, other: &#proxy_name) -> bool {
                     *self == other.id
@@ -418,9 +419,9 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                 }
             }
 
-            impl ::std::borrow::Borrow<ObjectId> for #proxy_name {
+            impl ::std::borrow::Borrow<_wayrs_client::core::ObjectId> for #proxy_name {
                 #[inline]
-                fn borrow(&self) -> &ObjectId {
+                fn borrow(&self) -> &_wayrs_client::core::ObjectId {
                     &self.id
                 }
             }
@@ -492,15 +493,24 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
         let arg_name = make_ident(&arg.name);
         let arg_ty = map_arg_to_argval(arg, false);
         match arg.arg_type {
-            ArgType::NewId { .. } => {
-                quote! { _wayrs_client::wire::ArgValue::#arg_ty(new_object.into()) }
+            ArgType::NewId { iface: Some(_) } => {
+                quote! { _wayrs_client::core::ArgValue::#arg_ty(Proxy::id(&new_object)) }
             }
-            ArgType::Object {
-                allow_null: true, ..
-            } => {
-                quote! { _wayrs_client::wire::ArgValue::#arg_ty(#arg_name.map(Into::into)) }
+            ArgType::NewId { iface: None } => {
+                quote! { _wayrs_client::core::ArgValue::#arg_ty(
+                    P::INTERFACE.name.to_owned(),
+                    Proxy::version(&new_object),
+                    Proxy::id(&new_object),
+                ) }
             }
-            _ => quote! { _wayrs_client::wire::ArgValue::#arg_ty(#arg_name.into()) },
+            ArgType::Object { allow_null, .. } => {
+                if allow_null {
+                    quote! { _wayrs_client::core::ArgValue::#arg_ty(#arg_name.as_ref().map(Proxy::id)) }
+                } else {
+                    quote! { _wayrs_client::core::ArgValue::#arg_ty(Proxy::id(&#arg_name)) }
+                }
+            }
+            _ => quote! { _wayrs_client::core::ArgValue::#arg_ty(#arg_name.into()) },
         }
     });
 
@@ -509,8 +519,8 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
         #( _args_vec.push(#msg_args); )*
         conn.send_request(
             Self::INTERFACE,
-            _wayrs_client::wire::Message {
-                header: _wayrs_client::wire::MessageHeader {
+            _wayrs_client::core::Message {
+                header: _wayrs_client::core::MessageHeader {
                     object_id: self.id,
                     size: 0,
                     opcode: #opcode,
@@ -637,11 +647,11 @@ fn map_arg_to_argval(arg: &Argument, is_event: bool) -> TokenStream {
             allow_null: true, ..
         } => quote!(OptObject),
         ArgType::NewId { iface } if is_event => match iface.as_deref() {
-            Some(_) => quote!(NewIdEvent),
+            Some(_) => quote!(NewId),
             None => unimplemented!(),
         },
-        ArgType::NewId { iface: None } => quote!(AnyNewIdRequest),
-        ArgType::NewId { iface: Some(_) } => quote!(NewIdRequest),
+        ArgType::NewId { iface: None } => quote!(AnyNewId),
+        ArgType::NewId { iface: Some(_) } => quote!(NewId),
         ArgType::String { allow_null: false } => quote!(String),
         ArgType::String { allow_null: true } => quote!(OptString),
         ArgType::Array => quote!(Array),
@@ -697,7 +707,7 @@ impl ArgExt for Argument {
                     quote!(#arg_name: #enum_name)
                 }
             }
-            ArgType::Fixed => quote!(#arg_name: _wayrs_client::wire::Fixed),
+            ArgType::Fixed => quote!(#arg_name: _wayrs_client::core::Fixed),
             ArgType::Object {
                 allow_null,
                 iface: None,
@@ -741,10 +751,10 @@ impl ArgExt for Argument {
                     quote!(#enum_name)
                 }
             }
-            ArgType::Fixed => quote!(_wayrs_client::wire::Fixed),
+            ArgType::Fixed => quote!(_wayrs_client::core::Fixed),
             ArgType::Object { allow_null, .. } => match allow_null {
-                false => quote!(ObjectId),
-                true => quote!(::std::option::Option<ObjectId>),
+                false => quote!(_wayrs_client::core::ObjectId),
+                true => quote!(::std::option::Option<_wayrs_client::core::ObjectId>),
             },
             ArgType::NewId { iface: None } => quote!(_wayrs_client::object::Object),
             ArgType::NewId { iface: Some(iface) } => make_proxy_path(iface),

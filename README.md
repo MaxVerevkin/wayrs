@@ -23,6 +23,7 @@ The project is split into multiple crates:
 - `wayrs-egl`: Brings OpenGL(-ES) to `wayrs`. Based on `EGL_KHR_platform_gbm`.
 - `wayrs-scanner`: Implements the `wayrs_client:::generate!` macro that generates glue code from `.xml` files. Generated code for the core protocol is already included in `wayrs-client::protocol`. Do not use this crate directly.
 - `wayrs-proto-parser`: Parses wayland `.xml` files. Used by `wayrs-scanner`.
+- `wayrs-core`: The core types, marshalling and unmarshalling implementation. Can be used by clients _and_ servers.
 
 ## Projects using `wayrs`
 

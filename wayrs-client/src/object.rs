@@ -5,8 +5,11 @@ use std::hash::{Hash, Hasher};
 use std::num::NonZeroU32;
 
 use crate::connection::GenericCallback;
-use crate::interface::Interface;
 use crate::protocol::WlDisplay;
+
+use wayrs_core::Interface;
+
+pub use wayrs_core::ObjectId;
 
 /// A Wayland object.
 ///
@@ -81,35 +84,6 @@ impl Debug for Object {
             self.id.0,
             self.version
         )
-    }
-}
-
-/// A Wayland object ID.
-///
-/// Uniquely identifies an object at each point of time. Note that an ID may have a limited
-/// lifetime. Also an ID which once pointed to a certain object, may point to a different object in
-/// the future, due to ID reuse.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ObjectId(pub(crate) NonZeroU32);
-
-impl ObjectId {
-    pub(crate) const DISPLAY: Self = Self(unsafe { NonZeroU32::new_unchecked(1) });
-    pub(crate) const MAX_CLIENT: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFEFFFFFF) });
-    pub(crate) const MIN_SERVER: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFF000000) });
-
-    /// Returns the numeric representation of the ID
-    pub fn as_u32(self) -> u32 {
-        self.0.get()
-    }
-
-    /// Whether the object with this ID was created by the server
-    pub fn created_by_server(self) -> bool {
-        self >= Self::MIN_SERVER
-    }
-
-    /// Whether the object with this ID was created by the client
-    pub fn created_by_client(self) -> bool {
-        self <= Self::MAX_CLIENT
     }
 }
 
