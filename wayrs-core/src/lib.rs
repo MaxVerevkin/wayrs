@@ -139,7 +139,7 @@ impl ArgValue {
 }
 
 /// Signed 24.8 decimal number
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Fixed(pub i32);
 
 impl From<i32> for Fixed {
@@ -167,6 +167,10 @@ impl From<f64> for Fixed {
 }
 
 impl Fixed {
+    pub const ZERO: Self = Self(0);
+    pub const ONE: Self = Self(256);
+    pub const MINUS_ONE: Self = Self(-256);
+
     pub fn as_f64(self) -> f64 {
         self.0 as f64 / 256.0
     }
@@ -177,6 +181,10 @@ impl Fixed {
 
     pub fn as_int(self) -> i32 {
         self.0 / 256
+    }
+
+    pub fn is_int(self) -> bool {
+        self.0 & 255 == 0
     }
 }
 
