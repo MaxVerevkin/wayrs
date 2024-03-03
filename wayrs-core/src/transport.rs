@@ -5,7 +5,6 @@ use std::ffi::CString;
 use std::io::{self, IoSlice, IoSliceMut};
 use std::num::NonZeroU32;
 use std::os::fd::{AsRawFd, OwnedFd, RawFd};
-use std::os::unix::net::UnixStream;
 
 use crate::ring_buffer::RingBuffer;
 use crate::{
@@ -21,8 +20,11 @@ pub const FDS_IN_LEN: usize = FDS_OUT_LEN * 2;
 
 /// A buffered Wayland socket
 ///
-/// Handles message marshalling and unmarshalling.
-pub struct BufferedSocket<T: Transport = UnixStream> {
+/// Handles message marshalling and unmarshalling. This struct is generic over [`Transport`], which
+/// is usually [`UnixStream`](std::os::unix::net::UnixStream).
+///
+/// To create a new instance, use the `From<T: Transport>` implementation.
+pub struct BufferedSocket<T> {
     socket: T,
     bytes_in: RingBuffer<BYTES_IN_LEN>,
     bytes_out: RingBuffer<BYTES_OUT_LEN>,

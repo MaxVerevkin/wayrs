@@ -42,7 +42,7 @@ pub struct Connection<D> {
     #[cfg(feature = "tokio")]
     async_fd: Option<AsyncFd<RawFd>>,
 
-    socket: BufferedSocket,
+    socket: BufferedSocket<UnixStream>,
     msg_buffers_pool: MessageBuffersPool,
 
     object_mgr: ObjectManager<D>,
