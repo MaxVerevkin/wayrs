@@ -180,11 +180,13 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         };
         quote! {
             #opcode => {
-                if event.args.len() != #args_len {
+                if __event.args.len() != #args_len {
                     return Err(_wayrs_client::proxy::BadMessage);
                 }
-                let mut args = event.args.into_iter();
-                #( let Some(_wayrs_client::core::ArgValue::#arg_ty(#arg_names)) = args.next() else { return Err(_wayrs_client::proxy::BadMessage) }; )*
+                let mut __args = __event.args.drain(..);
+                #( let Some(_wayrs_client::core::ArgValue::#arg_ty(#arg_names)) = __args.next() else { return Err(_wayrs_client::proxy::BadMessage) }; )*
+                drop(__args);
+                __pool.reuse_args(__event.args);
                 Ok(#retval)
             }
         }
@@ -330,8 +332,12 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                     Self { id, version }
                 }
 
-                fn parse_event(event: _wayrs_client::core::Message, __self_version: u32) -> ::std::result::Result<Event, _wayrs_client::proxy::BadMessage> {
-                    match event.header.opcode {
+                fn parse_event(
+                    mut __event: _wayrs_client::core::Message,
+                    __self_version: u32,
+                    __pool: &mut _wayrs_client::core::MessageBuffersPool,
+                ) -> ::std::result::Result<Event, _wayrs_client::proxy::BadMessage> {
+                    match __event.header.opcode {
                         #( #event_decoding )*
                         _ => Err(_wayrs_client::proxy::BadMessage),
                     }

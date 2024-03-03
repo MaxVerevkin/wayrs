@@ -1,6 +1,6 @@
 use crate::object::Object;
 
-use wayrs_core::{Interface, Message, ObjectId};
+use wayrs_core::{Interface, Message, MessageBuffersPool, ObjectId};
 
 #[derive(Debug)]
 pub struct BadMessage;
@@ -20,7 +20,11 @@ pub trait Proxy: TryFrom<Object, Error = WrongObject> + Copy {
     fn new(id: ObjectId, version: u32) -> Self;
 
     #[doc(hidden)]
-    fn parse_event(event: Message, version: u32) -> Result<Self::Event, BadMessage>;
+    fn parse_event(
+        event: Message,
+        version: u32,
+        pool: &mut MessageBuffersPool,
+    ) -> Result<Self::Event, BadMessage>;
 
     fn id(&self) -> ObjectId;
 

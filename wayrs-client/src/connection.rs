@@ -314,7 +314,7 @@ impl<D> Connection<D> {
         }
 
         if event.header.object_id == ObjectId::DISPLAY {
-            return match WlDisplay::parse_event(event, 1).unwrap() {
+            return match WlDisplay::parse_event(event, 1, &mut self.msg_buffers_pool).unwrap() {
                 // Catch protocol error as early as possible
                 wl_display::Event::Error(err) => Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -332,7 +332,7 @@ impl<D> Connection<D> {
         }
 
         if event.header.object_id == self.registry {
-            let event = WlRegistry::parse_event(event, 1).unwrap();
+            let event = WlRegistry::parse_event(event, 1, &mut self.msg_buffers_pool).unwrap();
             return Ok(QueuedEvent::RegistryEvent(event));
         }
 
@@ -563,7 +563,7 @@ impl<D> Connection<D> {
         // Note: if `F` does not capture anything, this `Box::new` will not allocate.
         Box::new(move |conn, state, object, event| {
             let proxy: P = object.try_into().unwrap();
-            let event = P::parse_event(event, object.version).unwrap();
+            let event = P::parse_event(event, object.version, &mut conn.msg_buffers_pool).unwrap();
             let ctx = EventCtx {
                 conn,
                 state,
