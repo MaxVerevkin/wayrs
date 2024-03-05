@@ -6,7 +6,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("EGL 1.5 is required, but {0}.{1} is available")]
+    #[error("EGL 1.4 is required, but {0}.{1} is available")]
     OldEgl(u32, u32),
     #[error(transparent)]
     Egl(#[from] EglError),

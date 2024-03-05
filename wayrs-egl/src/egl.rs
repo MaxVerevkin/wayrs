@@ -54,7 +54,7 @@ impl EglDisplay {
             return Err(Error::last_egl());
         }
 
-        if major_version <= 1 && minor_version < 5 {
+        if major_version <= 1 && minor_version < 4 {
             return Err(Error::OldEgl(major_version as u32, minor_version as u32));
         }
 
@@ -278,6 +278,8 @@ impl EglContextBuilder {
     }
 
     /// Enable/disable debugging. Default is `false`.
+    ///
+    /// Ignored if EGL version is lower than 1.5.
     pub fn debug(mut self, enable: bool) -> Self {
         self.debug = enable;
         self
@@ -297,15 +299,20 @@ impl EglContextBuilder {
             return Err(Error::last_egl());
         }
 
-        let context_attrs = [
+        let mut context_attrs = [
             egl_ffi::EGL_CONTEXT_MAJOR_VERSION,
             self.major_v as _,
             egl_ffi::EGL_CONTEXT_MINOR_VERSION,
             self.minor_v as _,
-            egl_ffi::EGL_CONTEXT_OPENGL_DEBUG,
-            self.debug as _,
+            egl_ffi::EGL_NONE,
+            egl_ffi::EGL_NONE,
             egl_ffi::EGL_NONE,
         ];
+        if self.debug && (display.major_version > 1 || display.minor_version >= 5) {
+            // EGL_CONTEXT_OPENGL_DEBUG was introduced in EGL 1.5
+            context_attrs[4] = egl_ffi::EGL_CONTEXT_OPENGL_DEBUG;
+            context_attrs[5] = self.debug as _;
+        }
 
         let raw = unsafe {
             egl_ffi::eglCreateContext(
