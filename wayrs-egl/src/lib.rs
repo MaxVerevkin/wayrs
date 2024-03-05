@@ -1,6 +1,6 @@
 //! Brings OpneGL-(ES) to `wayrs`.
 //!
-//! Requires EGL 1.5 with the following extensions:
+//! Requires EGL 1.4 with the following extensions:
 //! - [`EGL_KHR_platform_gbm`][1]
 //! - [`EGL_KHR_no_config_context`][2]
 //! - [`EGL_KHR_surfaceless_context`][3]
