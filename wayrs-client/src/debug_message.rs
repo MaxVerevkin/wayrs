@@ -57,8 +57,8 @@ impl Debug for DebugMessage<'_> {
                 ArgValue::AnyNewId(iface, version, id) => write!(
                     f,
                     "new id {}@{}v{version}",
+                    iface.to_string_lossy(),
                     id.as_u32(),
-                    iface.to_string_lossy()
                 )?,
                 ArgValue::String(x) | ArgValue::OptString(Some(x)) => write!(f, "{x:?}")?,
                 ArgValue::Array(_) => write!(f, "<array>")?,
