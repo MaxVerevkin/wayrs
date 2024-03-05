@@ -366,6 +366,7 @@ impl DmabufFeedbackHandler for State {
         let render_node = drm_device
             .render_node()
             .expect("drm_device does not have a render node");
+        eprintln!("DRM render node: {}", render_node.to_string_lossy());
 
         let egl_display = EglDisplay::new(self.linux_dmabuf, render_node).unwrap();
 
@@ -377,17 +378,25 @@ impl DmabufFeedbackHandler for State {
                 .flags
                 .contains(zwp_linux_dmabuf_feedback_v1::TrancheFlags::Scanout)
             {
+                eprintln!("Ignoring scanout tranche");
                 continue;
             }
-            for &index in tranche.formats.as_ref().expect("tranche.formats") {
+            let indices = tranche.formats.as_ref().expect("tranche.formats");
+            let mut supported = 0;
+            for &index in indices {
                 let fmt = format_table[index as usize];
                 if egl_display.is_format_supported(Fourcc(fmt.fourcc), fmt.modifier) {
+                    supported += 1;
                     formats
                         .entry(Fourcc(fmt.fourcc))
                         .or_default()
                         .push(fmt.modifier);
                 }
             }
+            eprintln!(
+                "Feedback tranche contains {} formats, {supported} of them supported by EGL",
+                indices.len()
+            );
         }
 
         // prefer DRM_FORMAT_ARGB8888, fallback to anything
