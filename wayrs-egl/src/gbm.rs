@@ -2,7 +2,7 @@ use std::ffi::CStr;
 use std::io;
 use std::os::fd::{FromRawFd, OwnedFd, RawFd};
 
-use crate::{Error, Fourcc, Result};
+use crate::{Error, Fourcc, Result, DRM_FORMAT_MOD_INVALID};
 
 #[derive(Debug)]
 pub struct Device {
@@ -36,16 +36,28 @@ impl Device {
         fourcc: Fourcc,
         modifiers: &[u64],
     ) -> Result<Buffer> {
-        let ptr = unsafe {
-            gbm_sys::gbm_bo_create_with_modifiers2(
-                self.raw,
-                width,
-                height,
-                fourcc.0,
-                modifiers.as_ptr(),
-                modifiers.len() as u32,
-                gbm_sys::gbm_bo_flags::GBM_BO_USE_RENDERING,
-            )
+        let ptr = if modifiers == [DRM_FORMAT_MOD_INVALID] {
+            unsafe {
+                gbm_sys::gbm_bo_create(
+                    self.raw,
+                    width,
+                    height,
+                    fourcc.0,
+                    gbm_sys::gbm_bo_flags::GBM_BO_USE_RENDERING,
+                )
+            }
+        } else {
+            unsafe {
+                gbm_sys::gbm_bo_create_with_modifiers2(
+                    self.raw,
+                    width,
+                    height,
+                    fourcc.0,
+                    modifiers.as_ptr(),
+                    modifiers.len() as u32,
+                    gbm_sys::gbm_bo_flags::GBM_BO_USE_RENDERING,
+                )
+            }
         };
         if ptr.is_null() {
             Err(Error::BadGbmAlloc)

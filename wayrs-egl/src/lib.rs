@@ -71,3 +71,5 @@ impl fmt::Debug for Fourcc {
         )
     }
 }
+
+const DRM_FORMAT_MOD_INVALID: u64 = 72057594037927935;
