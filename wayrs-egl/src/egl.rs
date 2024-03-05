@@ -5,7 +5,7 @@ use std::fmt;
 use wayrs_client::Connection;
 use wayrs_protocols::linux_dmabuf_unstable_v1::*;
 
-use crate::{egl_ffi, gbm, Buffer, Error, Fourcc, GraphicsApi, Result};
+use crate::{egl_ffi, gbm, Buffer, Error, Fourcc, GraphicsApi, Result, DRM_FORMAT_MOD_INVALID};
 
 /// GBM-based EGL display
 ///
@@ -151,7 +151,9 @@ impl EglDisplay {
     /// Check whether a fourcc/modifier pair is supported
     pub fn is_format_supported(&self, fourcc: Fourcc, modifier: u64) -> bool {
         match self.supported_formats.get(&fourcc) {
-            Some(mods) => mods.contains(&modifier),
+            Some(mods) => {
+                (mods.is_empty() && modifier == DRM_FORMAT_MOD_INVALID) || mods.contains(&modifier)
+            }
             None => false,
         }
     }
