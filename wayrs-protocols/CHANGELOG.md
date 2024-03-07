@@ -1,3 +1,7 @@
+# 0.13.2
+
+- Add missing `input-method-unstable-v1` protocol.
+
 # 0.13.1
 
 - Update `wayland-protocols` to v1.33.
