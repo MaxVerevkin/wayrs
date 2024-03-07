@@ -155,6 +155,13 @@ gen! {
 }
 
 gen! {
+    mod: input_method_unstable_v1,
+    feat: "input-method-unstable-v1",
+    file: "wayland-protocols/unstable/input-method/input-method-unstable-v1.xml",
+    deps: [core],
+}
+
+gen! {
     mod: input_timestamps_unstable_v1,
     feat: "input-timestamps-unstable-v1",
     file: "wayland-protocols/unstable/input-timestamps/input-timestamps-unstable-v1.xml",
