@@ -504,7 +504,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             }
             ArgType::NewId { iface: None } => {
                 quote! { _wayrs_client::core::ArgValue::#arg_ty(
-                    P::INTERFACE.name.to_owned(),
+                    ::std::borrow::Cow::Borrowed(P::INTERFACE.name),
                     Proxy::version(&new_object),
                     Proxy::id(&new_object),
                 ) }

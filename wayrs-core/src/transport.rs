@@ -1,5 +1,6 @@
 //! Wayland transport methods
 
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::ffi::CString;
 use std::io::{self, IoSlice, IoSliceMut};
@@ -191,7 +192,7 @@ impl<T: Transport> BufferedSocket<T> {
                 ArgValue::NewId(self.bytes_in.read_id().expect("unexpected null new_id"))
             }
             ArgType::AnyNewId => ArgValue::AnyNewId(
-                self.recv_string(),
+                Cow::Owned(self.recv_string()),
                 self.bytes_in.read_uint(),
                 self.bytes_in.read_id().expect("unexpected null new_id"),
             ),

@@ -2,6 +2,7 @@
 //!
 //! It can be used on both client and server side.
 
+use std::borrow::Cow;
 use std::ffi::{CStr, CString};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -101,7 +102,7 @@ pub enum ArgValue {
     Object(ObjectId),
     OptObject(Option<ObjectId>),
     NewId(ObjectId),
-    AnyNewId(CString, u32, ObjectId),
+    AnyNewId(Cow<'static, CStr>, u32, ObjectId),
     String(CString),
     OptString(Option<CString>),
     Array(Vec<u8>),
