@@ -34,7 +34,9 @@ pub struct BufferedSocket<T> {
 }
 
 /// An abstraction over Wayland transport methods
-pub trait Transport: AsRawFd {
+pub trait Transport {
+    fn pollable_fd(&self) -> RawFd;
+
     fn send(&mut self, bytes: &[IoSlice], fds: &[OwnedFd], mode: IoMode) -> io::Result<usize>;
 
     fn recv(
@@ -45,9 +47,28 @@ pub trait Transport: AsRawFd {
     ) -> io::Result<usize>;
 }
 
+impl Transport for Box<dyn Transport> {
+    fn pollable_fd(&self) -> RawFd {
+        self.as_ref().pollable_fd()
+    }
+
+    fn send(&mut self, bytes: &[IoSlice], fds: &[OwnedFd], mode: IoMode) -> io::Result<usize> {
+        self.as_mut().send(bytes, fds, mode)
+    }
+
+    fn recv(
+        &mut self,
+        bytes: &mut [IoSliceMut],
+        fds: &mut VecDeque<OwnedFd>,
+        mode: IoMode,
+    ) -> io::Result<usize> {
+        self.as_mut().recv(bytes, fds, mode)
+    }
+}
+
 impl<T: Transport> AsRawFd for BufferedSocket<T> {
     fn as_raw_fd(&self) -> RawFd {
-        self.socket.as_raw_fd()
+        self.socket.pollable_fd()
     }
 }
 

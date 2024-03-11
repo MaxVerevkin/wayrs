@@ -11,6 +11,10 @@ use super::{Transport, FDS_IN_LEN, FDS_OUT_LEN};
 use crate::IoMode;
 
 impl Transport for UnixStream {
+    fn pollable_fd(&self) -> RawFd {
+        self.as_raw_fd()
+    }
+
     fn send(&mut self, bytes: &[IoSlice], fds: &[OwnedFd], mode: IoMode) -> io::Result<usize> {
         let mut flags = libc::MSG_NOSIGNAL;
         if mode == IoMode::NonBlocking {
