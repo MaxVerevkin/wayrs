@@ -15,7 +15,7 @@ use crate::protocol::*;
 use crate::proxy::Proxy;
 use crate::EventCtx;
 
-use wayrs_core::transport::{BufferedSocket, SendMessageError};
+use wayrs_core::transport::{BufferedSocket, PeekHeaderError, RecvMessageError, SendMessageError};
 use wayrs_core::{ArgType, ArgValue, Interface, IoMode, Message, MessageBuffersPool, ObjectId};
 
 #[cfg(feature = "tokio")]
@@ -292,7 +292,13 @@ impl<D> Connection<D> {
     }
 
     fn recv_event(&mut self, mode: IoMode) -> io::Result<QueuedEvent> {
-        let header = self.socket.peek_message_header(mode)?;
+        let header = self
+            .socket
+            .peek_message_header(mode)
+            .map_err(|err| match err {
+                PeekHeaderError::Io(io) => io,
+                other => io::Error::new(io::ErrorKind::InvalidData, other),
+            })?;
 
         let obj = self
             .object_mgr
@@ -306,9 +312,13 @@ impl<D> Connection<D> {
             .expect("incorrect opcode")
             .signature;
 
-        let event =
-            self.socket
-                .recv_message(header, signature, &mut self.msg_buffers_pool, mode)?;
+        let event = self
+            .socket
+            .recv_message(header, signature, &mut self.msg_buffers_pool, mode)
+            .map_err(|err| match err {
+                RecvMessageError::Io(io) => io,
+                other => io::Error::new(io::ErrorKind::InvalidData, other),
+            })?;
         if self.debug {
             eprintln!("[wayrs] {:?}", DebugMessage::new(&event, true, object));
         }

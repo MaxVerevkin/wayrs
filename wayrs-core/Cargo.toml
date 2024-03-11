@@ -12,6 +12,7 @@ license.workspace = true
 
 [dependencies]
 libc = "0.2"
+thiserror = "1.0"
 
 [package.metadata.docs.rs]
 # To build locally:
