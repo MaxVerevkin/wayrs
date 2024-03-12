@@ -4,10 +4,10 @@ use std::fmt::{self, Debug};
 use std::time::Duration;
 
 use wayrs_client::object::ObjectId;
+use wayrs_client::object::Proxy;
 use wayrs_client::protocol::wl_keyboard::{EnterArgs, LeaveArgs};
-use wayrs_client::proxy::Proxy;
-use wayrs_client::Connection;
-use wayrs_client::{protocol::*, EventCtx};
+use wayrs_client::protocol::*;
+use wayrs_client::{Connection, EventCtx};
 
 pub use xkbcommon::xkb;
 

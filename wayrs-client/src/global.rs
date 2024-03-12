@@ -1,8 +1,10 @@
+//! Utils for working with global objects
+
 use std::ffi::{CStr, CString};
 use std::ops;
 
+use crate::object::Proxy;
 use crate::protocol::wl_registry::GlobalArgs;
-use crate::proxy::Proxy;
 use crate::{Connection, EventCtx};
 
 pub type Global = GlobalArgs;

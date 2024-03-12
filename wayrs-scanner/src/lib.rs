@@ -162,7 +162,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                 ArgType::Enum(_) => quote! {
                     match #arg_name.try_into() {
                         Ok(val) => val,
-                        Err(_) => return Err(_wayrs_client::proxy::BadMessage),
+                        Err(_) => return Err(_wayrs_client::object::BadMessage),
                     }
                 },
                 _ => quote!(#arg_name),
@@ -181,10 +181,10 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         quote! {
             #opcode => {
                 if __event.args.len() != #args_len {
-                    return Err(_wayrs_client::proxy::BadMessage);
+                    return Err(_wayrs_client::object::BadMessage);
                 }
                 let mut __args = __event.args.drain(..);
-                #( let Some(_wayrs_client::core::ArgValue::#arg_ty(#arg_names)) = __args.next() else { return Err(_wayrs_client::proxy::BadMessage) }; )*
+                #( let Some(_wayrs_client::core::ArgValue::#arg_ty(#arg_names)) = __args.next() else { return Err(_wayrs_client::object::BadMessage) }; )*
                 drop(__args);
                 __pool.reuse_args(__event.args);
                 Ok(#retval)
@@ -304,7 +304,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
         #mod_doc
         #visibility mod #mod_name {
             use #wayrs_client_path as _wayrs_client;
-            use _wayrs_client::proxy::Proxy;
+            use _wayrs_client::object::Proxy;
             use _wayrs_client::EventCtx;
 
             #mod_doc
@@ -336,10 +336,10 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
                     mut __event: _wayrs_client::core::Message,
                     __self_version: u32,
                     __pool: &mut _wayrs_client::core::MessageBuffersPool,
-                ) -> ::std::result::Result<Event, _wayrs_client::proxy::BadMessage> {
+                ) -> ::std::result::Result<Event, _wayrs_client::object::BadMessage> {
                     match __event.header.opcode {
                         #( #event_decoding )*
-                        _ => Err(_wayrs_client::proxy::BadMessage),
+                        _ => Err(_wayrs_client::object::BadMessage),
                     }
                 }
 
@@ -353,16 +353,16 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             }
 
             impl TryFrom<_wayrs_client::object::Object> for #proxy_name {
-                type Error = _wayrs_client::proxy::WrongObject;
+                type Error = _wayrs_client::object::WrongObject;
 
-                fn try_from(object: _wayrs_client::object::Object) -> ::std::result::Result<Self, _wayrs_client::proxy::WrongObject> {
+                fn try_from(object: _wayrs_client::object::Object) -> ::std::result::Result<Self, _wayrs_client::object::WrongObject> {
                     if object.interface == Self::INTERFACE {
                         Ok(Self {
                             id: object.id,
                             version: object.version,
                         })
                     } else {
-                        Err(_wayrs_client::proxy::WrongObject)
+                        Err(_wayrs_client::object::WrongObject)
                     }
                 }
             }

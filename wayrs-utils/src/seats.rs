@@ -53,11 +53,11 @@
 
 use std::ffi::CString;
 
+use wayrs_client::global::*;
+use wayrs_client::object::Proxy;
 use wayrs_client::protocol::wl_seat::Capability;
 use wayrs_client::protocol::*;
-use wayrs_client::proxy::Proxy;
-use wayrs_client::Connection;
-use wayrs_client::{global::*, EventCtx};
+use wayrs_client::{Connection, EventCtx};
 
 pub trait SeatHandler: Sized + 'static {
     fn get_seats(&mut self) -> &mut Seats;

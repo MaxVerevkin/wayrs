@@ -18,8 +18,8 @@
 use std::io;
 
 use wayrs_client::global::*;
+use wayrs_client::object::Proxy;
 use wayrs_client::protocol::*;
-use wayrs_client::proxy::Proxy;
 use wayrs_client::Connection;
 
 use crate::shm_alloc::{BufferSpec, ShmAlloc};

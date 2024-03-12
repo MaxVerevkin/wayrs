@@ -5,7 +5,6 @@
 pub mod global;
 pub mod object;
 pub mod protocol;
-pub mod proxy;
 
 mod connection;
 mod debug_message;
@@ -20,8 +19,6 @@ pub use wayrs_core::{Fixed, IoMode};
 
 use std::ffi::CStr;
 use std::fmt;
-
-use proxy::Proxy;
 
 /// Generate glue code from .xml protocol file. The path is relative to your project root.
 #[macro_export]
@@ -60,14 +57,14 @@ pub const fn _private_cstr(string: &str) -> &CStr {
 
 /// Event callback context.
 #[non_exhaustive]
-pub struct EventCtx<'a, D, P: Proxy> {
+pub struct EventCtx<'a, D, P: object::Proxy> {
     pub conn: &'a mut Connection<D>,
     pub state: &'a mut D,
     pub proxy: P,
     pub event: P::Event,
 }
 
-impl<'a, D, P: Proxy> fmt::Debug for EventCtx<'a, D, P>
+impl<'a, D, P: object::Proxy> fmt::Debug for EventCtx<'a, D, P>
 where
     P: fmt::Debug,
     P::Event: fmt::Debug,

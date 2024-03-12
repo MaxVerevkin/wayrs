@@ -9,10 +9,9 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
 use crate::debug_message::DebugMessage;
-use crate::object::{Object, ObjectManager};
+use crate::object::{Object, ObjectManager, Proxy};
 use crate::protocol::wl_registry::GlobalArgs;
 use crate::protocol::*;
-use crate::proxy::Proxy;
 use crate::EventCtx;
 
 use wayrs_core::transport::{BufferedSocket, PeekHeaderError, RecvMessageError, SendMessageError};

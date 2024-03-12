@@ -1,3 +1,5 @@
+//! Client side object representation
+
 use std::borrow::Borrow;
 use std::cmp;
 use std::fmt::{self, Debug};
@@ -7,9 +9,8 @@ use std::num::NonZeroU32;
 use crate::connection::GenericCallback;
 use crate::protocol::WlDisplay;
 
-use wayrs_core::Interface;
-
 pub use wayrs_core::ObjectId;
+use wayrs_core::{Interface, Message, MessageBuffersPool};
 
 /// A Wayland object.
 ///
@@ -70,6 +71,7 @@ impl Hash for Object {
 }
 
 impl Borrow<ObjectId> for Object {
+    #[inline]
     fn borrow(&self) -> &ObjectId {
         &self.id
     }
@@ -97,6 +99,47 @@ pub(crate) struct ObjectState<D> {
     pub object: Object,
     pub is_alive: bool,
     pub cb: Option<GenericCallback<D>>,
+}
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct BadMessage;
+
+/// Error which may occur in `Proxy: TryFrom<Object>` conversion.
+#[derive(Debug)]
+pub struct WrongObject;
+
+/// A Wayland object proxy.
+///
+/// This trait is implemented automatically for generated proxies, do not implement it yourself.
+pub trait Proxy: TryFrom<Object, Error = WrongObject> + Copy {
+    type Event;
+
+    const INTERFACE: &'static Interface;
+
+    #[doc(hidden)]
+    fn new(id: ObjectId, version: u32) -> Self;
+
+    #[doc(hidden)]
+    fn parse_event(
+        event: Message,
+        version: u32,
+        pool: &mut MessageBuffersPool,
+    ) -> Result<Self::Event, BadMessage>;
+
+    fn id(&self) -> ObjectId;
+
+    fn version(&self) -> u32;
+}
+
+impl<P: Proxy> From<P> for Object {
+    fn from(value: P) -> Self {
+        Self {
+            id: value.id(),
+            interface: P::INTERFACE,
+            version: value.version(),
+        }
+    }
 }
 
 impl<D> ObjectManager<D> {
