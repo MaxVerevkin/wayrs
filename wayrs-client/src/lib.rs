@@ -76,3 +76,8 @@ where
             .finish_non_exhaustive()
     }
 }
+
+#[doc(hidden)]
+pub mod proxy {
+    pub use crate::object::Proxy;
+}
