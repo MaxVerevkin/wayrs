@@ -2,32 +2,32 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub mod debug_message;
 pub mod global;
 pub mod object;
 pub mod protocol;
 pub mod proxy;
 
 mod connection;
+mod debug_message;
 
 pub use connection::{ConnectError, Connection};
 
 #[doc(hidden)]
-pub use wayrs_core as core;
-#[doc(hidden)]
-pub use wayrs_scanner;
+pub use wayrs_scanner as _private_scanner;
 
-use proxy::Proxy;
+pub use wayrs_core as core;
+pub use wayrs_core::{Fixed, IoMode};
+
 use std::ffi::CStr;
 use std::fmt;
 
-pub use wayrs_core::{Fixed, IoMode};
+use proxy::Proxy;
 
 /// Generate glue code from .xml protocol file. The path is relative to your project root.
 #[macro_export]
 macro_rules! generate {
     ($path:literal) => {
-        $crate::wayrs_scanner::generate!($path);
+        $crate::_private_scanner::generate!($path);
     };
 }
 
@@ -36,14 +36,14 @@ macro_rules! generate {
 #[macro_export]
 macro_rules! cstr {
     ($str:literal) => {{
-        const X: &'static ::std::ffi::CStr = $crate::cstr(concat!($str, "\0"));
+        const X: &'static ::std::ffi::CStr = $crate::_private_cstr(concat!($str, "\0"));
         X
     }};
 }
 
 // TODO: remove when MSRV is at least 1.72
 #[doc(hidden)]
-pub const fn cstr(string: &str) -> &CStr {
+pub const fn _private_cstr(string: &str) -> &CStr {
     let bytes = string.as_bytes();
     assert!(!bytes.is_empty());
 
