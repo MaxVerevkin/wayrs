@@ -102,7 +102,6 @@ pub(crate) struct ObjectState<D, T: ClientTransport> {
     pub cb: Option<GenericCallback<D, T>>,
 }
 
-<<<<<<< HEAD
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct BadMessage;

@@ -22,15 +22,20 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::{env, fmt};
 
-pub use wayrs_core::{Fixed, IoMode};
-
 pub use wayrs_core::transport::Transport;
-pub use wayrs_core::{Fixed, IoMode};
 
 pub trait ClientTransport: Transport {
     fn connect() -> Result<Self, ConnectError>
     where
         Self: Sized;
+
+    fn fix_metadata(
+        &mut self,
+        plane_idx: usize,
+        width: u32,
+        height: u32,
+        format: u32,
+    ) -> Option<(u32, u32, u64)>;
 }
 
 impl ClientTransport for UnixStream {
@@ -47,8 +52,17 @@ impl ClientTransport for UnixStream {
 
         Ok(UnixStream::connect(path)?)
     }
+
+    fn fix_metadata(
+        &mut self,
+        _plane_idx: usize,
+        _width: u32,
+        _height: u32,
+        _format: u32,
+    ) -> Option<(u32, u32, u64)> {
+        None
+    }
 }
->>>>>>> ed9c1cf (Add client transport abstraction)
 /// Generate glue code from .xml protocol file. The path is relative to your project root.
 #[macro_export]
 macro_rules! generate {

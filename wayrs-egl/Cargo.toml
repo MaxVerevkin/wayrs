@@ -16,6 +16,7 @@ libc = "0.2"
 thiserror = "1.0"
 wayrs-client = { version = "1.0", path = "../wayrs-client" }
 wayrs-protocols = { version = "0.13", path = "../wayrs-protocols", features = ["linux-dmabuf-unstable-v1"] }
+tokio = { version = "1.25.0", features = ["full"] }
 
 [dev-dependencies]
 gles31 = "1.0"

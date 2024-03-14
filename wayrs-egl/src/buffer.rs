@@ -1,8 +1,9 @@
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsFd, AsRawFd};
 use std::sync::{Arc, Mutex};
 
-use wayrs_client::{protocol::*, ClientTransport};
+use libc::SEEK_END;
 use wayrs_client::Connection;
+use wayrs_client::{protocol::*, ClientTransport};
 use wayrs_protocols::linux_dmabuf_unstable_v1::*;
 
 use crate::{egl_ffi, EglDisplay, Error, Fourcc, Result};
@@ -87,13 +88,36 @@ impl Buffer {
         }
 
         let wl_buffer_params = egl_display.linux_dmabuf().create_params(conn);
+
         for (i, plane) in buf_parts.planes.into_iter().enumerate() {
+            let (offset, stride, modifier) = match conn
+                .socket
+                .transport_mut()
+                .fix_metadata(i, width, height, fourcc.0)
+            {
+                Some((a, b, c)) if c == 0 => (a, b, buf_parts.modifier),
+                Some((a, b, c)) => (a, b, c),
+                None => (plane.offset, plane.stride, buf_parts.modifier),
+            };
+
+            let fdz = unsafe{libc::lseek(plane.dmabuf.as_raw_fd(), 0, SEEK_END)};
+
+            println!(
+                "modifier: {}, buf_parts.modifier: {} size: {}",
+                modifier, buf_parts.modifier, fdz
+            );
+
+            println!(
+                "{} {}",
+                (buf_parts.modifier >> 32) as u32,
+                (buf_parts.modifier & 0xFFFF_FFFF) as u32
+            );
             wl_buffer_params.add(
                 conn,
                 plane.dmabuf,
                 i as u32,
-                plane.offset,
-                plane.stride,
+                offset,
+                stride,
                 (buf_parts.modifier >> 32) as u32,
                 (buf_parts.modifier & 0xFFFF_FFFF) as u32,
             );

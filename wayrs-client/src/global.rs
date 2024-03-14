@@ -5,9 +5,6 @@ use std::ops;
 
 use crate::object::Proxy;
 use crate::protocol::wl_registry::GlobalArgs;
-use crate::{Connection, EventCtx};
-use crate::{Connection, EventCtx};
-use crate::proxy::Proxy;
 use crate::{ClientTransport, Connection, EventCtx};
 
 pub type Global = GlobalArgs;
@@ -105,7 +102,12 @@ impl GlobalExt for Global {
     }
 
     /// Same as [`bind`](Self::bind) but also sets the callback
-    fn bind_with_cb<P: Proxy, D, T: ClientTransport, F: FnMut(EventCtx<D, P, T>) + Send + 'static>(
+    fn bind_with_cb<
+        P: Proxy,
+        D,
+        T: ClientTransport,
+        F: FnMut(EventCtx<D, P, T>) + Send + 'static,
+    >(
         &self,
         conn: &mut Connection<D, T>,
         version: impl VersionBounds,
@@ -147,7 +149,12 @@ impl GlobalsExt for Globals {
         global.bind(conn, version)
     }
 
-    fn bind_with_cb<P: Proxy, D, T: ClientTransport, F: FnMut(EventCtx<D, P, T>) + Send + 'static>(
+    fn bind_with_cb<
+        P: Proxy,
+        D,
+        T: ClientTransport,
+        F: FnMut(EventCtx<D, P, T>) + Send + 'static,
+    >(
         &self,
         conn: &mut Connection<D, T>,
         version: impl VersionBounds,

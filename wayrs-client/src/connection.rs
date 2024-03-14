@@ -10,7 +10,6 @@ use crate::debug_message::DebugMessage;
 use crate::object::{Object, ObjectManager, Proxy};
 use crate::protocol::wl_registry::GlobalArgs;
 use crate::protocol::*;
-use crate::proxy::Proxy;
 use crate::ClientTransport;
 use crate::EventCtx;
 
@@ -40,9 +39,10 @@ pub enum ConnectError {
 pub struct Connection<D, T: ClientTransport = UnixStream> {
     #[cfg(feature = "tokio")]
     async_fd: Option<AsyncFd<RawFd>>,
+    #[cfg(feature = "tokio")]
+    read_async_fd: Option<AsyncFd<RawFd>>,
 
-    socket: BufferedSocket,
-    socket: BufferedSocket<T>,
+    pub socket: BufferedSocket<T>,
     msg_buffers_pool: MessageBuffersPool,
 
     object_mgr: ObjectManager<D, T>,
@@ -68,8 +68,7 @@ enum QueuedEvent {
 pub(crate) type GenericCallback<D, T> =
     Box<dyn FnMut(&mut Connection<D, T>, &mut D, Object, Message) + Send>;
 
-type RegistryCb<D, T> =
-    Box<dyn FnMut(&mut Connection<D, T>, &mut D, &wl_registry::Event) + Send>;
+type RegistryCb<D, T> = Box<dyn FnMut(&mut Connection<D, T>, &mut D, &wl_registry::Event) + Send>;
 
 impl<D, T: ClientTransport> AsRawFd for Connection<D, T> {
     fn as_raw_fd(&self) -> RawFd {
@@ -86,6 +85,8 @@ impl<D, T: ClientTransport> Connection<D, T> {
         let mut this = Self {
             #[cfg(feature = "tokio")]
             async_fd: None,
+            #[cfg(feature = "tokio")]
+            read_async_fd: None,
 
             socket: BufferedSocket::from(T::connect()?),
             msg_buffers_pool: MessageBuffersPool::default(),
@@ -209,6 +210,8 @@ impl<D, T: ClientTransport> Connection<D, T> {
         Connection {
             #[cfg(feature = "tokio")]
             async_fd: self.async_fd,
+            #[cfg(feature = "tokio")]
+            read_async_fd: self.read_async_fd,
             socket: self.socket,
             msg_buffers_pool: self.msg_buffers_pool,
             object_mgr: self.object_mgr.clear_callbacks(),
@@ -371,7 +374,7 @@ impl<D, T: ClientTransport> Connection<D, T> {
     async fn async_recv_event(&mut self) -> io::Result<QueuedEvent> {
         let mut async_fd = match self.async_fd.take() {
             Some(fd) => fd,
-            None => AsyncFd::new(self.as_raw_fd())?,
+            None => AsyncFd::new(self.socket.as_raw_fd())?,
         };
 
         loop {
@@ -459,10 +462,14 @@ impl<D, T: ClientTransport> Connection<D, T> {
             Some(fd) => fd,
             None => AsyncFd::new(self.as_raw_fd())?,
         };
+        println!("async_fd send {:?}", async_fd);
 
         loop {
+            println!("trying to take as async writable mut");
             let mut fd_guard = async_fd.writable_mut().await?;
-            match self.flush(IoMode::NonBlocking) {
+            let t = self.flush(IoMode::NonBlocking);
+            println!("trying to take as async writable mut done {:?}", t);
+            match t {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => fd_guard.clear_ready(),
                 result => {
                     self.async_fd = Some(async_fd);
