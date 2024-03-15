@@ -267,18 +267,17 @@ impl<T: Transport> BufferedSocket<T> {
 
     /// Flush all pending messages.
     pub fn flush(&mut self, mode: IoMode) -> io::Result<()> {
-        if self.bytes_out.is_empty() && self.fds_out.is_empty() {
-            return Ok(());
+        while !self.bytes_out.is_empty() || !self.fds_out.is_empty() {
+            let mut iov_buf = [IoSlice::new(&[]), IoSlice::new(&[])];
+            let iov = self.bytes_out.get_readable_iov(&mut iov_buf);
+
+            let sent = self
+                .socket
+                .send(iov, self.fds_out.make_contiguous(), mode)?;
+
+            self.bytes_out.move_tail(sent);
+            self.fds_out.clear();
         }
-
-        let mut iov_buf = [IoSlice::new(&[]), IoSlice::new(&[])];
-        let iov = self.bytes_out.get_readable_iov(&mut iov_buf);
-
-        let sent = self
-            .socket
-            .send(iov, self.fds_out.make_contiguous(), mode)?;
-        self.bytes_out.move_tail(sent);
-        self.fds_out.clear();
 
         Ok(())
     }
