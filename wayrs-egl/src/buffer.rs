@@ -90,27 +90,14 @@ impl Buffer {
         let wl_buffer_params = egl_display.linux_dmabuf().create_params(conn);
 
         for (i, plane) in buf_parts.planes.into_iter().enumerate() {
-            let (offset, stride, modifier) = match conn
+            let (offset, stride, _modifier) = match conn
                 .transport_mut()
                 .fix_metadata(i, width, height, fourcc.0)
             {
-                Some((a, b, c)) if c == 0 => (a, b, buf_parts.modifier),
-                Some((a, b, c)) => (a, b, c),
+                Some((offset, stride, _modifier)) => (offset, stride, _modifier),
                 None => (plane.offset, plane.stride, buf_parts.modifier),
             };
 
-            let fdz = unsafe { libc::lseek(plane.dmabuf.as_raw_fd(), 0, SEEK_END) };
-
-            println!(
-                "modifier: {}, buf_parts.modifier: {} size: {}",
-                modifier, buf_parts.modifier, fdz
-            );
-
-            println!(
-                "{} {}",
-                (buf_parts.modifier >> 32) as u32,
-                (buf_parts.modifier & 0xFFFF_FFFF) as u32
-            );
             wl_buffer_params.add(
                 conn,
                 plane.dmabuf,

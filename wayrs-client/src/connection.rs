@@ -488,13 +488,10 @@ impl<D, T> Connection<D, T> {
             Some(fd) => fd,
             None => AsyncFd::new(self.as_raw_fd())?,
         };
-        println!("async_fd send {:?}", async_fd);
 
         loop {
-            println!("trying to take as async writable mut");
             let mut fd_guard = async_fd.writable_mut().await?;
             let t = self.flush(IoMode::NonBlocking);
-            println!("trying to take as async writable mut done {:?}", t);
             match t {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => fd_guard.clear_ready(),
                 result => {
