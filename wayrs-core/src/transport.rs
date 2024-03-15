@@ -267,7 +267,7 @@ impl<T: Transport> BufferedSocket<T> {
 
     /// Flush all pending messages.
     pub fn flush(&mut self, mode: IoMode) -> io::Result<()> {
-        while !self.bytes_out.is_empty() || !self.fds_out.is_empty() {
+        while !self.bytes_out.is_empty() {
             let mut iov_buf = [IoSlice::new(&[]), IoSlice::new(&[])];
             let iov = self.bytes_out.get_readable_iov(&mut iov_buf);
 
