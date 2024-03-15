@@ -303,6 +303,8 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
     quote! {
         #mod_doc
         #visibility mod #mod_name {
+            #![allow(clippy::empty_docs)]
+
             use #wayrs_client_path as _wayrs_client;
             use _wayrs_client::object::Proxy;
             use _wayrs_client::EventCtx;
