@@ -140,7 +140,7 @@ impl<T: Transport> BufferedSocket<T> {
         // Check size and flush if neccessary
         assert!(size <= BYTES_OUT_LEN);
         assert!(fds_cnt <= FDS_OUT_LEN);
-        while size > self.bytes_out.writable_len() || fds_cnt + self.fds_out.len() > FDS_OUT_LEN {
+        if size > self.bytes_out.writable_len() || fds_cnt + self.fds_out.len() > FDS_OUT_LEN {
             if let Err(err) = self.flush(mode) {
                 return Err(SendMessageError { msg, err });
             }
