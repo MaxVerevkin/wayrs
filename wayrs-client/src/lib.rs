@@ -100,14 +100,14 @@ pub const fn _private_cstr(string: &str) -> &CStr {
 
 /// Event callback context.
 #[non_exhaustive]
-pub struct EventCtx<'a, D, P: object::Proxy, T: ClientTransport = UnixStream> {
+pub struct EventCtx<'a, D, P: object::Proxy, T = UnixStream> {
     pub conn: &'a mut Connection<D, T>,
     pub state: &'a mut D,
     pub proxy: P,
     pub event: P::Event,
 }
 
-impl<'a, D, P: object::Proxy, T: ClientTransport> fmt::Debug for EventCtx<'a, D, P, T>
+impl<'a, D, P: object::Proxy, T> fmt::Debug for EventCtx<'a, D, P, T>
 where
     P: fmt::Debug,
     P::Event: fmt::Debug,

@@ -8,7 +8,6 @@ use std::num::NonZeroU32;
 
 use crate::connection::GenericCallback;
 use crate::protocol::WlDisplay;
-use crate::ClientTransport;
 
 pub use wayrs_core::ObjectId;
 use wayrs_core::{Interface, Message, MessageBuffersPool};
@@ -90,13 +89,13 @@ impl Debug for Object {
     }
 }
 
-pub(crate) struct ObjectManager<D, T: ClientTransport> {
+pub(crate) struct ObjectManager<D, T> {
     vacant_ids: Vec<ObjectId>,
     client_objects: Vec<Option<ObjectState<D, T>>>,
     server_objects: Vec<Option<ObjectState<D, T>>>,
 }
 
-pub(crate) struct ObjectState<D, T: ClientTransport> {
+pub(crate) struct ObjectState<D, T> {
     pub object: Object,
     pub is_alive: bool,
     pub cb: Option<GenericCallback<D, T>>,
@@ -143,7 +142,7 @@ impl<P: Proxy> From<P> for Object {
     }
 }
 
-impl<D, T: ClientTransport> ObjectManager<D, T> {
+impl<D, T> ObjectManager<D, T> {
     pub fn new() -> Self {
         let mut this = Self {
             vacant_ids: Vec::new(),

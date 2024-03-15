@@ -308,7 +308,6 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &TokenStream) -> TokenStr
             use #wayrs_client_path as _wayrs_client;
             use _wayrs_client::object::Proxy;
             use _wayrs_client::EventCtx;
-            use _wayrs_client::ClientTransport;
 
             #mod_doc
             #[doc = "See [`Event`] for the list of possible events."]
@@ -545,7 +544,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
         None => gen_pub_fn(
             &doc,
             &request.name,
-            &[quote!(D), quote!(T: ClientTransport)],
+            &[quote!(D), quote!(T)],
             &fn_args,
             quote!(()),
             None,
@@ -555,7 +554,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             let no_cb = gen_pub_fn(
                 &doc,
                 &request.name,
-                &[quote!(P: Proxy), quote!(D), quote!(T: ClientTransport)],
+                &[quote!(P: Proxy), quote!(D), quote!(T)],
                 &fn_args,
                 quote!(P),
                 None,
@@ -569,7 +568,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             let cb = gen_pub_fn(
                 &doc,
                 &format!("{}_with_cb", request.name),
-                &[quote!(P: Proxy), quote!(D), quote!(T: ClientTransport)],
+                &[quote!(P: Proxy), quote!(D), quote!(T)],
                 &fn_args,
                 quote!(P),
                 None,
@@ -589,7 +588,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             let no_cb = gen_pub_fn(
                 &doc,
                 &request.name,
-                &[quote!(D), quote!(T: ClientTransport)],
+                &[quote!(D), quote!(T)],
                 &fn_args,
                 proxy_path.clone(),
                 None,
@@ -603,7 +602,7 @@ fn gen_request_fn(opcode: u16, request: &Message) -> TokenStream {
             let cb = gen_pub_fn(
                 &doc,
                 &format!("{}_with_cb", request.name),
-                &[quote!(D), quote!(T: ClientTransport)],
+                &[quote!(D), quote!(T)],
                 &fn_args,
                 proxy_path.clone(),
                 None,

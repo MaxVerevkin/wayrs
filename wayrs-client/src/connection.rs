@@ -36,7 +36,7 @@ pub enum ConnectError {
 /// and dispatches object events.
 ///
 /// Set `WAYLAND_DEBUG=1` environment variable to get debug messages.
-pub struct Connection<D, T: ClientTransport = UnixStream> {
+pub struct Connection<D, T = UnixStream> {
     #[cfg(feature = "tokio")]
     async_fd: Option<AsyncFd<RawFd>>,
 
@@ -74,12 +74,15 @@ impl<D, T: ClientTransport> AsRawFd for Connection<D, T> {
     }
 }
 
-impl<D, T: ClientTransport> Connection<D, T> {
+impl<D, T> Connection<D, T> {
     /// Connect to a Wayland socket at `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` and create a registry.
     ///
     /// At the moment, only a single registry can be created. This might or might not change in the
     /// future, considering registries cannot be destroyed.
-    pub fn connect() -> Result<Self, ConnectError> {
+    pub fn connect() -> Result<Self, ConnectError>
+    where
+        T: ClientTransport,
+    {
         let mut this = Self {
             #[cfg(feature = "tokio")]
             async_fd: None,
@@ -105,7 +108,10 @@ impl<D, T: ClientTransport> Connection<D, T> {
     }
 
     /// [`connect`](Self::connect) and collect the initial set of advertised globals.
-    pub fn connect_and_collect_globals() -> Result<(Self, Vec<GlobalArgs>), ConnectError> {
+    pub fn connect_and_collect_globals() -> Result<(Self, Vec<GlobalArgs>), ConnectError>
+    where
+        T: ClientTransport,
+    {
         let mut this = Self::connect()?;
         this.blocking_roundtrip()?;
         let globals = this
@@ -123,6 +129,8 @@ impl<D, T: ClientTransport> Connection<D, T> {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn async_connect_and_collect_globals() -> Result<(Self, Vec<GlobalArgs>), ConnectError>
+    where
+        T: ClientTransport,
     {
         let mut this = Self::connect()?;
         this.async_roundtrip().await?;
@@ -222,7 +230,10 @@ impl<D, T: ClientTransport> Connection<D, T> {
     ///
     /// This function flushes the buffer of pending requests. All received events during the
     /// roundtrip are queued.
-    pub fn blocking_roundtrip(&mut self) -> io::Result<()> {
+    pub fn blocking_roundtrip(&mut self) -> io::Result<()>
+    where
+        T: ClientTransport,
+    {
         let sync_cb = WlDisplay::INSTANCE.sync(self);
         self.flush(IoMode::Blocking)?;
 
@@ -239,7 +250,10 @@ impl<D, T: ClientTransport> Connection<D, T> {
     /// Async version of [`blocking_roundtrip`](Self::blocking_roundtrip).
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    pub async fn async_roundtrip(&mut self) -> io::Result<()> {
+    pub async fn async_roundtrip(&mut self) -> io::Result<()>
+    where
+        T: ClientTransport,
+    {
         let sync_cb = WlDisplay::INSTANCE.sync(self);
         self.async_flush().await?;
 
@@ -282,7 +296,10 @@ impl<D, T: ClientTransport> Connection<D, T> {
         self.requests_queue.push_back(request);
     }
 
-    fn recv_event(&mut self, mode: IoMode) -> io::Result<QueuedEvent> {
+    fn recv_event(&mut self, mode: IoMode) -> io::Result<QueuedEvent>
+    where
+        T: ClientTransport,
+    {
         let header = self
             .socket
             .peek_message_header(mode)
@@ -365,7 +382,10 @@ impl<D, T: ClientTransport> Connection<D, T> {
     }
 
     #[cfg(feature = "tokio")]
-    async fn async_recv_event(&mut self) -> io::Result<QueuedEvent> {
+    async fn async_recv_event(&mut self) -> io::Result<QueuedEvent>
+    where
+        T: ClientTransport,
+    {
         let mut async_fd = match self.async_fd.take() {
             Some(fd) => fd,
             None => AsyncFd::new(self.as_raw_fd())?,
@@ -393,7 +413,10 @@ impl<D, T: ClientTransport> Connection<D, T> {
     /// Otherwise, [`WouldBlock`](io::ErrorKind::WouldBlock) will be propagated.
     ///
     /// Regular IO errors are propagated as usual.
-    pub fn recv_events(&mut self, mut mode: IoMode) -> io::Result<()> {
+    pub fn recv_events(&mut self, mut mode: IoMode) -> io::Result<()>
+    where
+        T: ClientTransport,
+    {
         let mut at_least_one = false;
 
         loop {
@@ -412,7 +435,10 @@ impl<D, T: ClientTransport> Connection<D, T> {
     /// Async version of [`recv_events`](Self::recv_events).
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    pub async fn async_recv_events(&mut self) -> io::Result<()> {
+    pub async fn async_recv_events(&mut self) -> io::Result<()>
+    where
+        T: ClientTransport,
+    {
         let msg = self.async_recv_event().await?;
         self.event_queue.push_back(msg);
 
@@ -426,7 +452,10 @@ impl<D, T: ClientTransport> Connection<D, T> {
     }
 
     /// Send the queue of pending request to the server.
-    pub fn flush(&mut self, mode: IoMode) -> io::Result<()> {
+    pub fn flush(&mut self, mode: IoMode) -> io::Result<()>
+    where
+        T: ClientTransport,
+    {
         // Send pending messages
         while let Some(msg) = self.requests_queue.pop_front() {
             if let Err(SendMessageError { msg, err }) =
@@ -445,7 +474,10 @@ impl<D, T: ClientTransport> Connection<D, T> {
     /// Async version of [`flush`](Self::flush).
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    pub async fn async_flush(&mut self) -> io::Result<()> {
+    pub async fn async_flush(&mut self) -> io::Result<()>
+    where
+        T: ClientTransport,
+    {
         // Try to just flush before even touching async fd. In many cases flushing does not block.
         match self.flush(IoMode::NonBlocking) {
             Err(e) if e.kind() == io::ErrorKind::WouldBlock => (),
@@ -586,12 +618,18 @@ impl<D, T: ClientTransport> Connection<D, T> {
     }
 
     /// Get a reference to the underlying transport.
-    pub fn transport(&self) -> &T {
+    pub fn transport(&self) -> &T
+    where
+        T: ClientTransport,
+    {
         self.socket.transport()
     }
 
     /// Get a mutable reference to the underlying transport.
-    pub fn transport_mut(&mut self) -> &mut T {
+    pub fn transport_mut(&mut self) -> &mut T
+    where
+        T: ClientTransport,
+    {
         self.socket.transport_mut()
     }
 }

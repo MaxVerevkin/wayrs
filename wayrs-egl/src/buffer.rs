@@ -99,7 +99,7 @@ impl Buffer {
                 None => (plane.offset, plane.stride, buf_parts.modifier),
             };
 
-            let fdz = unsafe{libc::lseek(plane.dmabuf.as_raw_fd(), 0, SEEK_END)};
+            let fdz = unsafe { libc::lseek(plane.dmabuf.as_raw_fd(), 0, SEEK_END) };
 
             println!(
                 "modifier: {}, buf_parts.modifier: {} size: {}",
@@ -223,7 +223,7 @@ impl Buffer {
     /// Destroy this buffer.
     ///
     /// Not calling this function and just dropping the buffer will leak some resources.
-    pub fn destroy<D, T: ClientTransport>(self, conn: &mut Connection<D, T>) {
+    pub fn destroy<D, T>(self, conn: &mut Connection<D, T>) {
         let mut state_guard = self.state.lock().unwrap();
         match *state_guard {
             BufferState::Available => self.wl_buffer.destroy(conn),
@@ -304,7 +304,7 @@ impl<const N: usize> BufferPool<N> {
     /// Destroy all buffers in this pool.
     ///
     /// Not calling this function and just dropping the buffer pool will leak some resources.
-    pub fn destroy<D, T: ClientTransport>(self, conn: &mut Connection<D, T>) {
+    pub fn destroy<D, T>(self, conn: &mut Connection<D, T>) {
         for buf in self.buffers.into_iter().flatten() {
             buf.destroy(conn);
         }
