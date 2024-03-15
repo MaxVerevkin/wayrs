@@ -39,10 +39,8 @@ pub enum ConnectError {
 pub struct Connection<D, T: ClientTransport = UnixStream> {
     #[cfg(feature = "tokio")]
     async_fd: Option<AsyncFd<RawFd>>,
-    #[cfg(feature = "tokio")]
-    read_async_fd: Option<AsyncFd<RawFd>>,
 
-    pub socket: BufferedSocket<T>,
+    socket: BufferedSocket<T>,
     msg_buffers_pool: MessageBuffersPool,
 
     object_mgr: ObjectManager<D, T>,
@@ -85,8 +83,6 @@ impl<D, T: ClientTransport> Connection<D, T> {
         let mut this = Self {
             #[cfg(feature = "tokio")]
             async_fd: None,
-            #[cfg(feature = "tokio")]
-            read_async_fd: None,
 
             socket: BufferedSocket::from(T::connect()?),
             msg_buffers_pool: MessageBuffersPool::default(),
@@ -210,8 +206,6 @@ impl<D, T: ClientTransport> Connection<D, T> {
         Connection {
             #[cfg(feature = "tokio")]
             async_fd: self.async_fd,
-            #[cfg(feature = "tokio")]
-            read_async_fd: self.read_async_fd,
             socket: self.socket,
             msg_buffers_pool: self.msg_buffers_pool,
             object_mgr: self.object_mgr.clear_callbacks(),
@@ -374,7 +368,7 @@ impl<D, T: ClientTransport> Connection<D, T> {
     async fn async_recv_event(&mut self) -> io::Result<QueuedEvent> {
         let mut async_fd = match self.async_fd.take() {
             Some(fd) => fd,
-            None => AsyncFd::new(self.socket.as_raw_fd())?,
+            None => AsyncFd::new(self.as_raw_fd())?,
         };
 
         loop {
@@ -589,6 +583,16 @@ impl<D, T: ClientTransport> Connection<D, T> {
             };
             cb(ctx);
         })
+    }
+
+    /// Get a reference to the underlying transport.
+    pub fn transport(&self) -> &T {
+        self.socket.transport()
+    }
+
+    /// Get a mutable reference to the underlying transport.
+    pub fn transport_mut(&mut self) -> &mut T {
+        self.socket.transport_mut()
     }
 }
 

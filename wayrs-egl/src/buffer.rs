@@ -91,7 +91,6 @@ impl Buffer {
 
         for (i, plane) in buf_parts.planes.into_iter().enumerate() {
             let (offset, stride, modifier) = match conn
-                .socket
                 .transport_mut()
                 .fix_metadata(i, width, height, fourcc.0)
             {
