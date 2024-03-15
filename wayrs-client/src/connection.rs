@@ -454,6 +454,12 @@ impl<D> Connection<D> {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn async_flush(&mut self) -> io::Result<()> {
+        // Try to just flush before even touching async fd. In many cases flushing does not block.
+        match self.flush(IoMode::NonBlocking) {
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => (),
+            result => return result,
+        }
+
         let mut async_fd = match self.async_fd.take() {
             Some(fd) => fd,
             None => AsyncFd::new(self.as_raw_fd())?,
