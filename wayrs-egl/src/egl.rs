@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
 use std::fmt;
 
-use wayrs_client::Connection;
+use wayrs_client::{ClientTransport, Connection};
 use wayrs_protocols::linux_dmabuf_unstable_v1::*;
 
 use crate::{egl_ffi, gbm, Buffer, Error, Fourcc, GraphicsApi, Result, DRM_FORMAT_MOD_INVALID};
@@ -159,9 +159,9 @@ impl EglDisplay {
     }
 
     /// Allocate a new buffer
-    pub fn alloc_buffer<D>(
+    pub fn alloc_buffer<D, T: ClientTransport>(
         &self,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         width: u32,
         height: u32,
         fourcc: Fourcc,
