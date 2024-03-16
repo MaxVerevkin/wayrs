@@ -1,7 +1,6 @@
-use std::os::fd::{AsFd, AsRawFd};
+use std::os::fd::AsRawFd;
 use std::sync::{Arc, Mutex};
 
-use libc::SEEK_END;
 use wayrs_client::Connection;
 use wayrs_client::{protocol::*, ClientTransport};
 use wayrs_protocols::linux_dmabuf_unstable_v1::*;
