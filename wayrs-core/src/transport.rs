@@ -27,8 +27,8 @@ pub const FDS_IN_LEN: usize = FDS_OUT_LEN * 2;
 /// To create a new instance, use the `From<T: Transport>` implementation.
 pub struct BufferedSocket<T> {
     socket: T,
-    bytes_in: RingBuffer<BYTES_IN_LEN>,
-    bytes_out: RingBuffer<BYTES_OUT_LEN>,
+    bytes_in: RingBuffer,
+    bytes_out: RingBuffer,
     fds_in: VecDeque<OwnedFd>,
     fds_out: VecDeque<OwnedFd>,
 }
@@ -76,8 +76,8 @@ impl<T: Transport> From<T> for BufferedSocket<T> {
     fn from(socket: T) -> Self {
         Self {
             socket,
-            bytes_in: RingBuffer::new(),
-            bytes_out: RingBuffer::new(),
+            bytes_in: RingBuffer::new(BYTES_IN_LEN),
+            bytes_out: RingBuffer::new(BYTES_OUT_LEN),
             fds_in: VecDeque::new(),
             fds_out: VecDeque::new(),
         }

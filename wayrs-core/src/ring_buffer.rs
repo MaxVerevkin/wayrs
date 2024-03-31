@@ -3,16 +3,16 @@ use std::num::NonZeroU32;
 
 use crate::ObjectId;
 
-pub struct RingBuffer<const N: usize> {
-    bytes: Box<[u8; N]>,
+pub struct RingBuffer {
+    bytes: Box<[u8]>,
     offset: usize,
     len: usize,
 }
 
-impl<const N: usize> RingBuffer<N> {
-    pub fn new() -> Self {
+impl RingBuffer {
+    pub fn new(size: usize) -> Self {
         Self {
-            bytes: Box::new([0; N]),
+            bytes: Box::from(vec![0; size]),
             offset: 0,
             len: 0,
         }
@@ -23,7 +23,7 @@ impl<const N: usize> RingBuffer<N> {
     }
 
     pub fn move_tail(&mut self, n: usize) {
-        self.offset = (self.offset + n) % N;
+        self.offset = (self.offset + n) % self.bytes.len();
         self.len = self.len.checked_sub(n).unwrap();
     }
 
@@ -32,7 +32,7 @@ impl<const N: usize> RingBuffer<N> {
     }
 
     pub fn writable_len(&self) -> usize {
-        N - self.len
+        self.bytes.len() - self.len
     }
 
     pub fn is_empty(&self) -> bool {
@@ -40,21 +40,21 @@ impl<const N: usize> RingBuffer<N> {
     }
 
     pub fn is_full(&self) -> bool {
-        self.len == N
+        self.len == self.bytes.len()
     }
 
     fn head(&self) -> usize {
-        (self.offset + self.len) % N
+        (self.offset + self.len) % self.bytes.len()
     }
 
     pub fn write_bytes(&mut self, data: &[u8]) {
         assert!(self.writable_len() >= data.len());
 
         let head = self.head();
-        if head + data.len() <= N {
+        if head + data.len() <= self.bytes.len() {
             self.bytes[head..][..data.len()].copy_from_slice(data);
         } else {
-            let size = N - head;
+            let size = self.bytes.len() - head;
             let rest = data.len() - size;
             self.bytes[head..][..size].copy_from_slice(&data[..size]);
             self.bytes[..rest].copy_from_slice(&data[size..]);
@@ -66,10 +66,10 @@ impl<const N: usize> RingBuffer<N> {
     pub fn peek_bytes(&mut self, buf: &mut [u8]) {
         assert!(self.readable_len() >= buf.len());
 
-        if self.offset + buf.len() <= N {
+        if self.offset + buf.len() <= self.bytes.len() {
             buf.copy_from_slice(&self.bytes[self.offset..][..buf.len()]);
         } else {
-            let size = N - self.offset;
+            let size = self.bytes.len() - self.offset;
             let rest = buf.len() - size;
             buf[..size].copy_from_slice(&self.bytes[self.offset..][..size]);
             buf[size..].copy_from_slice(&self.bytes[..rest]);
@@ -88,13 +88,13 @@ impl<const N: usize> RingBuffer<N> {
         let head = self.head();
         if self.len == 0 {
             self.offset = 0;
-            iov_buf[0] = IoSliceMut::new(&mut *self.bytes);
+            iov_buf[0] = IoSliceMut::new(&mut self.bytes);
             &mut iov_buf[0..1]
         } else if head < self.offset {
             iov_buf[0] = IoSliceMut::new(&mut self.bytes[head..self.offset]);
             &mut iov_buf[0..1]
         } else if self.offset == 0 {
-            iov_buf[0] = IoSliceMut::new(&mut self.bytes[head..N]);
+            iov_buf[0] = IoSliceMut::new(&mut self.bytes[head..]);
             &mut iov_buf[0..1]
         } else {
             let (left, right) = self.bytes.split_at_mut(head);
