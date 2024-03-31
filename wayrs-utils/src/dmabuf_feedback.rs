@@ -193,6 +193,7 @@ impl fmt::Debug for FormatTableEntry {
     }
 }
 
+// TODO: remove when MSRV is 1.79
 fn ptr_is_aligned<T>(ptr: *const T) -> bool {
     (ptr as usize) & (std::mem::align_of::<T>() - 1) == 0
 }
