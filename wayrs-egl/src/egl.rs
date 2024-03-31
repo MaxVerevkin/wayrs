@@ -10,7 +10,7 @@ use crate::{egl_ffi, gbm, Buffer, Error, Fourcc, GraphicsApi, Result, DRM_FORMAT
 /// GBM-based EGL display
 ///
 /// Dropping this struct terminates the EGL display.
-// TODO: derive Debug when MSRV is >= 1.70
+#[derive(Debug)]
 pub struct EglDisplay {
     raw: egl_ffi::EGLDisplay,
     gbm_device: gbm::Device,
