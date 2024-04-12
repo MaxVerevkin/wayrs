@@ -64,8 +64,8 @@ impl EglDisplay {
         extensions.require("EGL_KHR_surfaceless_context")?;
 
         let egl_query_dmabuf_formats_ext = unsafe {
-            std::mem::transmute::<_, Option<egl_ffi::EglQueryDmabufFormatsExtProc>>(
-                egl_ffi::eglGetProcAddress(b"eglQueryDmaBufFormatsEXT\0".as_ptr() as *const _),
+            std::mem::transmute::<*mut libc::c_void, Option<egl_ffi::EglQueryDmabufFormatsExtProc>>(
+                egl_ffi::eglGetProcAddress(b"eglQueryDmaBufFormatsEXT\0".as_ptr().cast()),
             )
             .ok_or(Error::ExtensionUnsupported(
                 "EGL_EXT_image_dma_buf_import_modifiers",
@@ -73,8 +73,8 @@ impl EglDisplay {
         };
 
         let egl_query_dmabuf_modifiers_ext = unsafe {
-            std::mem::transmute::<_, Option<egl_ffi::EglQueryDmabufModifiersExtProc>>(
-                egl_ffi::eglGetProcAddress(b"eglQueryDmaBufModifiersEXT\0".as_ptr() as *const _),
+            std::mem::transmute::<*mut libc::c_void, Option<egl_ffi::EglQueryDmabufModifiersExtProc>>(
+                egl_ffi::eglGetProcAddress(b"eglQueryDmaBufModifiersEXT\0".as_ptr().cast()),
             )
             .ok_or(Error::ExtensionUnsupported(
                 "EGL_EXT_image_dma_buf_import_modifiers",
@@ -84,11 +84,12 @@ impl EglDisplay {
         // NOTE: eglGetProcAddress may return non-null pointer even if the extension is not supported.
         // Since this is a OpenGL/GLES extention, we cannot check it's presence now.
         let egl_image_target_renderbuffer_starage_oes = unsafe {
-            std::mem::transmute::<_, Option<egl_ffi::EglImageTargetRenderbufferStorageOesProc>>(
-                egl_ffi::eglGetProcAddress(
-                    b"glEGLImageTargetRenderbufferStorageOES\0".as_ptr() as *const _
-                ),
-            )
+            std::mem::transmute::<
+                *mut libc::c_void,
+                Option<egl_ffi::EglImageTargetRenderbufferStorageOesProc>,
+            >(egl_ffi::eglGetProcAddress(
+                b"glEGLImageTargetRenderbufferStorageOES\0".as_ptr().cast(),
+            ))
             .ok_or(Error::ExtensionUnsupported("GL_OES_EGL_image"))?
         };
 
