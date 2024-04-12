@@ -36,7 +36,7 @@ impl EglDisplay {
         let raw = unsafe {
             egl_ffi::eglGetPlatformDisplay(
                 egl_ffi::EGL_PLATFORM_GBM_KHR,
-                gbm_device.as_raw() as *mut _,
+                gbm_device.as_raw().cast(),
                 std::ptr::null(),
             )
         };

@@ -40,7 +40,7 @@ impl Renderer {
 
         egl_context.make_current().unwrap();
 
-        unsafe { load_gl_functions(&|name| egl_ffi::eglGetProcAddress(name as *const _)).unwrap() };
+        unsafe { load_gl_functions(&|name| egl_ffi::eglGetProcAddress(name.cast())).unwrap() };
 
         let shader_prog;
         let mut vbo = 0;
@@ -141,7 +141,7 @@ void main() {
             glBufferData(
                 GL_ARRAY_BUFFER,
                 std::mem::size_of_val(&points) as _,
-                points.as_ptr() as *const _,
+                points.as_ptr().cast(),
                 GL_STATIC_DRAW,
             );
 
@@ -433,7 +433,7 @@ fn assert_shader_ok(shader: u32) {
         let mut log = [0u8; 1024];
         let mut len = 0;
         unsafe {
-            glGetShaderInfoLog(shader, log.len() as _, &mut len, log.as_mut_ptr() as *mut _);
+            glGetShaderInfoLog(shader, log.len() as _, &mut len, log.as_mut_ptr().cast());
         }
         let msg = std::str::from_utf8(&log[..len as usize]).unwrap();
         panic!("Shader error:\n{msg}");
@@ -454,7 +454,7 @@ fn assert_shader_program_ok(shader_program: u32) {
                 shader_program,
                 log.len() as _,
                 &mut len,
-                log.as_mut_ptr() as *mut _,
+                log.as_mut_ptr().cast(),
             );
         }
         let msg = std::str::from_utf8(&log[..len as usize]).unwrap();
