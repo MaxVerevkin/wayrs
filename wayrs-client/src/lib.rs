@@ -9,7 +9,7 @@ pub mod protocol;
 mod connection;
 mod debug_message;
 
-pub use connection::{ConnectError, Connection};
+pub use connection::{ConnectError, Connection, ConnectionBuilder};
 
 #[doc(hidden)]
 pub use wayrs_scanner as _private_scanner;
