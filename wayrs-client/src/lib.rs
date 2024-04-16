@@ -65,6 +65,14 @@ where
 }
 
 #[doc(hidden)]
+pub mod interface {
+    pub use crate::core::{Interface, MessageDesc};
+}
+#[doc(hidden)]
 pub mod proxy {
-    pub use crate::object::Proxy;
+    pub use crate::object::{BadMessage, Proxy, WrongObject};
+}
+#[doc(hidden)]
+pub mod wire {
+    pub use crate::core::{ArgType, ArgValue, Fixed, Message, MessageHeader};
 }
