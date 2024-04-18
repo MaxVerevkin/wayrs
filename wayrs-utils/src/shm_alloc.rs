@@ -113,6 +113,20 @@ impl ShmAlloc {
         };
         pool.alloc_buffer(conn, spec)
     }
+
+    /// Release all Wayland resources.
+    pub fn destroy<D>(self, conn: &mut Connection<D>) {
+        match self.state {
+            ShmAllocState::Uninit(wl_shm) => {
+                if wl_shm.version() >= 2 {
+                    wl_shm.release(conn);
+                }
+            }
+            ShmAllocState::Init(pool) => {
+                pool.pool.destroy(conn);
+            }
+        }
+    }
 }
 
 impl Buffer {
