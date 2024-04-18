@@ -9,14 +9,20 @@ use std::sync::Arc;
 use memmap2::MmapMut;
 
 use wayrs_client::global::{BindError, Globals, GlobalsExt};
+use wayrs_client::object::Proxy;
 use wayrs_client::protocol::*;
 use wayrs_client::Connection;
 
 /// A simple "free list" shared memory allocator
 #[derive(Debug)]
 pub struct ShmAlloc {
-    wl_shm: WlShm,
-    pool: Option<InitShmPool>,
+    state: ShmAllocState,
+}
+
+#[derive(Debug)]
+enum ShmAllocState {
+    Uninit(WlShm),
+    Init(InitShmPool),
 }
 
 #[derive(Debug)]
@@ -63,12 +69,16 @@ pub struct Buffer {
 impl ShmAlloc {
     /// Bind `wl_shm` and create new [`ShmAlloc`].
     pub fn bind<D>(conn: &mut Connection<D>, globals: &Globals) -> Result<Self, BindError> {
-        Ok(Self::new(globals.bind(conn, 1)?))
+        Ok(Self::new(globals.bind(conn, 1..=2)?))
     }
 
     /// Create new [`ShmAlloc`].
+    ///
+    /// This function takes the ownership of `wl_shm` and destroys it when it is no longer used.
     pub fn new(wl_shm: WlShm) -> Self {
-        Self { wl_shm, pool: None }
+        Self {
+            state: ShmAllocState::Uninit(wl_shm),
+        }
     }
 
     /// Allocate a new buffer.
@@ -82,14 +92,26 @@ impl ShmAlloc {
         conn: &mut Connection<D>,
         spec: BufferSpec,
     ) -> io::Result<(Buffer, &mut [u8])> {
-        // Note: if let Some(poll) = &mut self.poll doesn't work because Rust's borrow checker is
-        // too dumb.
-        if self.pool.is_some() {
-            return self.pool.as_mut().unwrap().alloc_buffer(conn, spec);
+        // Note: `if let` does not work here because borrow checker is to dumb
+        if matches!(&self.state, ShmAllocState::Init(_)) {
+            let ShmAllocState::Init(pool) = &mut self.state else {
+                unreachable!()
+            };
+            return pool.alloc_buffer(conn, spec);
         }
 
-        let pool = InitShmPool::new(conn, self.wl_shm, spec.size())?;
-        self.pool.insert(pool).alloc_buffer(conn, spec)
+        let &ShmAllocState::Uninit(wl_shm) = &self.state else {
+            unreachable!()
+        };
+
+        self.state = ShmAllocState::Init(InitShmPool::new(conn, wl_shm, spec.size())?);
+        if wl_shm.version() >= 2 {
+            wl_shm.release(conn);
+        }
+        let ShmAllocState::Init(pool) = &mut self.state else {
+            unreachable!()
+        };
+        pool.alloc_buffer(conn, spec)
     }
 }
 
