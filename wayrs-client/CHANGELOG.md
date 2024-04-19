@@ -1,3 +1,11 @@
+# 1.1.0
+
+- Refactor the core functionality and types into `wayrs-core`, which can be used by both clinets and servers.
+- Drop `nix` dependency.
+- Reduce memory allocations by reusing buffers between messages.
+- The `Proxy` trait was changed to make the optimization above possible, but the intended usage should work the same.
+- The `interface`, `proxy` and `wire` modules are deprecated and were made doc-hidden. `interface::*`/`wire::*` is now in `core::*` and `proxy::*` is now in `object::*`.
+
 # 1.0.3
 
 - Update `nix` to v0.28.
