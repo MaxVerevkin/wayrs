@@ -7,7 +7,7 @@ use wayrs_client::protocol::*;
 use wayrs_client::EventCtx;
 use wayrs_client::{Connection, IoMode};
 use wayrs_egl::*;
-use wayrs_protocols::linux_dmabuf_unstable_v1::*;
+use wayrs_protocols::linux_dmabuf_v1::*;
 use wayrs_protocols::xdg_shell::*;
 use wayrs_utils::dmabuf_feedback::*;
 
