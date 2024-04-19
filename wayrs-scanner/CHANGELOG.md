@@ -1,3 +1,7 @@
+# 0.14.0
+
+- Update for `wayrs-client` v1.1.0.
+
 # 0.13.2
 
 - Update `wayrs-proto-parser`.
