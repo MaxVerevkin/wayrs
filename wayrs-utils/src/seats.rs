@@ -9,7 +9,7 @@
 //! use wayrs_utils::seats::*;
 //! use wayrs_client::Connection;
 //! use wayrs_client::protocol::*;
-//! use wayrs_client::proxy::Proxy;
+//! use wayrs_client::object::Proxy;
 //!
 //! #[derive(Debug)]
 //! struct State {
