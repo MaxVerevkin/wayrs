@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use wayrs_client::protocol::*;
 use wayrs_client::Connection;
-use wayrs_protocols::linux_dmabuf_unstable_v1::*;
+use wayrs_protocols::linux_dmabuf_v1::*;
 
 use crate::{egl_ffi, EglDisplay, Error, Fourcc, Result};
 

@@ -3,7 +3,7 @@ use std::ffi::CStr;
 use std::fmt;
 
 use wayrs_client::Connection;
-use wayrs_protocols::linux_dmabuf_unstable_v1::*;
+use wayrs_protocols::linux_dmabuf_v1::*;
 
 use crate::{egl_ffi, gbm, Buffer, Error, Fourcc, GraphicsApi, Result, DRM_FORMAT_MOD_INVALID};
 

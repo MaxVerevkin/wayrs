@@ -1,3 +1,11 @@
+# 0.14.0
+
+- Update `wayland-protocols` to v1.35.
+- New protocols: `xdg-toplevel-drag-v1`, `xdg-dialog-v1`, `linux-drm-syncobj-v1`, `alpha-modifier-v1`.
+- `XdgPositioner::set_constraint_adjustment` now accepts the `ConstraintAdjustment` instead of `u32`.
+- Replace `tablet-unstable-v2` with `tablet-v2`.
+- Replace `linux-dmabuf-unstable-v1` with `linux-dmabuf-v1`.
+
 # 0.13.2
 
 - Add missing `input-method-unstable-v1` protocol.

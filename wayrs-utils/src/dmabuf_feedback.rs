@@ -12,7 +12,7 @@ use std::fmt;
 
 use wayrs_client::protocol::WlSurface;
 use wayrs_client::{Connection, EventCtx};
-use wayrs_protocols::linux_dmabuf_unstable_v1::*;
+use wayrs_protocols::linux_dmabuf_v1::*;
 
 #[derive(Debug)]
 pub struct DmabufFeedback {

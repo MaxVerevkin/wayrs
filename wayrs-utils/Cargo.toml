@@ -15,7 +15,7 @@ seats = []
 shm_alloc = ["dep:memmap2", "dep:shmemfdrs2"]
 cursor = ["shm_alloc", "dep:xcursor", "wayrs-protocols/cursor-shape-v1"]
 keyboard = ["dep:xkbcommon"]
-dmabuf_feedback = ["dep:memmap2", "wayrs-protocols/linux-dmabuf-unstable-v1"]
+dmabuf_feedback = ["dep:memmap2", "wayrs-protocols/linux-dmabuf-v1"]
 
 [dependencies]
 libc = "0.2"

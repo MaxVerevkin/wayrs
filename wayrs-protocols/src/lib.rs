@@ -50,6 +50,13 @@ gen! {
 }
 
 gen! {
+    mod: alpha_modifier_v1,
+    feat: "alpha-modifier-v1",
+    file: "wayland-protocols/staging/alpha-modifier/alpha-modifier-v1.xml",
+    deps: [core],
+}
+
+gen! {
     mod: content_type_v1,
     feat: "content-type-v1",
     file: "wayland-protocols/staging/content-type/content-type-v1.xml",
@@ -60,7 +67,7 @@ gen! {
     mod: cursor_shape_v1,
     feat: "cursor-shape-v1",
     file: "wayland-protocols/staging/cursor-shape/cursor-shape-v1.xml",
-    deps: [core, tablet_unstable_v2],
+    deps: [core, tablet_v2],
 }
 
 gen! {
@@ -106,6 +113,13 @@ gen! {
 }
 
 gen! {
+    mod: linux_drm_syncobj_v1,
+    feat: "linux-drm-syncobj-v1",
+    file: "wayland-protocols/staging/linux-drm-syncobj/linux-drm-syncobj-v1.xml",
+    deps: [core],
+}
+
+gen! {
     mod: security_context_v1,
     feat: "security-context-v1",
     file: "wayland-protocols/staging/security-context/security-context-v1.xml",
@@ -131,6 +145,20 @@ gen! {
     feat: "xdg-activation-v1",
     file: "wayland-protocols/staging/xdg-activation/xdg-activation-v1.xml",
     deps: [core],
+}
+
+gen! {
+    mod: xdg_dialog_v1,
+    feat: "xdg-dialog-v1",
+    file: "wayland-protocols/staging/xdg-dialog/xdg-dialog-v1.xml",
+    deps: [xdg_shell],
+}
+
+gen! {
+    mod: xdg_toplevel_drag_v1,
+    feat: "xdg-toplevel-drag-v1",
+    file: "wayland-protocols/staging/xdg-toplevel-drag/xdg-toplevel-drag-v1.xml",
+    deps: [core, xdg_shell],
 }
 
 gen! {
@@ -172,13 +200,6 @@ gen! {
     mod: keyboard_shortcuts_inhibit_unstable_v1,
     feat: "keyboard-shortcuts-inhibit-unstable-v1",
     file: "wayland-protocols/unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml",
-    deps: [core],
-}
-
-gen! {
-    mod: linux_dmabuf_unstable_v1,
-    feat: "linux-dmabuf-unstable-v1",
-    file: "wayland-protocols/unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml",
     deps: [core],
 }
 
@@ -225,9 +246,9 @@ gen! {
 }
 
 gen! {
-    mod: tablet_unstable_v2,
-    feat: "tablet-unstable-v2",
-    file: "wayland-protocols/unstable/tablet/tablet-unstable-v2.xml",
+    mod: tablet_v2,
+    feat: "tablet-v2",
+    file: "wayland-protocols/stable/tablet/tablet-v2.xml",
     deps: [core],
 }
 
