@@ -1,3 +1,10 @@
+# 0.15.0
+
+- Update `wayrs-protocols` to v0.14.
+- dmabuf_feedback: map format table with MAP_PRIVATE.
+- shm_alloc: destroy wl_shm if is v2.
+- shm_alloc: add `ShmAlloc::destroy`.
+
 # 0.14.0
 
 - `ShmAlloc::alloc_buffer` now returns `io::Result` and does not panic.
