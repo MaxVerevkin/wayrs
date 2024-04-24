@@ -194,6 +194,8 @@ impl fmt::Debug for Fixed {
 }
 
 /// A Wayland interface, usually generated from the XML files
+///
+/// `PartialEq` and `Hash` implementations are delegated to the `name` field for performance reasons.
 pub struct Interface {
     pub name: &'static CStr,
     pub version: u32,
