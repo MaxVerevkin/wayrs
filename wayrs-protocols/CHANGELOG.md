@@ -1,3 +1,7 @@
+# 0.14.1
+
+- Include license file in the package.
+
 # 0.14.0
 
 - Update `wayland-protocols` to v1.35.
