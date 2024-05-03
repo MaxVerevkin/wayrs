@@ -1,3 +1,7 @@
+# 1.1.1
+
+- Include license file in the package.
+
 # 1.1.0
 
 - Refactor the core functionality and types into `wayrs-core`, which can be used by both clinets and servers.
