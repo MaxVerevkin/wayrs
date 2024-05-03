@@ -1,3 +1,7 @@
+# 0.15.1
+
+- Include license file in the package.
+
 # 0.15.0
 
 - Update `wayrs-protocols` to v0.14.
