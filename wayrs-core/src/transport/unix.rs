@@ -42,7 +42,7 @@ impl Transport for UnixStream {
                 let pmhdr = unsafe { libc::CMSG_FIRSTHDR(&mhdr).as_mut().unwrap() };
                 pmhdr.cmsg_level = libc::SOL_SOCKET;
                 pmhdr.cmsg_type = libc::SCM_RIGHTS;
-                pmhdr.cmsg_len = unsafe { libc::CMSG_LEN(fds_size as libc::c_uint) } as usize;
+                pmhdr.cmsg_len = unsafe { libc::CMSG_LEN(fds_size as libc::c_uint) } as _;
                 let dst_ptr = unsafe { libc::CMSG_DATA(pmhdr) };
                 let src_ptr = fds.as_ptr().cast();
                 unsafe { std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, fds_size) };
