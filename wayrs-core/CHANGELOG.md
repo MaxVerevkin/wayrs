@@ -1,3 +1,7 @@
+# 1.0.2
+
+- Fix compilation on FreeBSD.
+
 # 1.0.1
 
 - Include license file in the package.
