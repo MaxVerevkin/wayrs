@@ -1,10 +1,11 @@
 //! Wayland connection
 
+use std::any::Any;
 use std::collections::VecDeque;
 use std::env;
 use std::io;
 use std::num::NonZeroU32;
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, OwnedFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
@@ -14,7 +15,9 @@ use crate::protocol::wl_registry::GlobalArgs;
 use crate::protocol::*;
 use crate::EventCtx;
 
-use wayrs_core::transport::{BufferedSocket, PeekHeaderError, RecvMessageError, SendMessageError};
+use wayrs_core::transport::{
+    BufferedSocket, PeekHeaderError, RecvMessageError, SendMessageError, Transport,
+};
 use wayrs_core::{ArgType, ArgValue, Interface, IoMode, Message, MessageBuffersPool, ObjectId};
 
 #[cfg(feature = "tokio")]
@@ -41,7 +44,7 @@ pub struct Connection<D> {
     #[cfg(feature = "tokio")]
     async_fd: Option<AsyncFd<RawFd>>,
 
-    socket: BufferedSocket<UnixStream>,
+    socket: BufferedSocket<AnyTranpsort>,
     msg_buffers_pool: MessageBuffersPool,
 
     object_mgr: ObjectManager<D>,
@@ -75,11 +78,18 @@ impl<D> AsRawFd for Connection<D> {
     }
 }
 
-impl<D> Connection<D> {
-    /// Connect to a Wayland socket at `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` and create a registry.
+/// A builder for [`Connection`]
+///
+/// Connect to a Wayland socket at the standard path with [`connect`](Self::connect), or use any
+/// Wayland transport method with [`with_transport`](Self::with_transport).
+pub struct ConnectionBuilder {
+    transport: AnyTranpsort,
+}
+
+impl ConnectionBuilder {
+    /// Connect to a Wayland socket at `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY`.
     ///
-    /// At the moment, only a single registry can be created. This might or might not change in the
-    /// future, considering registries cannot be destroyed.
+    /// [`UnixStream`] is used as the underlying transport.
     pub fn connect() -> Result<Self, ConnectError> {
         let runtime_dir = env::var_os("XDG_RUNTIME_DIR").ok_or(ConnectError::NotEnoughEnvVars)?;
         let wayland_disp = env::var_os("WAYLAND_DISPLAY").ok_or(ConnectError::NotEnoughEnvVars)?;
@@ -88,11 +98,26 @@ impl<D> Connection<D> {
         path.push(runtime_dir);
         path.push(wayland_disp);
 
-        let mut this = Self {
+        Ok(Self::with_transport(UnixStream::connect(path)?))
+    }
+
+    /// Use a custom transport
+    pub fn with_transport<T: Transport + Send + 'static>(transport: T) -> Self {
+        Self {
+            transport: AnyTranpsort(Box::new(transport)),
+        }
+    }
+
+    /// Build a connection and create a registry
+    ///
+    /// At the moment, only a single registry can be created. This might or might not change in the
+    /// future, considering registries cannot be destroyed.
+    pub fn build<D>(self) -> Connection<D> {
+        let mut conn = Connection {
             #[cfg(feature = "tokio")]
             async_fd: None,
 
-            socket: BufferedSocket::from(UnixStream::connect(path)?),
+            socket: BufferedSocket::from(self.transport),
             msg_buffers_pool: MessageBuffersPool::default(),
 
             object_mgr: ObjectManager::new(),
@@ -104,45 +129,61 @@ impl<D> Connection<D> {
             registry: WlRegistry::new(ObjectId::MAX_CLIENT, 1), // Temp dummy object
             registry_cbs: Some(Vec::new()),
 
-            debug: std::env::var_os("WAYLAND_DEBUG").is_some(),
+            debug: env::var_os("WAYLAND_DEBUG").is_some(),
         };
+        conn.registry = WlDisplay::INSTANCE.get_registry(&mut conn);
+        conn
+    }
 
-        this.registry = WlDisplay::INSTANCE.get_registry(&mut this);
+    /// Build a connection and collect the initial set of advertised globals
+    pub fn build_and_collect_globals<D>(self) -> io::Result<(Connection<D>, Vec<GlobalArgs>)> {
+        let mut conn = self.build();
+        conn.blocking_roundtrip()?;
+        let globals = conn.collect_initial_globals();
+        Ok((conn, globals))
+    }
 
-        Ok(this)
+    /// Async version of [`build_and_collect_globals`](Self::build_and_collect_globals).
+    #[cfg(feature = "tokio")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    pub async fn async_build_and_collect_globals<D>(
+        self,
+    ) -> io::Result<(Connection<D>, Vec<GlobalArgs>)> {
+        let mut conn = self.build();
+        conn.async_roundtrip().await?;
+        let globals = conn.collect_initial_globals();
+        Ok((conn, globals))
+    }
+}
+
+impl<D> Connection<D> {
+    /// Connect to a Wayland socket at `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` and create a registry.
+    ///
+    /// At the moment, only a single registry can be created. This might or might not change in the
+    /// future, considering registries cannot be destroyed.
+    ///
+    /// This is a shortcut for `ConnectionBuilder::connect()?.build()`.
+    pub fn connect() -> Result<Self, ConnectError> {
+        Ok(ConnectionBuilder::connect()?.build())
     }
 
     /// [`connect`](Self::connect) and collect the initial set of advertised globals.
+    ///
+    /// This is a shortcut for `ConnectionBuilder::connect()?.build_and_collect_globals()`.
     pub fn connect_and_collect_globals() -> Result<(Self, Vec<GlobalArgs>), ConnectError> {
-        let mut this = Self::connect()?;
-        this.blocking_roundtrip()?;
-        let globals = this
-            .event_queue
-            .drain(..)
-            .map(|event| match event {
-                QueuedEvent::RegistryEvent(wl_registry::Event::Global(global)) => global,
-                _ => unreachable!("unexpected event during the initial burst of globals"),
-            })
-            .collect();
-        Ok((this, globals))
+        Ok(ConnectionBuilder::connect()?.build_and_collect_globals()?)
     }
 
     /// Async version of [`connect_and_collect_globals`](Self::connect_and_collect_globals).
+    ///
+    /// This is a shortcut for `ConnectionBuilder::connect()?.async_build_and_collect_globals().await`.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn async_connect_and_collect_globals() -> Result<(Self, Vec<GlobalArgs>), ConnectError>
     {
-        let mut this = Self::connect()?;
-        this.async_roundtrip().await?;
-        let globals = this
-            .event_queue
-            .drain(..)
-            .map(|event| match event {
-                QueuedEvent::RegistryEvent(wl_registry::Event::Global(global)) => global,
-                _ => unreachable!("unexpected event during the initial burst of globals"),
-            })
-            .collect();
-        Ok((this, globals))
+        Ok(ConnectionBuilder::connect()?
+            .async_build_and_collect_globals()
+            .await?)
     }
 
     /// Get Wayland registry.
@@ -259,6 +300,20 @@ impl<D> Connection<D> {
         }
 
         Ok(())
+    }
+
+    /// Try to get a reference to the underlying transport.
+    ///
+    /// Returns `None` if the type of the transport is not `T`.
+    pub fn transport<T: 'static>(&self) -> Option<&T> {
+        self.socket.transport().0.as_any().downcast_ref()
+    }
+
+    /// Try to get a mutable reference to the underlying transport.
+    ///
+    /// Returns `None` if the type of the transport is not `T`.
+    pub fn transport_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.socket.transport_mut().0.as_any_mut().downcast_mut()
     }
 
     #[doc(hidden)]
@@ -588,6 +643,51 @@ impl<D> Connection<D> {
             cb(ctx);
         })
     }
+
+    /// Collect the initial globals from the first roundtrip.
+    /// Must be called only once, after the initial roundtrip, or never.
+    fn collect_initial_globals(&mut self) -> Vec<GlobalArgs> {
+        self.event_queue
+            .drain(..)
+            .map(|event| match event {
+                QueuedEvent::RegistryEvent(wl_registry::Event::Global(global)) => global,
+                _ => unreachable!("unexpected event during the initial burst of globals"),
+            })
+            .collect()
+    }
+}
+
+trait IsAnyTransport: Transport + Send {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+impl<T: Transport + Send + 'static> IsAnyTransport for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+struct AnyTranpsort(Box<dyn IsAnyTransport>);
+impl Transport for AnyTranpsort {
+    fn pollable_fd(&self) -> RawFd {
+        self.0.as_ref().pollable_fd()
+    }
+
+    fn send(&mut self, bytes: &[io::IoSlice], fds: &[OwnedFd], mode: IoMode) -> io::Result<usize> {
+        self.0.as_mut().send(bytes, fds, mode)
+    }
+
+    fn recv(
+        &mut self,
+        bytes: &mut [io::IoSliceMut],
+        fds: &mut VecDeque<OwnedFd>,
+        mode: IoMode,
+    ) -> io::Result<usize> {
+        self.0.as_mut().recv(bytes, fds, mode)
+    }
 }
 
 #[cfg(test)]
@@ -599,5 +699,37 @@ mod tests {
     #[test]
     fn send() {
         assert_send::<Connection<()>>();
+    }
+
+    #[test]
+    fn transport_downcast() {
+        struct T;
+        impl Transport for T {
+            fn pollable_fd(&self) -> RawFd {
+                todo!()
+            }
+            fn send(
+                &mut self,
+                _bytes: &[io::IoSlice],
+                _fds: &[OwnedFd],
+                _mode: IoMode,
+            ) -> io::Result<usize> {
+                todo!()
+            }
+            fn recv(
+                &mut self,
+                _bytes: &mut [io::IoSliceMut],
+                _fds: &mut VecDeque<OwnedFd>,
+                _mode: IoMode,
+            ) -> io::Result<usize> {
+                todo!()
+            }
+        }
+
+        let mut conn = ConnectionBuilder::with_transport(T).build::<()>();
+        assert!(conn.transport::<T>().is_some());
+        assert!(conn.transport_mut::<T>().is_some());
+        assert!(conn.transport::<()>().is_none());
+        assert!(conn.transport_mut::<()>().is_none());
     }
 }
