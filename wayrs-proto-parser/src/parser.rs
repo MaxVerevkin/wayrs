@@ -32,7 +32,7 @@ impl From<quick_xml::Error> for Error {
 impl<'a> Parser<'a> {
     pub fn new(str: &'a str) -> Self {
         let mut reader = quick_xml::Reader::from_str(str);
-        reader.trim_text(true);
+        reader.config_mut().trim_text(true);
         Self { reader }
     }
 
