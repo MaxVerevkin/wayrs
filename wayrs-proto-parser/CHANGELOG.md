@@ -1,3 +1,7 @@
+# 2.0.2
+
+- Update `quick-xml` to v0.32.
+
 # 2.0.1
 
 - Include license file in the package.
