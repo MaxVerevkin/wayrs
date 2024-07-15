@@ -1,3 +1,7 @@
+# 2.0.3
+
+- Update `quick-xml` to v0.36.
+
 # 2.0.2
 
 - Update `quick-xml` to v0.32.

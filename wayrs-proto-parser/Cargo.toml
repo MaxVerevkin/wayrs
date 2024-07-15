@@ -1,6 +1,6 @@
 [package]
 name = "wayrs-proto-parser"
-version = "2.0.2"
+version = "2.0.3"
 description = "Parser for wayland protocol xml files"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "protocol", "parser", "xml"]
