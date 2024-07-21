@@ -37,9 +37,9 @@ enum BufferState {
 }
 
 impl Buffer {
-    pub(crate) fn alloc<D>(
+    pub(crate) fn alloc<D, T>(
         egl_display: &EglDisplay,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         width: u32,
         height: u32,
         fourcc: Fourcc,
@@ -200,7 +200,7 @@ impl Buffer {
     /// Destroy this buffer.
     ///
     /// Not calling this function and just dropping the buffer will leak some resources.
-    pub fn destroy<D>(self, conn: &mut Connection<D>) {
+    pub fn destroy<D, T>(self, conn: &mut Connection<D, T>) {
         let mut state_guard = self.state.lock().unwrap();
         match *state_guard {
             BufferState::Available => self.wl_buffer.destroy(conn),
@@ -239,10 +239,10 @@ impl<const N: usize> BufferPool<N> {
     /// Get a buffer, reusing free buffers if possible.
     ///
     /// Returns `Ok(None)` if all buffers are currently in use.
-    pub fn get_buffer<D>(
+    pub fn get_buffer<D, T>(
         &mut self,
         egl_display: &EglDisplay,
-        conn: &mut Connection<D>,
+        conn: &mut Connection<D, T>,
         width: u32,
         height: u32,
     ) -> Result<Option<&Buffer>> {
@@ -281,7 +281,7 @@ impl<const N: usize> BufferPool<N> {
     /// Destroy all buffers in this pool.
     ///
     /// Not calling this function and just dropping the buffer pool will leak some resources.
-    pub fn destroy<D>(self, conn: &mut Connection<D>) {
+    pub fn destroy<D, T>(self, conn: &mut Connection<D, T>) {
         for buf in self.buffers.into_iter().flatten() {
             buf.destroy(conn);
         }

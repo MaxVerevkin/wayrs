@@ -89,16 +89,16 @@ impl Debug for Object {
     }
 }
 
-pub(crate) struct ObjectManager<D> {
+pub(crate) struct ObjectManager<D, T> {
     vacant_ids: Vec<ObjectId>,
-    client_objects: Vec<Option<ObjectState<D>>>,
-    server_objects: Vec<Option<ObjectState<D>>>,
+    client_objects: Vec<Option<ObjectState<D, T>>>,
+    server_objects: Vec<Option<ObjectState<D, T>>>,
 }
 
-pub(crate) struct ObjectState<D> {
+pub(crate) struct ObjectState<D, T> {
     pub object: Object,
     pub is_alive: bool,
-    pub cb: Option<GenericCallback<D>>,
+    pub cb: Option<GenericCallback<D, T>>,
 }
 
 #[doc(hidden)]
@@ -142,7 +142,7 @@ impl<P: Proxy> From<P> for Object {
     }
 }
 
-impl<D> ObjectManager<D> {
+impl<D, T> ObjectManager<D, T> {
     pub fn new() -> Self {
         let mut this = Self {
             vacant_ids: Vec::new(),
@@ -163,8 +163,8 @@ impl<D> ObjectManager<D> {
         this
     }
 
-    pub fn clear_callbacks<D2>(self) -> ObjectManager<D2> {
-        let map = |x: ObjectState<D>| ObjectState {
+    pub fn clear_callbacks<D2>(self) -> ObjectManager<D2, T> {
+        let map = |x: ObjectState<D, T>| ObjectState {
             object: x.object,
             is_alive: x.is_alive,
             cb: None,
@@ -188,7 +188,7 @@ impl<D> ObjectManager<D> {
         &mut self,
         interface: &'static Interface,
         version: u32,
-    ) -> &mut ObjectState<D> {
+    ) -> &mut ObjectState<D, T> {
         let id = self.vacant_ids.pop().unwrap_or_else(|| {
             let id = self.client_objects.len() as u32;
             self.client_objects.push(None);
@@ -210,7 +210,7 @@ impl<D> ObjectManager<D> {
         })
     }
 
-    pub fn register_server_object(&mut self, object: Object) -> &mut ObjectState<D> {
+    pub fn register_server_object(&mut self, object: Object) -> &mut ObjectState<D, T> {
         assert!(object.id.created_by_server());
 
         let index = (object.id.as_u32() - ObjectId::MIN_SERVER.as_u32()) as usize;
@@ -226,7 +226,7 @@ impl<D> ObjectManager<D> {
         })
     }
 
-    pub fn get_object_mut(&mut self, id: ObjectId) -> Option<&mut ObjectState<D>> {
+    pub fn get_object_mut(&mut self, id: ObjectId) -> Option<&mut ObjectState<D, T>> {
         if id.created_by_client() {
             self.client_objects
                 .get_mut(id.as_u32() as usize)
