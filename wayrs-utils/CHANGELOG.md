@@ -1,3 +1,7 @@
+# 0.16.0 [unreleased]
+
+- Update `xkbcommon` to v0.8 and `memmap2` to v0.9.
+
 # 0.15.1
 
 - Include license file in the package.

@@ -19,13 +19,13 @@ dmabuf_feedback = ["dep:memmap2", "wayrs-protocols/linux-dmabuf-v1"]
 
 [dependencies]
 libc = "0.2"
-memmap2 = { version = "0.8", optional = true }
+memmap2 = { version = "0.9", optional = true }
 shmemfdrs2 = { version = "1.0", optional = true }
 thiserror = "1.0"
 wayrs-client = { version = "1.1", path = "../wayrs-client" }
 wayrs-protocols = { version = "0.14", path = "../wayrs-protocols", optional = true }
 xcursor = { version = "0.3", optional = true }
-xkbcommon = { version = "0.7", optional = true }
+xkbcommon = { version = "0.8", optional = true }
 
 [package.metadata.docs.rs]
 # To build locally:
