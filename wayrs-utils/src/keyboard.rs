@@ -56,6 +56,7 @@ pub struct KeyboardEvent {
     pub serial: u32,
     pub time: u32,
     pub keycode: xkb::Keycode,
+    pub keysym: xkb::Keysym,
     /// How this key should be repeated.
     ///
     /// Present if the compositor advertised repeat info AND this key should be repeated (as defined
@@ -145,6 +146,7 @@ fn wl_keyboard_cb<D: KeyboardHandler>(ctx: EventCtx<D, WlKeyboard>) {
             };
 
             let keycode = xkb::Keycode::new(args.key + 8);
+            let keysym = xkb_state.key_get_one_sym(keycode);
 
             let repeat_info = if xkb_state.get_keymap().key_repeats(keycode) {
                 kbd.repeat_info
@@ -159,6 +161,7 @@ fn wl_keyboard_cb<D: KeyboardHandler>(ctx: EventCtx<D, WlKeyboard>) {
                 serial: args.serial,
                 time: args.time,
                 keycode,
+                keysym,
                 repeat_info,
                 xkb_state,
             };
