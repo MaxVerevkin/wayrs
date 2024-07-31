@@ -1,5 +1,6 @@
-# 0.16.0 [unreleased]
+# 0.16.0
 
+- Keyboard: add `keysym` to `KeyboardEvent`.
 - Update `xkbcommon` to v0.8 and `memmap2` to v0.9.
 
 # 0.15.1
