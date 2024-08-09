@@ -1,3 +1,7 @@
+# 0.14.2 [unreleased]
+
+- Update `wlr-protocols` to [2b8d433](https://gitlab.freedesktop.org/wlroots/wlr-protocols/-/commit/2b8d43325b7012cc3f9b55c08d26e50e42beac7d).
+
 # 0.14.1
 
 - Include license file in the package.
