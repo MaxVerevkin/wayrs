@@ -15,7 +15,7 @@
 //!
 //! ```
 
-use std::io;
+use std::{fs, io};
 
 use wayrs_client::global::*;
 use wayrs_client::object::Proxy;
@@ -24,7 +24,7 @@ use wayrs_client::Connection;
 
 use crate::shm_alloc::{BufferSpec, ShmAlloc};
 
-use xcursor::parser::{parse_xcursor, Image};
+use xcursor::parser::{parse_xcursor_stream, Image};
 
 use wayrs_protocols::cursor_shape_v1::*;
 pub use wp_cursor_shape_device_v1::Shape as CursorShape;
@@ -120,8 +120,17 @@ impl CursorTheme {
                     .or_else(|| theme.load_icon("default"))
                     .ok_or(CursorError::DefaultCursorNotFound)?;
 
-                let mut imgs = parse_xcursor(&std::fs::read(theme_path)?)
-                    .ok_or(CursorError::ThemeParseError)?;
+                let mut reader = io::BufReader::new(fs::File::open(theme_path)?);
+                let mut imgs = match parse_xcursor_stream(&mut reader) {
+                    Ok(imgs) => imgs,
+                    Err(e) if e.kind() == io::ErrorKind::Other => {
+                        return Err(CursorError::ThemeParseError);
+                    }
+                    Err(e) => {
+                        return Err(e.into());
+                    }
+                };
+
                 if imgs.is_empty() {
                     return Err(CursorError::DefaultCursorNotFound);
                 }
