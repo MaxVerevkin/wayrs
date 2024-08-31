@@ -92,6 +92,20 @@ gen! {
 }
 
 gen! {
+    mod: ext_image_copy_capture_v1,
+    feat: "ext-image-copy-capture-v1",
+    file: "wayland-protocols/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml",
+    deps: [core, ext_image_capture_source_v1],
+}
+
+gen! {
+    mod: ext_image_capture_source_v1,
+    feat: "ext-image-capture-source-v1",
+    file: "wayland-protocols/staging/ext-image-capture-source/ext-image-capture-source-v1.xml",
+    deps: [core, ext_foreign_toplevel_list],
+}
+
+gen! {
     mod: ext_session_lock_v1,
     feat: "ext-session-lock-v1",
     file: "wayland-protocols/staging/ext-session-lock/ext-session-lock-v1.xml",
@@ -158,6 +172,13 @@ gen! {
     mod: xdg_toplevel_drag_v1,
     feat: "xdg-toplevel-drag-v1",
     file: "wayland-protocols/staging/xdg-toplevel-drag/xdg-toplevel-drag-v1.xml",
+    deps: [core, xdg_shell],
+}
+
+gen! {
+    mod: xdg_toplevel_icon_v1,
+    feat: "xdg-toplevel-icon-v1",
+    file: "wayland-protocols/staging/xdg-toplevel-icon/xdg-toplevel-icon-v1.xml",
     deps: [core, xdg_shell],
 }
 

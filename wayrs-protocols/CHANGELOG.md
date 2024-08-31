@@ -1,3 +1,8 @@
+# 0.14.3 [unreleased]
+
+- Update `wayland-protocols` to v1.36.
+- New protocols: `xdg-toplevel-icon-v1`, `ext-image-capture-source-v1` and `ext-image-copy-capture-v1`.
+
 # 0.14.2
 
 - Update `wayland-protocols` to v1.36 (nothing interesting).
