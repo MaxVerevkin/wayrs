@@ -1,3 +1,7 @@
+# 1.1.2
+
+- Drop `proc-macro-crate` transitive dependency by updating `wayrs-scanner`.
+
 # 1.1.1
 
 - Include license file in the package.
