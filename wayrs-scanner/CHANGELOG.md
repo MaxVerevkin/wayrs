@@ -1,3 +1,7 @@
+# 0.15.0
+
+- Drop `proc-macro-crate` dependency.
+
 # 0.14.1
 
 - Include license file in the package.
