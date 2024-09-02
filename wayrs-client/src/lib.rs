@@ -23,7 +23,7 @@ use std::fmt;
 #[macro_export]
 macro_rules! generate {
     ($path:literal) => {
-        $crate::_private_scanner::generate!($path);
+        $crate::_private_scanner::generate!($crate, $path);
     };
 }
 
