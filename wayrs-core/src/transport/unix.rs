@@ -21,21 +21,17 @@ impl Transport for UnixStream {
             flags |= libc::MSG_DONTWAIT;
         }
 
-        let fds_size = std::mem::size_of_val(fds);
-        let mut cmsg = [0u8; cmsg_space(std::mem::size_of::<[OwnedFd; FDS_OUT_LEN]>())];
-        let controllen = if fds.is_empty() {
-            0
-        } else {
-            cmsg_space(fds_size)
-        };
-        assert!(controllen <= cmsg.len());
-
         let mhdr = {
             let mut mhdr = unsafe { std::mem::zeroed::<libc::msghdr>() };
             mhdr.msg_iov = bytes.as_ptr().cast_mut().cast();
             mhdr.msg_iovlen = bytes.len() as _;
 
             if !fds.is_empty() {
+                let fds_size = std::mem::size_of_val(fds);
+                let mut cmsg = [0u8; cmsg_space(std::mem::size_of::<[OwnedFd; FDS_OUT_LEN]>())];
+                let controllen = cmsg_space(fds_size);
+                assert!(controllen <= cmsg.len());
+
                 mhdr.msg_control = cmsg.as_mut_ptr().cast();
                 mhdr.msg_controllen = controllen as _;
 
