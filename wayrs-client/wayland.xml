@@ -46,7 +46,7 @@
 	compositor after the callback is fired and as such the client must not
 	attempt to use it after that point.
 
-	The callback_data passed in the callback is the event serial.
+	The callback_data passed in the callback is undefined and should be ignored.
       </description>
       <arg name="callback" type="new_id" interface="wl_callback"
 	   summary="callback object for the sync request"/>
@@ -1514,9 +1514,15 @@
 	mutates the underlying buffer storage, the surface contents become
 	undefined immediately.
 
-	If wl_surface.attach is sent with a NULL wl_buffer, or the pending
-	wl_buffer has been destroyed, the following wl_surface.commit will
-	remove the surface content.
+	If wl_surface.attach is sent with a NULL wl_buffer, the
+	following wl_surface.commit will remove the surface content.
+
+	If a pending wl_buffer has been destroyed, the result is not specified.
+	Many compositors are known to remove the surface content on the following
+	wl_surface.commit, but this behaviour is not universal. Clients seeking to
+	maximise compatibility should not destroy pending buffers and should
+	ensure that they explicitly remove content from surfaces, even after
+	destroying buffers.
       </description>
       <arg name="buffer" type="object" interface="wl_buffer" allow-null="true"
 	   summary="buffer of surface contents"/>
@@ -1656,16 +1662,18 @@
       <description summary="commit pending surface state">
 	Surface state (input, opaque, and damage regions, attached buffers,
 	etc.) is double-buffered. Protocol requests modify the pending state,
-	as opposed to the current state in use by the compositor. A commit
-	request atomically applies all pending state, replacing the current
-	state. After commit, the new pending state is as documented for each
-	related request.
+	as opposed to the active state in use by the compositor.
 
-	On commit, a pending wl_buffer is applied first, and all other state
-	second. This means that all coordinates in double-buffered state are
-	relative to the new wl_buffer coming into use, except for
-	wl_surface.attach itself. If there is no pending wl_buffer, the
-	coordinates are relative to the current surface contents.
+	A commit request atomically creates a content update from the pending
+	state, even if the pending state has not been touched. The content
+	update is placed in a queue until it becomes active. After commit, the
+	new pending state is as documented for each related request.
+
+	When the content update is applied, the wl_buffer is applied before all
+	other state. This means that all coordinates in double-buffered state
+	are relative to the newly attached wl_buffers, except for
+	wl_surface.attach itself. If there is no newly attached wl_buffer, the
+	coordinates are relative to the previous content update.
 
 	All requests that need a commit to become effective are documented
 	to affect double-buffered state.
@@ -1704,10 +1712,12 @@
 
     <request name="set_buffer_transform" since="2">
       <description summary="sets the buffer transformation">
-	This request sets an optional transformation on how the compositor
-	interprets the contents of the buffer attached to the surface. The
-	accepted values for the transform parameter are the values for
-	wl_output.transform.
+	This request sets the transformation that the client has already applied
+	to the content of the buffer. The accepted values for the transform
+	parameter are the values for wl_output.transform.
+
+	The compositor applies the inverse of this transformation whenever it
+	uses the buffer contents.
 
 	Buffer transform is double-buffered state, see wl_surface.commit.
 
@@ -1861,9 +1871,9 @@
 	Before receiving this event the preferred buffer transform for this
 	surface is normal.
 
-	It is intended that transform aware clients use this event to apply the
-	transform to their content and use wl_surface.set_buffer_transform to
-	indicate the transform they have rendered with.
+	Applying this transformation to the surface buffer contents and using
+	wl_surface.set_buffer_transform might allow the compositor to use the
+	surface buffer more efficiently.
       </description>
       <arg name="transform" type="uint" enum="wl_output.transform"
 	   summary="preferred transform"/>
@@ -2294,7 +2304,7 @@
       <arg name="axis" type="uint" enum="axis" summary="the axis stopped with this event"/>
     </event>
 
-    <event name="axis_discrete" since="5">
+    <event name="axis_discrete" since="5" deprecated-since="8">
       <description summary="axis click event">
 	Discrete step information for scroll and other axes.
 
@@ -2420,6 +2430,16 @@
     <description summary="keyboard input device">
       The wl_keyboard interface represents one or more keyboards
       associated with a seat.
+
+      Each wl_keyboard has the following logical state:
+
+      - an active surface (possibly null),
+      - the keys currently logically down,
+      - the active modifiers,
+      - the active group.
+
+      By default, the active surface is null, the keys currently logically down
+      are empty, the active modifiers and the active group are 0.
     </description>
 
     <enum name="keymap_format">
@@ -2454,10 +2474,18 @@
 
 	The compositor must send the wl_keyboard.modifiers event after this
 	event.
+
+	In the wl_keyboard logical state, this event sets the active surface to
+	the surface argument and the keys currently logically down to the keys
+	in the keys argument. The compositor must not send this event if the
+	wl_keyboard already had an active surface immediately before this event.
+
+	Clients should not use the list of pressed keys to emulate key-press
+	events. The order of keys in the list is unspecified.
       </description>
       <arg name="serial" type="uint" summary="serial number of the enter event"/>
       <arg name="surface" type="object" interface="wl_surface" summary="surface gaining keyboard focus"/>
-      <arg name="keys" type="array" summary="the currently pressed keys"/>
+      <arg name="keys" type="array" summary="the keys currently logically down"/>
     </event>
 
     <event name="leave">
@@ -2468,10 +2496,10 @@
 	The leave notification is sent before the enter notification
 	for the new focus.
 
-	After this event client must assume that no keys are pressed,
-	it must stop key repeating if there's some going on and until
-	it receives the next wl_keyboard.modifiers event, the client
-	must also assume no modifiers are active.
+	In the wl_keyboard logical state, this event resets all values to their
+	defaults. The compositor must not send this event if the active surface
+	of the wl_keyboard was not equal to the surface argument immediately
+	before this event.
       </description>
       <arg name="serial" type="uint" summary="serial number of the leave event"/>
       <arg name="surface" type="object" interface="wl_surface" summary="surface that lost keyboard focus"/>
@@ -2497,8 +2525,14 @@
 	If this event produces a change in modifiers, then the resulting
 	wl_keyboard.modifiers event must be sent after this event.
 
-	The compositor must not send this event without a surface of the client
-	having keyboard focus.
+	In the wl_keyboard logical state, this event adds the key to the keys
+	currently logically down (if the state argument is pressed) or removes
+	the key from the keys currently logically down (if the state argument is
+	released). The compositor must not send this event if the wl_keyboard
+	did not have an active surface immediately before this event. The
+	compositor must not send this event if state is pressed (resp. released)
+	and the key was already logically down (resp. was not logically down)
+	immediately before this event.
       </description>
       <arg name="serial" type="uint" summary="serial number of the key event"/>
       <arg name="time" type="uint" summary="timestamp with millisecond granularity"/>
@@ -2518,6 +2552,9 @@
 	valid until it receives the next wl_keyboard.modifiers event. In order to
 	reset the modifier state again, the compositor can send a
 	wl_keyboard.modifiers event with no pressed modifiers.
+
+	In the wl_keyboard logical state, this event updates the modifiers and
+	group.
       </description>
       <arg name="serial" type="uint" summary="serial number of the modifiers event"/>
       <arg name="mods_depressed" type="uint" summary="depressed modifiers"/>
@@ -2726,10 +2763,9 @@
     </enum>
 
     <enum name="transform">
-      <description summary="transform from framebuffer to output">
-	This describes the transform that a compositor will apply to a
-	surface to compensate for the rotation or mirroring of an
-	output device.
+      <description summary="transformation applied to buffer contents">
+	This describes transformations that clients and compositors apply to
+	buffer contents.
 
 	The flipped values correspond to an initial flip around a
 	vertical axis followed by rotation.
@@ -2787,7 +2823,7 @@
       <arg name="model" type="string"
 	   summary="textual description of the model"/>
       <arg name="transform" type="int" enum="transform"
-	   summary="transform that maps framebuffer to output"/>
+	   summary="additional transformation applied to buffer contents during presentation"/>
     </event>
 
     <enum name="mode" bitfield="true">
