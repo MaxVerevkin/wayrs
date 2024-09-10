@@ -12,7 +12,7 @@ mod utils;
 use crate::utils::*;
 
 /// These interfaces are frozen at version 1 and will not introduce new events or requests.
-const FROZEN_IFACES: &[&str] = &["wl_callback", "wl_buffer"];
+const FROZEN_IFACES: &[&str] = &["wl_display", "wl_registry", "wl_callback", "wl_buffer"];
 
 #[derive(Debug)]
 struct MacroArgs {
