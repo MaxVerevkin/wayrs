@@ -21,7 +21,8 @@ impl Transport for UnixStream {
             flags |= libc::MSG_DONTWAIT;
         }
 
-        let mut cmsg = [0u8; cmsg_space(std::mem::size_of::<[OwnedFd; FDS_OUT_LEN]>())];
+        let mut cmsg = [std::mem::MaybeUninit::<u8>::uninit();
+            cmsg_space(std::mem::size_of::<[OwnedFd; FDS_OUT_LEN]>())];
 
         let mhdr = {
             let mut mhdr = unsafe { std::mem::zeroed::<libc::msghdr>() };
@@ -62,21 +63,21 @@ impl Transport for UnixStream {
         fds: &mut VecDeque<OwnedFd>,
         mode: IoMode,
     ) -> io::Result<usize> {
-        let mut cmsg = [0u8; cmsg_space(std::mem::size_of::<[RawFd; FDS_IN_LEN]>())];
-
         let mut flags = libc::MSG_CMSG_CLOEXEC | libc::MSG_NOSIGNAL;
         if mode == IoMode::NonBlocking {
             flags |= libc::MSG_DONTWAIT;
         }
 
+        let mut cmsg = [std::mem::MaybeUninit::<u8>::uninit();
+            cmsg_space(std::mem::size_of::<[RawFd; FDS_IN_LEN]>())];
+
         let (read, mut cmsghdr, mhdr) = {
-            let (msg_control, msg_controllen) = (cmsg.as_mut_ptr(), cmsg.len());
             let mut mhdr = {
                 let mut mhdr = unsafe { std::mem::zeroed::<libc::msghdr>() };
                 mhdr.msg_iov = bytes.as_mut_ptr().cast();
                 mhdr.msg_iovlen = bytes.len() as _;
-                mhdr.msg_control = msg_control.cast();
-                mhdr.msg_controllen = msg_controllen as _;
+                mhdr.msg_control = cmsg.as_mut_ptr().cast();
+                mhdr.msg_controllen = cmsg.len() as _;
                 mhdr
             };
 
@@ -90,7 +91,7 @@ impl Transport for UnixStream {
             let cmsghdr = {
                 let ptr = if mhdr.msg_controllen > 0 {
                     assert!(!mhdr.msg_control.is_null());
-                    assert!(msg_controllen >= mhdr.msg_controllen as usize);
+                    assert!(cmsg.len() >= mhdr.msg_controllen as usize);
                     unsafe { libc::CMSG_FIRSTHDR(&mhdr) }
                 } else {
                     std::ptr::null()
