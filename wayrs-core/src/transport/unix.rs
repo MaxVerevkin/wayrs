@@ -21,6 +21,8 @@ impl Transport for UnixStream {
             flags |= libc::MSG_DONTWAIT;
         }
 
+        let mut cmsg = [0u8; cmsg_space(std::mem::size_of::<[OwnedFd; FDS_OUT_LEN]>())];
+
         let mhdr = {
             let mut mhdr = unsafe { std::mem::zeroed::<libc::msghdr>() };
             mhdr.msg_iov = bytes.as_ptr().cast_mut().cast();
@@ -28,7 +30,6 @@ impl Transport for UnixStream {
 
             if !fds.is_empty() {
                 let fds_size = std::mem::size_of_val(fds);
-                let mut cmsg = [0u8; cmsg_space(std::mem::size_of::<[OwnedFd; FDS_OUT_LEN]>())];
                 let controllen = cmsg_space(fds_size);
                 assert!(controllen <= cmsg.len());
 
