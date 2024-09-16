@@ -1,3 +1,7 @@
+# 1.0.3
+
+- Do not zero-initialize cmsg (control message) buffers when sending/receivng socket messages.
+
 # 1.0.2
 
 - Fix compilation on FreeBSD.
