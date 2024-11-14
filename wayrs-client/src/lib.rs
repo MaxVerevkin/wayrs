@@ -15,14 +15,12 @@ pub use connection::{ConnectError, Connection};
 pub use wayrs_scanner as _private_scanner;
 
 pub use wayrs_core as core;
-pub use wayrs_core::{Fixed, IoMode};
+pub use wayrs_core::transport::Transport;
 
 use std::ffi::CStr;
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::{env, fmt};
-
-pub use wayrs_core::transport::Transport;
 
 pub trait ClientTransport: Transport {
     fn connect() -> Result<Self, ConnectError>
