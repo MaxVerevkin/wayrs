@@ -51,7 +51,7 @@ pub struct EventCtx<'a, D, P: object::Proxy> {
     pub event: P::Event,
 }
 
-impl<'a, D, P: object::Proxy> fmt::Debug for EventCtx<'a, D, P>
+impl<D, P: object::Proxy> fmt::Debug for EventCtx<'_, D, P>
 where
     P: fmt::Debug,
     P::Event: fmt::Debug,

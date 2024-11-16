@@ -49,7 +49,7 @@ impl Output {
 fn wl_registry_cb(conn: &mut Connection<State>, state: &mut State, event: &wl_registry::Event) {
     match event {
         wl_registry::Event::Global(global) if global.is::<WlOutput>() => {
-            state.outputs.push(Output::bind(conn, &global));
+            state.outputs.push(Output::bind(conn, global));
         }
         wl_registry::Event::GlobalRemove(name) => {
             if let Some(i) = state.outputs.iter().position(|o| o.registry_name == *name) {
