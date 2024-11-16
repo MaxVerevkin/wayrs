@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::ffi::CString;
+use std::fmt;
 use std::io::{self, IoSlice, IoSliceMut};
 use std::num::NonZeroU32;
 use std::os::fd::{AsRawFd, OwnedFd, RawFd};
@@ -72,27 +73,45 @@ pub struct SendMessageError {
 }
 
 /// An error occured while trying to receive a message
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum RecvMessageError {
-    #[error("io: {0}")]
     Io(io::Error),
-    #[error("message has too many file descriptors")]
     TooManyFds,
-    #[error("message is too large")]
     TooManyBytes,
-    #[error("message contains unexpected null")]
     UnexpectedNull,
-    #[error("message contains null byte in a string")]
     NullInString,
 }
 
+impl std::error::Error for RecvMessageError {}
+
+impl fmt::Display for RecvMessageError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(error) => write!(f, "io: {error}"),
+            Self::TooManyFds => f.write_str("message has too many file descriptors"),
+            Self::TooManyBytes => f.write_str("message is too large"),
+            Self::UnexpectedNull => f.write_str("message contains unexpected null"),
+            Self::NullInString => f.write_str("message contains null byte in a string"),
+        }
+    }
+}
+
 /// An error occured while trying to receive a message
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum PeekHeaderError {
-    #[error("io: {0}")]
     Io(io::Error),
-    #[error("header has a null object id")]
     NullObject,
+}
+
+impl std::error::Error for PeekHeaderError {}
+
+impl fmt::Display for PeekHeaderError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(error) => write!(f, "io: {error}"),
+            Self::NullObject => f.write_str("header has a null object id"),
+        }
+    }
 }
 
 impl<T: Transport> BufferedSocket<T> {

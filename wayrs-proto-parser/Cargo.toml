@@ -12,4 +12,3 @@ license.workspace = true
 
 [dependencies]
 quick-xml = "0.37"
-thiserror = "1.0"

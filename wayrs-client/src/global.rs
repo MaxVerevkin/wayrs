@@ -1,6 +1,7 @@
 //! Utils for working with global objects
 
 use std::ffi::{CStr, CString};
+use std::fmt;
 use std::ops;
 
 use crate::object::Proxy;
@@ -10,17 +11,35 @@ use crate::{Connection, EventCtx};
 pub type Global = GlobalArgs;
 pub type Globals = [Global];
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum BindError {
-    #[error("global has interface {actual:?} but {requested:?} was requested")]
     IncorrectInterface {
         actual: CString,
         requested: &'static CStr,
     },
-    #[error("global has version {actual} but a minimum version of {min} was requested")]
-    UnsupportedVersion { actual: u32, min: u32 },
-    #[error("global with interface {0:?} not found")]
+    UnsupportedVersion {
+        actual: u32,
+        min: u32,
+    },
     GlobalNotFound(&'static CStr),
+}
+
+impl std::error::Error for BindError {}
+
+impl fmt::Display for BindError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::IncorrectInterface { actual, requested } => write!(
+                f,
+                "global has interface {actual:?} but {requested:?} was requested"
+            ),
+            Self::UnsupportedVersion { actual, min } => write!(
+                f,
+                "global has version {actual} but a minimum version of {min} was requested"
+            ),
+            Self::GlobalNotFound(name) => write!(f, "global with interface {name:?} not found"),
+        }
+    }
 }
 
 pub trait GlobalExt {

@@ -15,7 +15,7 @@
 //!
 //! ```
 
-use std::{fs, io};
+use std::{fmt, fs, io};
 
 use wayrs_client::global::*;
 use wayrs_client::object::Proxy;
@@ -29,14 +29,29 @@ use xcursor::parser::{parse_xcursor_stream, Image};
 use wayrs_protocols::cursor_shape_v1::*;
 pub use wp_cursor_shape_device_v1::Shape as CursorShape;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum CursorError {
-    #[error("default cursor not found")]
     DefaultCursorNotFound,
-    #[error("theme could not be parsed")]
     ThemeParseError,
-    #[error(transparent)]
-    ReadError(#[from] io::Error),
+    ReadError(io::Error),
+}
+
+impl std::error::Error for CursorError {}
+
+impl fmt::Display for CursorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DefaultCursorNotFound => f.write_str("default cursor not found"),
+            Self::ThemeParseError => f.write_str("theme could not be parsed"),
+            Self::ReadError(error) => error.fmt(f),
+        }
+    }
+}
+
+impl From<io::Error> for CursorError {
+    fn from(value: io::Error) -> Self {
+        Self::ReadError(value)
+    }
 }
 
 /// [`WpCursorShapeManagerV1`] wrapper which fallbacks to `xcursor` when `cursor-shape-v1` protocol

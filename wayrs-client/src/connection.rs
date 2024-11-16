@@ -2,6 +2,7 @@
 
 use std::collections::VecDeque;
 use std::env;
+use std::fmt;
 use std::io;
 use std::num::NonZeroU32;
 use std::os::fd::{AsRawFd, RawFd};
@@ -21,14 +22,31 @@ use wayrs_core::{ArgType, ArgValue, Interface, IoMode, Message, MessageBuffersPo
 use tokio::io::unix::AsyncFd;
 
 /// An error that can occur while connecting to a Wayland socket.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum ConnectError {
     /// Either `$XDG_RUNTIME_DIR` or `$WAYLAND_DISPLAY` was not available.
-    #[error("both $XDG_RUNTIME_DIR and $WAYLAND_DISPLAY must be set")]
     NotEnoughEnvVars,
     /// Some IO error.
-    #[error(transparent)]
-    Io(#[from] io::Error),
+    Io(io::Error),
+}
+
+impl std::error::Error for ConnectError {}
+
+impl fmt::Display for ConnectError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotEnoughEnvVars => {
+                f.write_str("both $XDG_RUNTIME_DIR and $WAYLAND_DISPLAY must be set")
+            }
+            Self::Io(error) => error.fmt(f),
+        }
+    }
+}
+
+impl From<io::Error> for ConnectError {
+    fn from(value: io::Error) -> Self {
+        Self::Io(value)
+    }
 }
 
 /// Wayland connection state.

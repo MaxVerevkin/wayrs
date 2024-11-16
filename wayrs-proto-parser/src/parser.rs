@@ -1,31 +1,49 @@
-use crate::types::*;
-use quick_xml::events::{BytesStart, Event as XmlEvent};
+use std::fmt;
 use std::str;
+
+use quick_xml::events::{BytesStart, Event as XmlEvent};
+
+use crate::types::*;
 
 pub struct Parser<'a> {
     reader: quick_xml::Reader<&'a [u8]>,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
-    #[error("unexpected tag: {0}")]
     UnexpectedTag(String),
-    #[error("unexpected argument type: {0}")]
     UnexpectedArgType(String),
-    #[error("unexpeced end of file")]
     UnexpectedEof,
-    #[error("protocol does not have a name")]
     ProtocolWithoutName,
-    #[error("xml parsing error: {0}")]
     XmlError(String),
-    #[error(transparent)]
-    NonUtf8Data(#[from] str::Utf8Error),
+    NonUtf8Data(str::Utf8Error),
+}
+
+impl std::error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnexpectedTag(tag) => write!(f, "unexpected tag: {tag}"),
+            Self::UnexpectedArgType(ty) => write!(f, "unexpected argument type: {ty}"),
+            Self::UnexpectedEof => f.write_str("unexpeced end of file"),
+            Self::ProtocolWithoutName => f.write_str("protocol does not have a name"),
+            Self::XmlError(error) => write!(f, "xml parsing error: {error}"),
+            Self::NonUtf8Data(utf8_error) => utf8_error.fmt(f),
+        }
+    }
 }
 
 impl From<quick_xml::Error> for Error {
     fn from(value: quick_xml::Error) -> Self {
         Self::XmlError(value.to_string())
+    }
+}
+
+impl From<str::Utf8Error> for Error {
+    fn from(value: str::Utf8Error) -> Self {
+        Self::NonUtf8Data(value)
     }
 }
 
