@@ -204,7 +204,7 @@ impl<'a> Parser<'a> {
             is_bitfield: tag
                 .try_get_attribute("bitfield")
                 .unwrap()
-                .map_or(false, |attr| attr.unescape_value().unwrap() == "true"),
+                .is_some_and(|attr| attr.unescape_value().unwrap() == "true"),
             description: None,
             items: Vec::new(),
         };
