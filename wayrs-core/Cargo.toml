@@ -1,6 +1,6 @@
 [package]
 name = "wayrs-core"
-version = "1.0.3"
+version = "1.0.4"
 description = "The core Wayland types for wayrs"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland"]

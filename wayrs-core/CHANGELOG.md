@@ -1,3 +1,7 @@
+# 1.0.4
+
+- Drop `thiserror` dependency.
+
 # 1.0.3
 
 - Do not zero-initialize cmsg (control message) buffers when sending/receivng socket messages.
