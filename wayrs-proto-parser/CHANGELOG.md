@@ -1,3 +1,8 @@
+# 2.0.4
+
+- Update `quick-xml` to v0.37.
+- Drop `thiserror` dependency.
+
 # 2.0.3
 
 - Update `quick-xml` to v0.36.
