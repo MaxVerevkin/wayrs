@@ -1,3 +1,7 @@
+# 1.1.3
+
+- Drop `thiserror` dependency.
+
 # 1.1.2
 
 - Drop `proc-macro-crate` transitive dependency by updating `wayrs-scanner`.
