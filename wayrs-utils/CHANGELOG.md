@@ -1,3 +1,7 @@
+# 0.16.1
+
+- Drop `thiserror` dependency.
+
 # 0.16.0
 
 - Keyboard: add `keysym` to `KeyboardEvent`.
