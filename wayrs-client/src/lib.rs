@@ -9,7 +9,10 @@ pub mod protocol;
 mod connection;
 mod debug_message;
 
-pub use connection::{ConnectError, Connection};
+#[cfg(feature = "any_transport")]
+mod any_transport;
+
+pub use connection::{ConnectError, Connection, ConnectionBuilder};
 
 #[doc(hidden)]
 pub use wayrs_scanner as _private_scanner;
