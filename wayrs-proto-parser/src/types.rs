@@ -22,6 +22,7 @@ pub struct Message<'a> {
     pub name: String,
     pub kind: Option<String>,
     pub since: u32,
+    pub deprecated_since: Option<u32>,
     pub description: Option<Description<'a>>,
     pub args: Vec<Argument>,
 }

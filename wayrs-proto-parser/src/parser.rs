@@ -144,6 +144,7 @@ impl<'a> Parser<'a> {
         let mut name = None;
         let mut kind = None;
         let mut since = 1;
+        let mut deprecated_since = None;
 
         for attr in tag.attributes() {
             let attr = attr.unwrap();
@@ -151,6 +152,9 @@ impl<'a> Parser<'a> {
                 b"name" => name = Some(attr.unescape_value().unwrap().into_owned()),
                 b"type" => kind = Some(attr.unescape_value().unwrap().into_owned()),
                 b"since" => since = attr.unescape_value().unwrap().parse().unwrap(),
+                b"deprecated-since" => {
+                    deprecated_since = Some(attr.unescape_value().unwrap().parse().unwrap())
+                }
                 _ => (),
             }
         }
@@ -159,6 +163,7 @@ impl<'a> Parser<'a> {
             name: name.unwrap(),
             kind,
             since,
+            deprecated_since,
             description: None,
             args: Vec::new(),
         };
