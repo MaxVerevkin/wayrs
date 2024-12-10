@@ -1,3 +1,8 @@
+# 3.0.0
+
+- Parse `event.deprecated-since`.
+- Remove some unwraps.
+
 # 2.0.4
 
 - Update `quick-xml` to v0.37.
