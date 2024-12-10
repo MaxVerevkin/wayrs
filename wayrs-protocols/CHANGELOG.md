@@ -1,3 +1,8 @@
+# 0.14.4
+
+- Update `wayland-protocols` to v1.38.
+- New protocols: `commit-timing-v1`, `fifo-v1` and `xdg-system-bell-v1`.
+
 # 0.14.3
 
 - Update `wayland-protocols` to v1.37.
