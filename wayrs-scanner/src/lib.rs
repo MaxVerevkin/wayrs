@@ -102,7 +102,7 @@ fn make_proxy_path(iface: impl AsRef<str>) -> TokenStream {
 }
 
 fn gen_interface(iface: &Interface, wayrs_client_path: &syn::Ident) -> TokenStream {
-    let mod_doc = gen_doc(iface.description.as_ref(), None);
+    let mod_doc = gen_doc(iface.description.as_ref(), None, None);
     let mod_name = syn::Ident::new(&iface.name, Span::call_site());
 
     let proxy_name = make_pascal_case_ident(&iface.name);
@@ -149,7 +149,11 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &syn::Ident) -> TokenStre
 
     let event_enum_options = iface.events.iter().map(|event| {
         let event_name = make_pascal_case_ident(&event.name);
-        let doc = gen_doc(event.description.as_ref(), Some(event.since));
+        let doc = gen_doc(
+            event.description.as_ref(),
+            Some(event.since),
+            event.deprecated_since,
+        );
         match event.args.as_slice() {
             [] => quote! { #doc #event_name },
             [_, _, ..] => {
@@ -231,11 +235,11 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &syn::Ident) -> TokenStre
         let values = en.items.iter().map(|item| item.value);
         let items2 = items.clone();
         let values2 = values.clone();
-        let doc = gen_doc(en.description.as_ref(), None);
+        let doc = gen_doc(en.description.as_ref(), None, None);
         let item_docs = en
             .items
             .iter()
-            .map(|i| gen_doc(i.description.as_ref(), Some(i.since)));
+            .map(|i| gen_doc(i.description.as_ref(), Some(i.since), None));
         if en.is_bitfield {
             quote! {
                 #doc
@@ -565,7 +569,11 @@ fn gen_request_fn(opcode: u16, request: &Message, wayrs_client_path: &syn::Ident
         );
     };
 
-    let doc = gen_doc(request.description.as_ref(), Some(request.since));
+    let doc = gen_doc(
+        request.description.as_ref(),
+        Some(request.since),
+        request.deprecated_since,
+    );
 
     match new_id_interface {
         None => gen_pub_fn(
@@ -695,9 +703,17 @@ fn map_arg_to_argval(arg: &Argument, is_event: bool) -> TokenStream {
     }
 }
 
-fn gen_doc(desc: Option<&Description>, since: Option<u32>) -> TokenStream {
+fn gen_doc(
+    desc: Option<&Description>,
+    since: Option<u32>,
+    deprecated_since: Option<u32>,
+) -> TokenStream {
     let since = since
         .map(|ver| format!("**Since version {ver}**.\n"))
+        .map(|ver| quote!(#[doc = #ver]));
+
+    let deprecated_since = deprecated_since
+        .map(|ver| format!("**Deprecated since version {ver}**.\n"))
         .map(|ver| quote!(#[doc = #ver]));
 
     let summary = desc
@@ -718,6 +734,8 @@ fn gen_doc(desc: Option<&Description>, since: Option<u32>) -> TokenStream {
         #(#text)*
         #[doc = "\n"]
         #since
+        #[doc = "\n"]
+        #deprecated_since
         #[doc = "\n"]
     }
 }
