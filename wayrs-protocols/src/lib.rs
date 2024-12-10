@@ -57,6 +57,13 @@ gen! {
 }
 
 gen! {
+    mod: commit_timing_v1,
+    feat: "commit-timing-v1",
+    file: "wayland-protocols/staging/commit-timing/commit-timing-v1.xml",
+    deps: [core],
+}
+
+gen! {
     mod: content_type_v1,
     feat: "content-type-v1",
     file: "wayland-protocols/staging/content-type/content-type-v1.xml",
@@ -120,6 +127,13 @@ gen! {
 }
 
 gen! {
+    mod: fifo_v1,
+    feat: "fifo-v1",
+    file: "wayland-protocols/staging/fifo/fifo-v1.xml",
+    deps: [core],
+}
+
+gen! {
     mod: fractional_scale_v1,
     feat: "fractional-scale-v1",
     file: "wayland-protocols/staging/fractional-scale/fractional-scale-v1.xml",
@@ -166,6 +180,13 @@ gen! {
     feat: "xdg-dialog-v1",
     file: "wayland-protocols/staging/xdg-dialog/xdg-dialog-v1.xml",
     deps: [xdg_shell],
+}
+
+gen! {
+    mod: xdg_system_bell_v1,
+    feat: "xdg-system-bell-v1",
+    file: "wayland-protocols/staging/xdg-system-bell/xdg-system-bell-v1.xml",
+    deps: [core],
 }
 
 gen! {
