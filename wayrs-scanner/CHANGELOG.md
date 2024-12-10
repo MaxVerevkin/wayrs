@@ -1,3 +1,7 @@
+# 0.15.1
+
+- Emit "Deprecated since version ..." for events and requests.
+
 # 0.15.0
 
 - Drop `proc-macro-crate` dependency.
