@@ -1,3 +1,9 @@
+# 0.14.5+1.39
+
+- Update `wayland-protocols` to v1.39.
+- New protocols: `ext-workspace-v1` and `ext-data-control-v1`.
+- Include the `wayland-protocols` version in the crate version.
+
 # 0.14.4
 
 - Update `wayland-protocols` to v1.38.
