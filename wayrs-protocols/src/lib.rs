@@ -85,6 +85,13 @@ gen! {
 }
 
 gen! {
+    mod: ext_data_control_v1,
+    feat: "ext-data-control-v1",
+    file: "wayland-protocols/staging/ext-data-control/ext-data-control-v1.xml",
+    deps: [core],
+}
+
+gen! {
     mod: ext_foreign_toplevel_list,
     feat: "ext-foreign-toplevel-list-v1",
     file: "wayland-protocols/staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1.xml",
@@ -123,6 +130,13 @@ gen! {
     mod: ext_transient_seat_v1,
     feat: "ext-transient-seat-v1",
     file: "wayland-protocols/staging/ext-transient-seat/ext-transient-seat-v1.xml",
+    deps: [],
+}
+
+gen! {
+    mod: ext_workspace_v1,
+    feat: "ext-workspace-v1",
+    file: "wayland-protocols/staging/ext-workspace/ext-workspace-v1.xml",
     deps: [],
 }
 
