@@ -350,6 +350,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &syn::Ident) -> TokenStre
 
                 const INTERFACE: &'static #wayrs_client_path::core::Interface
                     = &#wayrs_client_path::core::Interface {
+                        // TODO: use c-string literals when MSRV is 1.79
                         name: #wayrs_client_path::cstr!(#raw_iface_name),
                         version: #iface_version,
                         events: &[ #(#events_desc,)* ],
