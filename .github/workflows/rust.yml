@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
-        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libgbm-dev libegl-dev
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
-        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libgbm-dev libegl-dev
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
-        run: sudo apt-get update && sudo apt-get install fd-find libxkbcommon-dev libdrm-dev libegl-dev
+        run: sudo apt-get update && sudo apt-get install fd-find libxkbcommon-dev libdrm-dev libgbm-dev libegl-dev
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get required packages
-        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libegl-dev
+        run: sudo apt-get update && sudo apt-get install libxkbcommon-dev libdrm-dev libgbm-dev libegl-dev
       - uses: actions/checkout@v4
         with:
           submodules: recursive
