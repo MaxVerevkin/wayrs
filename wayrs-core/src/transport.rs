@@ -149,7 +149,7 @@ impl<T: Transport> BufferedSocket<T> {
         // Header
         self.bytes_out.write_uint(msg.header.object_id.0.get());
         self.bytes_out
-            .write_uint((size as u32) << 16 | msg.header.opcode as u32);
+            .write_uint(((size as u32) << 16) | msg.header.opcode as u32);
 
         // Args
         let mut msg = msg;
