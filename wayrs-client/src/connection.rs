@@ -533,9 +533,8 @@ impl<D> Connection<D> {
                     let object = object.object;
                     let opcode = event.header.opcode;
 
-                    match &mut object_cb {
-                        Some(cb) => cb(self, state, object, event),
-                        None => continue, // Skip if object has no callback
+                    if let Some(cb) = &mut object_cb {
+                        cb(self, state, object, event);
                     }
 
                     let object = self.object_mgr.get_object_mut(object.id).unwrap();
