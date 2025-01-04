@@ -379,106 +379,104 @@ impl<D> Connection<D> {
     }
 
     fn recv_event(&mut self, mode: IoMode) -> io::Result<QueuedEvent> {
-        loop {
-            let header = self
-                .socket
-                .peek_message_header(mode)
-                .map_err(|err| match err {
-                    PeekHeaderError::Io(io) => io,
-                    other => io::Error::new(io::ErrorKind::InvalidData, other),
-                })?;
+        let header = self
+            .socket
+            .peek_message_header(mode)
+            .map_err(|err| match err {
+                PeekHeaderError::Io(io) => io,
+                other => io::Error::new(io::ErrorKind::InvalidData, other),
+            })?;
 
-            let obj = self
-                .object_mgr
-                .get_object_mut(header.object_id)
-                .expect("received event for non-existing object");
-            let object = obj.object;
-            let signature = object
-                .interface
-                .events
-                .get(header.opcode as usize)
-                .expect("incorrect opcode")
-                .signature;
+        let obj = self
+            .object_mgr
+            .get_object_mut(header.object_id)
+            .expect("received event for non-existing object");
+        let object = obj.object;
+        let signature = object
+            .interface
+            .events
+            .get(header.opcode as usize)
+            .expect("incorrect opcode")
+            .signature;
 
-            let event = self
-                .socket
-                .recv_message(header, signature, &mut self.msg_buffers_pool, mode)
-                .map_err(|err| match err {
-                    RecvMessageError::Io(io) => io,
-                    other => io::Error::new(io::ErrorKind::InvalidData, other),
-                })?;
-            if self.debug {
-                eprintln!("[wayrs] {:?}", DebugMessage::new(&event, true, object));
-            }
-
-            if event.header.object_id == ObjectId::DISPLAY {
-                match WlDisplay::parse_event(event, 1, &mut self.msg_buffers_pool).unwrap() {
-                    wl_display::Event::Error(err) => {
-                        // Catch protocol error as early as possible
-                        return Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            format!(
-                                "Error in object {} (code({})): {}",
-                                err.object_id.0,
-                                err.code,
-                                err.message.to_string_lossy(),
-                            ),
-                        ));
-                    }
-                    wl_display::Event::DeleteId(id) => {
-                        return Ok(QueuedEvent::DeleteId(ObjectId(
-                            NonZeroU32::new(id).ok_or_else(|| {
-                                io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    "wl_display.delete_id with null id",
-                                )
-                            })?,
-                        )));
-                    }
-                };
-            }
-
-            if event.header.object_id == self.registry {
-                let event = WlRegistry::parse_event(event, 1, &mut self.msg_buffers_pool).unwrap();
-                match &event {
-                    wl_registry::Event::Global(global) => {
-                        self.globals.push(global.clone());
-                    }
-                    wl_registry::Event::GlobalRemove(name) => {
-                        if let Some(i) = self.globals.iter().position(|g| g.name == *name) {
-                            self.globals.swap_remove(i);
-                        }
-                    }
-                }
-                return Ok(QueuedEvent::RegistryEvent(event));
-            }
-
-            // Allocate objects if necessary
-            let signature = object
-                .interface
-                .events
-                .get(header.opcode as usize)
-                .expect("incorrect opcode")
-                .signature;
-            for (arg, arg_ty) in event.args.iter().zip(signature) {
-                match arg {
-                    ArgValue::NewId(id) => {
-                        let ArgType::NewId(interface) = arg_ty else {
-                            unreachable!()
-                        };
-                        self.object_mgr.register_server_object(Object {
-                            id: *id,
-                            interface,
-                            version: object.version,
-                        });
-                    }
-                    ArgValue::AnyNewId(_, _, _) => unimplemented!(),
-                    _ => (),
-                }
-            }
-
-            return Ok(QueuedEvent::Message(event));
+        let event = self
+            .socket
+            .recv_message(header, signature, &mut self.msg_buffers_pool, mode)
+            .map_err(|err| match err {
+                RecvMessageError::Io(io) => io,
+                other => io::Error::new(io::ErrorKind::InvalidData, other),
+            })?;
+        if self.debug {
+            eprintln!("[wayrs] {:?}", DebugMessage::new(&event, true, object));
         }
+
+        if event.header.object_id == ObjectId::DISPLAY {
+            match WlDisplay::parse_event(event, 1, &mut self.msg_buffers_pool).unwrap() {
+                wl_display::Event::Error(err) => {
+                    // Catch protocol error as early as possible
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!(
+                            "Error in object {} (code({})): {}",
+                            err.object_id.0,
+                            err.code,
+                            err.message.to_string_lossy(),
+                        ),
+                    ));
+                }
+                wl_display::Event::DeleteId(id) => {
+                    return Ok(QueuedEvent::DeleteId(ObjectId(
+                        NonZeroU32::new(id).ok_or_else(|| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "wl_display.delete_id with null id",
+                            )
+                        })?,
+                    )));
+                }
+            };
+        }
+
+        if event.header.object_id == self.registry {
+            let event = WlRegistry::parse_event(event, 1, &mut self.msg_buffers_pool).unwrap();
+            match &event {
+                wl_registry::Event::Global(global) => {
+                    self.globals.push(global.clone());
+                }
+                wl_registry::Event::GlobalRemove(name) => {
+                    if let Some(i) = self.globals.iter().position(|g| g.name == *name) {
+                        self.globals.swap_remove(i);
+                    }
+                }
+            }
+            return Ok(QueuedEvent::RegistryEvent(event));
+        }
+
+        // Allocate objects if necessary
+        let signature = object
+            .interface
+            .events
+            .get(header.opcode as usize)
+            .expect("incorrect opcode")
+            .signature;
+        for (arg, arg_ty) in event.args.iter().zip(signature) {
+            match arg {
+                ArgValue::NewId(id) => {
+                    let ArgType::NewId(interface) = arg_ty else {
+                        unreachable!()
+                    };
+                    self.object_mgr.register_server_object(Object {
+                        id: *id,
+                        interface,
+                        version: object.version,
+                    });
+                }
+                ArgValue::AnyNewId(_, _, _) => unimplemented!(),
+                _ => (),
+            }
+        }
+
+        Ok(QueuedEvent::Message(event))
     }
 
     #[cfg(feature = "tokio")]
