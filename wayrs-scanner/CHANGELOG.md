@@ -1,3 +1,7 @@
+# 0.15.2
+
+- Derive `Clone` and `Copy` for event structs when possible.
+
 # 0.15.1
 
 - Emit "Deprecated since version ..." for events and requests.

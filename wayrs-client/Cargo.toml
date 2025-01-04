@@ -12,7 +12,7 @@ license.workspace = true
 
 [dependencies]
 wayrs-core = { version = "1.0", path = "../wayrs-core" }
-wayrs-scanner = { version = "0.15", path = "../wayrs-scanner" }
+wayrs-scanner = { version = "0.15.2", path = "../wayrs-scanner" }
 
 [dependencies.tokio]
 version = "1"
