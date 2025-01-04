@@ -1,6 +1,6 @@
-# 0.17.0
+# 0.17.1
 
-- Update `CursorTheme::new` and `ShmAlloc::bind` to not take the globals list.
+- Update `Seats::bind`, `CursorTheme::new` and `ShmAlloc::bind` to not take the globals list.
 
 # 0.16.1
 

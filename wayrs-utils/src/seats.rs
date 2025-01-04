@@ -37,11 +37,10 @@
 //!     }
 //! }
 //!
-//! let (mut conn, globals) = Connection::connect_and_collect_globals().unwrap();
+//! let mut conn = Connection::connect().unwrap();
 //!
 //! let mut state = State {
-//!     // NOTE: you can pass `&[]` if you choose not to collect initial globals.
-//!     seats: Seats::bind(&mut conn, &globals),
+//!     seats: Seats::bind(&mut conn),
 //!     keyboards: Vec::new(),
 //! };
 //!
@@ -108,15 +107,9 @@ struct Seat {
 }
 
 impl Seats {
-    pub fn bind<D: SeatHandler>(conn: &mut Connection<D>, globals: &Globals) -> Self {
+    pub fn bind<D: SeatHandler>(conn: &mut Connection<D>) -> Self {
         conn.add_registry_cb(registry_cb);
-        Self {
-            seats: globals
-                .iter()
-                .filter(|g| g.is::<WlSeat>())
-                .map(|g| Seat::bind(conn, g))
-                .collect(),
-        }
+        Self { seats: Vec::new() }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = WlSeat> + '_ {
