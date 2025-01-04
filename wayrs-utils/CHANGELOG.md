@@ -1,3 +1,7 @@
+# 0.17.0
+
+- Update `CursorTheme::new` and `ShmAlloc::bind` to not take the globals list.
+
 # 0.16.1
 
 - Drop `thiserror` dependency.

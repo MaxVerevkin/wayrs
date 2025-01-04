@@ -17,7 +17,6 @@
 
 use std::{fmt, fs, io};
 
-use wayrs_client::global::*;
 use wayrs_client::object::Proxy;
 use wayrs_client::protocol::*;
 use wayrs_client::Connection;
@@ -97,29 +96,27 @@ enum ThemedPointerImp {
 
 impl CursorTheme {
     /// Create new [`CursorTheme`], preferring the server-side implementation if possible.
-    pub fn new<D>(conn: &mut Connection<D>, globals: &Globals, compositor: WlCompositor) -> Self {
-        #[allow(deprecated)]
-        match globals.bind(conn, 1..=1) {
-            Ok(manager) => Self(CursorThemeImp::Server { manager }),
-            Err(_) => {
-                let theme = xcursor::CursorTheme::load(
-                    std::env::var("XCURSOR_THEME")
-                        .as_deref()
-                        .unwrap_or("default"),
-                );
-
-                let cursor_size = std::env::var("XCURSOR_SIZE")
-                    .ok()
-                    .and_then(|x| x.parse().ok())
-                    .unwrap_or(24);
-
-                Self(CursorThemeImp::Client {
-                    compositor,
-                    cursor_size,
-                    theme,
-                })
-            }
+    pub fn new<D>(conn: &mut Connection<D>, compositor: WlCompositor) -> Self {
+        if let Ok(manager) = conn.bind_singleton(1) {
+            return Self(CursorThemeImp::Server { manager });
         }
+
+        let theme = xcursor::CursorTheme::load(
+            std::env::var("XCURSOR_THEME")
+                .as_deref()
+                .unwrap_or("default"),
+        );
+
+        let cursor_size = std::env::var("XCURSOR_SIZE")
+            .ok()
+            .and_then(|x| x.parse().ok())
+            .unwrap_or(24);
+
+        Self(CursorThemeImp::Client {
+            compositor,
+            cursor_size,
+            theme,
+        })
     }
 
     /// Find and parse a cursor image.
