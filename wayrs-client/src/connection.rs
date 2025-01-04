@@ -81,6 +81,7 @@ pub struct Connection<D> {
 }
 
 enum QueuedEvent {
+    DeleteId(ObjectId),
     RegistryEvent(wl_registry::Event),
     Message(Message),
 }
@@ -425,15 +426,14 @@ impl<D> Connection<D> {
                         ));
                     }
                     wl_display::Event::DeleteId(id) => {
-                        // It is okay to process delete_id event out of order
-                        let id = ObjectId(NonZeroU32::new(id).ok_or_else(|| {
-                            io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "wl_display.delete_id with null id",
-                            )
-                        })?);
-                        self.object_mgr.delete_client_object(id);
-                        continue;
+                        return Ok(QueuedEvent::DeleteId(ObjectId(
+                            NonZeroU32::new(id).ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidData,
+                                    "wl_display.delete_id with null id",
+                                )
+                            })?,
+                        )));
                     }
                 };
             }
@@ -596,6 +596,7 @@ impl<D> Connection<D> {
 
         while let Some(event) = self.event_queue.pop_front() {
             match event {
+                QueuedEvent::DeleteId(id) => self.object_mgr.delete_client_object(id),
                 QueuedEvent::RegistryEvent(event) => {
                     let mut registry_cbs = self
                         .registry_cbs
