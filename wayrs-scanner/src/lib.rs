@@ -141,8 +141,18 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &syn::Ident) -> TokenStre
                 .args
                 .iter()
                 .map(|arg| arg.summary.as_ref().map(|s| quote!(#[doc = #s])));
+            let clone_derive = event
+                .args
+                .iter()
+                .all(|arg| arg.is_clone())
+                .then(|| quote!(, Clone));
+            let copy_derive = event
+                .args
+                .iter()
+                .all(|arg| arg.is_copy())
+                .then(|| quote!(, Copy));
             quote! {
-                #[derive(Debug)]
+                #[derive(Debug #clone_derive #copy_derive)]
                 pub struct #struct_name { #( #summary pub #arg_name: #arg_ty, )* }
             }
         });
@@ -744,6 +754,8 @@ fn gen_doc(
 trait ArgExt {
     fn as_request_fn_arg(&self, wayrs_client_path: &syn::Ident) -> Option<TokenStream>;
     fn as_event_ty(&self, wayrs_client_path: &syn::Ident) -> TokenStream;
+    fn is_clone(&self) -> bool;
+    fn is_copy(&self) -> bool;
 }
 
 impl ArgExt for Argument {
@@ -821,6 +833,32 @@ impl ArgExt for Argument {
             },
             ArgType::Array => quote!(::std::vec::Vec<u8>),
             ArgType::Fd => quote!(::std::os::fd::OwnedFd),
+        }
+    }
+
+    fn is_clone(&self) -> bool {
+        match &self.arg_type {
+            ArgType::Int
+            | ArgType::Uint
+            | ArgType::Enum(_)
+            | ArgType::Fixed
+            | ArgType::String { .. }
+            | ArgType::Object { .. }
+            | ArgType::NewId { .. }
+            | ArgType::Array => true,
+            ArgType::Fd => false,
+        }
+    }
+
+    fn is_copy(&self) -> bool {
+        match &self.arg_type {
+            ArgType::Int
+            | ArgType::Uint
+            | ArgType::Enum(_)
+            | ArgType::Fixed
+            | ArgType::Object { .. }
+            | ArgType::NewId { .. } => true,
+            ArgType::String { .. } | ArgType::Array | ArgType::Fd => false,
         }
     }
 }
