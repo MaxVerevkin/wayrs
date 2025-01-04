@@ -1,3 +1,9 @@
+# 1.2.0
+
+- Store a list of globals in the `Connection` struct.
+- Deprecate `Connection::connect_and_collect_globals`, `Connection::async_connect_and_collect_globals`, `GlobalsExt::bind` and `GlobalsExt::bind_with_cb`. Instead use `Connection::blocking_roundtrip`/`Connection::async_roundtrip` followed with `Connection::bind_singleton`/`Connection::bind_singleton_with_cb`.
+- Derive `Clone` and `Copy` on event structs when possible.
+
 # 1.1.3
 
 - Drop `thiserror` dependency.
