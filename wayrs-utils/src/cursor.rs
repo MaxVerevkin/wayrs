@@ -98,6 +98,7 @@ enum ThemedPointerImp {
 impl CursorTheme {
     /// Create new [`CursorTheme`], preferring the server-side implementation if possible.
     pub fn new<D>(conn: &mut Connection<D>, globals: &Globals, compositor: WlCompositor) -> Self {
+        #[allow(deprecated)]
         match globals.bind(conn, 1..=1) {
             Ok(manager) => Self(CursorThemeImp::Server { manager }),
             Err(_) => {

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use gles31::*;
 
-use wayrs_client::global::*;
 use wayrs_client::protocol::*;
 use wayrs_client::EventCtx;
 use wayrs_client::{Connection, IoMode};
@@ -206,12 +205,11 @@ void main() {
 }
 
 fn main() {
-    let (mut conn, globals) = Connection::connect_and_collect_globals().unwrap();
-    let linux_dmabuf: ZwpLinuxDmabufV1 = globals.bind(&mut conn, 4).unwrap();
-    let wl_compositor: WlCompositor = globals.bind(&mut conn, ..=6).unwrap();
-    let xdg_wm_base: XdgWmBase = globals
-        .bind_with_cb(&mut conn, ..=4, xdg_wm_base_cb)
-        .unwrap();
+    let mut conn = Connection::connect().unwrap();
+    conn.blocking_roundtrip().unwrap();
+    let linux_dmabuf: ZwpLinuxDmabufV1 = conn.bind_singleton(4).unwrap();
+    let wl_compositor: WlCompositor = conn.bind_singleton(..=6).unwrap();
+    let xdg_wm_base: XdgWmBase = conn.bind_singleton_with_cb(..=4, xdg_wm_base_cb).unwrap();
 
     let mut state = State {
         time: 0.0,

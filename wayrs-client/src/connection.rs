@@ -10,6 +10,9 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
 use crate::debug_message::DebugMessage;
+use crate::global::BindError;
+use crate::global::GlobalExt;
+use crate::global::VersionBounds;
 use crate::object::{Object, ObjectManager, Proxy};
 use crate::protocol::wl_registry::GlobalArgs;
 use crate::protocol::*;
@@ -69,6 +72,7 @@ pub struct Connection<D> {
     break_dispatch: bool,
 
     registry: WlRegistry,
+    globals: Vec<GlobalArgs>,
 
     // This is `None` while dispatching registry events, to prevent mutation from registry callbacks.
     registry_cbs: Option<Vec<RegistryCb<D>>>,
@@ -119,6 +123,7 @@ impl<D> Connection<D> {
             break_dispatch: false,
 
             registry: WlRegistry::new(ObjectId::MAX_CLIENT, 1), // Temp dummy object
+            globals: Vec::new(),
             registry_cbs: Some(Vec::new()),
 
             debug: std::env::var_os("WAYLAND_DEBUG").is_some(),
@@ -130,35 +135,27 @@ impl<D> Connection<D> {
     }
 
     /// [`connect`](Self::connect) and collect the initial set of advertised globals.
+    ///
+    /// This will empty the event queue, so no callbacks will be called on the received globals.
+    #[deprecated = "use blocking_roundtrip() + bind_singleton() instead"]
     pub fn connect_and_collect_globals() -> Result<(Self, Vec<GlobalArgs>), ConnectError> {
         let mut this = Self::connect()?;
         this.blocking_roundtrip()?;
-        let globals = this
-            .event_queue
-            .drain(..)
-            .map(|event| match event {
-                QueuedEvent::RegistryEvent(wl_registry::Event::Global(global)) => global,
-                _ => unreachable!("unexpected event during the initial burst of globals"),
-            })
-            .collect();
+        let globals = this.globals.clone();
+        this.event_queue.clear();
         Ok((this, globals))
     }
 
     /// Async version of [`connect_and_collect_globals`](Self::connect_and_collect_globals).
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    #[deprecated = "use async_roundtrip() + bind_singleton() instead"]
     pub async fn async_connect_and_collect_globals() -> Result<(Self, Vec<GlobalArgs>), ConnectError>
     {
         let mut this = Self::connect()?;
         this.async_roundtrip().await?;
-        let globals = this
-            .event_queue
-            .drain(..)
-            .map(|event| match event {
-                QueuedEvent::RegistryEvent(wl_registry::Event::Global(global)) => global,
-                _ => unreachable!("unexpected event during the initial burst of globals"),
-            })
-            .collect();
+        let globals = this.globals.clone();
+        this.event_queue.clear();
         Ok((this, globals))
     }
 
@@ -168,6 +165,78 @@ impl<D> Connection<D> {
     /// future, considering registries cannot be destroyed.
     pub fn registry(&self) -> WlRegistry {
         self.registry
+    }
+
+    /// Get a list of available globals.
+    ///
+    /// The order of globals is not specified.
+    ///
+    /// Note that this function has knowledge of all events received from the compositor, even the
+    /// ones that had not been dispatched in [`dispatch_events`](Self::dispatch_events) yet.
+    pub fn globals(&self) -> &[GlobalArgs] {
+        &self.globals
+    }
+
+    /// Bind a singleton global.
+    ///
+    /// Use this function to only bind singleton globals. If more than one global of the requeseted
+    /// interface is available, the behaviour is not specified.
+    ///
+    /// Note that this function has knowledge of all events received from the compositor, even the
+    /// ones that had not been dispatched in [`dispatch_events`](Self::dispatch_events) yet.
+    ///
+    /// The version argmuent can be a:
+    /// - Number - require a specific version
+    /// - Range to inclusive (`..=b` - bind a version in range `[1, b]`)
+    /// - Range inclusive (`a..=b` - bind a version in range `[a, b]`)
+    pub fn bind_singleton<P: Proxy>(
+        &mut self,
+        version: impl VersionBounds,
+    ) -> Result<P, BindError> {
+        assert!(version.upper() <= P::INTERFACE.version);
+
+        let i = self
+            .globals
+            .iter()
+            .position(|g| g.is::<P>())
+            .ok_or(BindError::GlobalNotFound(P::INTERFACE.name))?;
+
+        if self.globals[i].version < version.lower() {
+            return Err(BindError::UnsupportedVersion {
+                actual: self.globals[i].version,
+                min: version.lower(),
+            });
+        }
+
+        let name = self.globals[i].name;
+        let version = u32::min(version.upper(), self.globals[i].version);
+        Ok(self.registry.bind(self, name, version))
+    }
+
+    /// Same as [`bind_singleton`](Self::bind_singleton) but also sets the callback
+    pub fn bind_singleton_with_cb<P: Proxy, F: FnMut(EventCtx<D, P>) + Send + 'static>(
+        &mut self,
+        version: impl VersionBounds,
+        cb: F,
+    ) -> Result<P, BindError> {
+        assert!(version.upper() <= P::INTERFACE.version);
+
+        let i = self
+            .globals
+            .iter()
+            .position(|g| g.is::<P>())
+            .ok_or(BindError::GlobalNotFound(P::INTERFACE.name))?;
+
+        if self.globals[i].version < version.lower() {
+            return Err(BindError::UnsupportedVersion {
+                actual: self.globals[i].version,
+                min: version.lower(),
+            });
+        }
+
+        let name = self.globals[i].name;
+        let version = u32::min(version.upper(), self.globals[i].version);
+        Ok(self.registry.bind_with_cb(self, name, version, cb))
     }
 
     /// Register a registry event callback.
@@ -238,6 +307,7 @@ impl<D> Connection<D> {
             requests_queue: self.requests_queue,
             break_dispatch: self.break_dispatch,
             registry: self.registry,
+            globals: self.globals,
             registry_cbs: Some(Vec::new()),
             debug: self.debug,
         }
@@ -370,6 +440,16 @@ impl<D> Connection<D> {
 
             if event.header.object_id == self.registry {
                 let event = WlRegistry::parse_event(event, 1, &mut self.msg_buffers_pool).unwrap();
+                match &event {
+                    wl_registry::Event::Global(global) => {
+                        self.globals.push(global.clone());
+                    }
+                    wl_registry::Event::GlobalRemove(name) => {
+                        if let Some(i) = self.globals.iter().position(|g| g.name == *name) {
+                            self.globals.swap_remove(i);
+                        }
+                    }
+                }
                 return Ok(QueuedEvent::RegistryEvent(event));
             }
 

@@ -69,6 +69,7 @@ pub struct Buffer {
 impl ShmAlloc {
     /// Bind `wl_shm` and create new [`ShmAlloc`].
     pub fn bind<D>(conn: &mut Connection<D>, globals: &Globals) -> Result<Self, BindError> {
+        #[allow(deprecated)]
         Ok(Self::new(globals.bind(conn, 1..=2)?))
     }
 

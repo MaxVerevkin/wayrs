@@ -67,13 +67,14 @@ pub trait GlobalExt {
 }
 
 pub trait GlobalsExt {
+    #[deprecated = "use Connection::bind_singleton() instead"]
     fn bind<P: Proxy, D>(
         &self,
         conn: &mut Connection<D>,
         version: impl VersionBounds,
     ) -> Result<P, BindError>;
 
-    /// Same as [`bind`](Self::bind) but also sets the callback
+    #[deprecated = "use Connection::bind_singleton_with_cb() instead"]
     fn bind_with_cb<P: Proxy, D, F: FnMut(EventCtx<D, P>) + Send + 'static>(
         &self,
         conn: &mut Connection<D>,

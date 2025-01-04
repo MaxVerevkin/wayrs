@@ -5,12 +5,17 @@ use wayrs_client::protocol::wl_output::{self, WlOutput};
 use wayrs_client::{Connection, EventCtx, IoMode};
 
 fn main() {
-    let (mut conn, globals) = Connection::connect_and_collect_globals().unwrap();
+    let mut conn = Connection::connect().unwrap();
+    conn.blocking_roundtrip().unwrap();
 
     let mut state = State {
-        outputs: globals
+        outputs: conn
+            .globals()
             .iter()
             .filter(|g| g.is::<WlOutput>())
+            .map(|g| g.clone())
+            .collect::<Vec<_>>()
+            .into_iter()
             .map(|g| g.bind_with_cb(&mut conn, 2..=4, wl_output_cb).unwrap())
             .map(|output| (output, OutputInfo::default()))
             .collect(),
