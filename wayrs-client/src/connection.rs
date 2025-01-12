@@ -414,15 +414,12 @@ impl<D> Connection<D> {
             match WlDisplay::parse_event(event, 1, &mut self.msg_buffers_pool).unwrap() {
                 wl_display::Event::Error(err) => {
                     // Catch protocol error as early as possible
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!(
-                            "Error in object {} (code({})): {}",
-                            err.object_id.0,
-                            err.code,
-                            err.message.to_string_lossy(),
-                        ),
-                    ));
+                    return Err(io::Error::other(format!(
+                        "Error in object {} (code({})): {}",
+                        err.object_id.0,
+                        err.code,
+                        err.message.to_string_lossy(),
+                    )));
                 }
                 wl_display::Event::DeleteId(id) => {
                     return Ok(QueuedEvent::DeleteId(ObjectId(
