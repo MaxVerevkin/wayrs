@@ -29,8 +29,7 @@ macro_rules! generate {
 
 /// Create a `&'static CStr` from a string literal. Panics at compile time if given string literal
 /// contains null bytes.
-// TODO: deprecate when MSRV is 1.79
-// #[deprecated = "use c-string literals instead"]
+#[deprecated = "use c-string literals instead"]
 #[macro_export]
 macro_rules! cstr {
     ($str:literal) => {{

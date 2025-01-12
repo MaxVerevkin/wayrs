@@ -2,7 +2,7 @@
 //!
 //! **Do not use directly in your projcets. Call `wayrs_client::generate!()` instead.**
 
-use std::path::PathBuf;
+use std::{ffi::CString, path::PathBuf};
 
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
@@ -109,6 +109,8 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &syn::Ident) -> TokenStre
     let proxy_name_str = snake_to_pascal(&iface.name);
 
     let raw_iface_name = &iface.name;
+    let raw_iface_name_cstr =
+        CString::new(iface.name.as_bytes()).expect("null byte in interface name");
     let iface_version = iface.version;
 
     let gen_msg_gesc = |msg: &Message| {
@@ -360,8 +362,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &syn::Ident) -> TokenStre
 
                 const INTERFACE: &'static #wayrs_client_path::core::Interface
                     = &#wayrs_client_path::core::Interface {
-                        // TODO: use c-string literals when MSRV is 1.79
-                        name: #wayrs_client_path::cstr!(#raw_iface_name),
+                        name: #raw_iface_name_cstr,
                         version: #iface_version,
                         events: &[ #(#events_desc,)* ],
                         requests: &[ #(#requests_desc,)* ],

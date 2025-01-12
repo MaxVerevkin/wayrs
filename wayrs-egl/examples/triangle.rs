@@ -319,8 +319,8 @@ impl Surface {
             _ => (),
         });
 
-        xdg_toplevel.set_app_id(conn, wayrs_client::cstr!("wayrs-egl").into());
-        xdg_toplevel.set_title(conn, wayrs_client::cstr!("TITLE").into());
+        xdg_toplevel.set_app_id(conn, c"wayrs-egl".into());
+        xdg_toplevel.set_title(conn, c"TITLE".into());
 
         wl.commit(conn);
 

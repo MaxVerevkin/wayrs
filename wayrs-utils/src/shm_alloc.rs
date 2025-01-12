@@ -180,7 +180,7 @@ impl Drop for Buffer {
 
 impl InitShmPool {
     fn new<D>(conn: &mut Connection<D>, wl_shm: WlShm, size: usize) -> io::Result<InitShmPool> {
-        let file = shmemfdrs2::create_shmem(wayrs_client::cstr!("/wayrs_shm_pool"))?;
+        let file = shmemfdrs2::create_shmem(c"/wayrs_shm_pool")?;
         file.set_len(size as u64)?;
         let mmap = unsafe { MmapMut::map_mut(&file)? };
 
