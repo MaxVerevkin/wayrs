@@ -24,6 +24,13 @@ use wayrs_core::{ArgType, ArgValue, Interface, IoMode, Message, MessageBuffersPo
 #[cfg(feature = "tokio")]
 use tokio::io::unix::AsyncFd;
 
+#[cfg(feature = "any_transport")]
+use wayrs_core::transport::Transport;
+#[cfg(feature = "any_transport")]
+type TransportImp = crate::any_transport::AnyTranpsort;
+#[cfg(not(feature = "any_transport"))]
+type TransportImp = UnixStream;
+
 /// An error that can occur while connecting to a Wayland socket.
 #[derive(Debug)]
 pub enum ConnectError {
@@ -62,7 +69,7 @@ pub struct Connection<D> {
     #[cfg(feature = "tokio")]
     async_fd: Option<AsyncFd<RawFd>>,
 
-    socket: BufferedSocket<UnixStream>,
+    socket: BufferedSocket<TransportImp>,
     msg_buffers_pool: MessageBuffersPool,
 
     object_mgr: ObjectManager<D>,
@@ -110,11 +117,27 @@ impl<D> Connection<D> {
         path.push(runtime_dir);
         path.push(wayland_disp);
 
+        #[cfg(feature = "any_transport")]
+        let transport = TransportImp::new(UnixStream::connect(path)?);
+        #[cfg(not(feature = "any_transport"))]
+        let transport = UnixStream::connect(path)?;
+
+        Ok(Self::with_transport_imp(transport))
+    }
+
+    /// Use a custom transport
+    #[cfg(feature = "any_transport")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "any_transport")))]
+    pub fn with_transport<T: Transport + Send + 'static>(transport: T) -> Self {
+        Self::with_transport_imp(TransportImp::new(transport))
+    }
+
+    fn with_transport_imp(transport: TransportImp) -> Self {
         let mut this = Self {
             #[cfg(feature = "tokio")]
             async_fd: None,
 
-            socket: BufferedSocket::from(UnixStream::connect(path)?),
+            socket: BufferedSocket::from(transport),
             msg_buffers_pool: MessageBuffersPool::default(),
 
             object_mgr: ObjectManager::new(),
@@ -132,7 +155,25 @@ impl<D> Connection<D> {
 
         this.registry = WlDisplay::INSTANCE.get_registry(&mut this);
 
-        Ok(this)
+        this
+    }
+
+    /// Try to get a reference to the underlying transport.
+    ///
+    /// Returns `None` if the type of the transport is not `T`.
+    #[cfg(feature = "any_transport")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "any_transport")))]
+    pub fn transport<T: 'static>(&self) -> Option<&T> {
+        self.socket.transport().as_any().downcast_ref()
+    }
+
+    /// Try to get a mutable reference to the underlying transport.
+    ///
+    /// Returns `None` if the type of the transport is not `T`.
+    #[cfg(feature = "any_transport")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "any_transport")))]
+    pub fn transport_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.socket.transport_mut().as_any_mut().downcast_mut()
     }
 
     /// [`connect`](Self::connect) and collect the initial set of advertised globals.
@@ -705,5 +746,40 @@ mod tests {
     #[test]
     fn send() {
         assert_send::<Connection<()>>();
+    }
+
+    #[test]
+    #[cfg(feature = "any_transport")]
+    fn transport_downcast() {
+        use std::os::fd::OwnedFd;
+
+        struct T;
+        impl Transport for T {
+            fn pollable_fd(&self) -> RawFd {
+                todo!()
+            }
+            fn send(
+                &mut self,
+                _bytes: &[io::IoSlice],
+                _fds: &[OwnedFd],
+                _mode: IoMode,
+            ) -> io::Result<usize> {
+                todo!()
+            }
+            fn recv(
+                &mut self,
+                _bytes: &mut [io::IoSliceMut],
+                _fds: &mut VecDeque<OwnedFd>,
+                _mode: IoMode,
+            ) -> io::Result<usize> {
+                todo!()
+            }
+        }
+
+        let mut conn = Connection::<()>::with_transport(T);
+        assert!(conn.transport::<T>().is_some());
+        assert!(conn.transport_mut::<T>().is_some());
+        assert!(conn.transport::<()>().is_none());
+        assert!(conn.transport_mut::<()>().is_none());
     }
 }
