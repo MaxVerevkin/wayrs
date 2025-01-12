@@ -112,11 +112,6 @@ pub enum ArgValue {
 impl ArgValue {
     /// The size of the argument in bytes.
     pub fn size(&self) -> usize {
-        fn len_with_padding(len: usize) -> usize {
-            let padding = (4 - (len % 4)) % 4;
-            4 + len + padding
-        }
-
         match self {
             Self::Int(_)
             | Self::Uint(_)
@@ -126,12 +121,12 @@ impl ArgValue {
             | Self::NewId(_)
             | Self::OptString(None) => 4,
             Self::AnyNewId(iface, _version, _id) => {
-                len_with_padding(iface.to_bytes_with_nul().len()) + 8
+                iface.to_bytes_with_nul().len().next_multiple_of(4) + 12
             }
             Self::String(string) | Self::OptString(Some(string)) => {
-                len_with_padding(string.to_bytes_with_nul().len())
+                string.to_bytes_with_nul().len().next_multiple_of(4) + 4
             }
-            Self::Array(array) => len_with_padding(array.len()),
+            Self::Array(array) => array.len().next_multiple_of(4) + 4,
             Self::Fd(_) => 0,
         }
     }
