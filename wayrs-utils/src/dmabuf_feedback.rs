@@ -129,7 +129,7 @@ fn dmabuf_feedback_cb<D: DmabufFeedbackHandler>(ctx: EventCtx<D, ZwpLinuxDmabufF
                     .expect("mmap failed")
             };
             assert!(
-                ptr_is_aligned(mmap.as_ptr().cast::<FormatTableEntry>()),
+                mmap.as_ptr().cast::<FormatTableEntry>().is_aligned(),
                 "memory map is not alligned"
             );
             feedback.format_table = Some(mmap);
@@ -191,9 +191,4 @@ impl fmt::Debug for FormatTableEntry {
             self.modifier
         )
     }
-}
-
-// TODO: remove when MSRV is 1.79
-fn ptr_is_aligned<T>(ptr: *const T) -> bool {
-    (ptr as usize) & (std::mem::align_of::<T>() - 1) == 0
 }
