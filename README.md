@@ -33,6 +33,7 @@ The following projects use `wayrs` and may serve as additional usage examples:
 - [`i3status-rs`]: Feature-rich and resource-friendly replacement for i3status.
 - [`river-kbd-layout-watcher`]: Prints current keyboard layout whenever it changes.
 - [`wayidle`]: Waits until the compositor reports being N seconds idle.
+- [`way-secure`]: Create wayland security contexts.
 - [`wl-gammarelay-rs`]: Provides DBus interface to control display temperature and brightness without flickering.
 - [`wlr-which-key`]: Keymap manager for wlroots-based compositors.
 
@@ -40,6 +41,7 @@ The following projects use `wayrs` and may serve as additional usage examples:
 [`i3status-rs`]: https://github.com/greshake/i3status-rust/
 [`river-kbd-layout-watcher`]: https://github.com/MaxVerevkin/river-kbd-layout-watcher
 [`wayidle`]: https://git.sr.ht/~whynothugo/wayidle
+[`way-secure`]: https://git.sr.ht/~whynothugo/way-secure
 [`wl-gammarelay-rs`]: https://github.com/MaxVerevkin/wl-gammarelay-rs
 [`wlr-which-key`]: https://github.com/MaxVerevkin/wlr-which-key
 
