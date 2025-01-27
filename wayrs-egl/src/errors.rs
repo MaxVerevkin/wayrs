@@ -107,6 +107,7 @@ impl fmt::Display for EglError {
 }
 
 impl EglError {
+    #[must_use]
     pub fn last() -> Self {
         match unsafe { egl_ffi::eglGetError() } {
             egl_ffi::EGL_SUCCESS => Self::Success,
@@ -130,6 +131,7 @@ impl EglError {
 }
 
 impl Error {
+    #[must_use]
     pub fn last_egl() -> Self {
         Self::Egl(EglError::last())
     }

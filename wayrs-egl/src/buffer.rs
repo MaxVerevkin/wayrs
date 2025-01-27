@@ -133,26 +133,31 @@ impl Buffer {
     }
 
     /// Get this buffer's fourcc format
+    #[must_use]
     pub fn fourcc(&self) -> Fourcc {
         self.fourcc
     }
 
     /// Get this buffer format's modifier
+    #[must_use]
     pub fn modifier(&self) -> u64 {
         self.modifier
     }
 
     /// Get this buffer's width
+    #[must_use]
     pub fn width(&self) -> u32 {
         self.width
     }
 
     /// Get this buffer's height
+    #[must_use]
     pub fn height(&self) -> u32 {
         self.height
     }
 
     /// Check whether this buffer is currently in use by the compositor.
+    #[must_use]
     pub fn is_available(&self) -> bool {
         *self.state.lock().unwrap() == BufferState::Available
     }
@@ -228,6 +233,7 @@ pub struct BufferPool<const N: usize> {
 
 impl<const N: usize> BufferPool<N> {
     /// Create a new buffer pool.
+    #[must_use]
     pub fn new(fourcc: Fourcc, modifiers: Vec<u64>) -> Self {
         Self {
             fourcc,

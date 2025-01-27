@@ -164,6 +164,7 @@ impl<D> Connection<D> {
     ///
     /// At the moment, only a single registry can be created. This might or might not change in the
     /// future, considering registries cannot be destroyed.
+    #[must_use]
     pub fn registry(&self) -> WlRegistry {
         self.registry
     }
@@ -174,6 +175,7 @@ impl<D> Connection<D> {
     ///
     /// Note that this function has knowledge of all events received from the compositor, even the
     /// ones that had not been dispatched in [`dispatch_events`](Self::dispatch_events) yet.
+    #[must_use]
     pub fn globals(&self) -> &[GlobalArgs] {
         &self.globals
     }
@@ -297,6 +299,7 @@ impl<D> Connection<D> {
     /// Remove all callbacks.
     ///
     /// You can use this function to change the "state type" of a connection.
+    #[must_use]
     pub fn clear_callbacks<D2>(self) -> Connection<D2> {
         Connection {
             #[cfg(feature = "tokio")]

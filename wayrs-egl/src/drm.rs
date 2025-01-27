@@ -27,6 +27,7 @@ impl DrmDevice {
     }
 
     /// Get a render node path, if supported.
+    #[must_use]
     pub fn render_node(&self) -> Option<&CStr> {
         self.get_node(xf86drm_ffi::DRM_NODE_RENDER)
     }
