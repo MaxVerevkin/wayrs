@@ -79,14 +79,17 @@ impl DmabufFeedback {
         }
     }
 
+    #[must_use]
     pub fn wl(&self) -> ZwpLinuxDmabufFeedbackV1 {
         self.wl
     }
 
+    #[must_use]
     pub fn main_device(&self) -> Option<dev_t> {
         self.main_device
     }
 
+    #[must_use]
     pub fn format_table(&self) -> &[FormatTableEntry] {
         match &self.format_table {
             Some(mmap) => unsafe {
@@ -99,6 +102,7 @@ impl DmabufFeedback {
         }
     }
 
+    #[must_use]
     pub fn tranches(&self) -> &[DmabufTranche] {
         &self.tranches
     }

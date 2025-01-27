@@ -9,6 +9,7 @@ pub struct Timer {
 
 impl Timer {
     /// Create a new timer with a given delay and interval.
+    #[must_use]
     pub fn new(delay: Duration, interval: Duration) -> Self {
         Self {
             next_fire: Instant::now() + delay,
@@ -32,6 +33,7 @@ impl Timer {
     }
 
     /// The duration untill next fire.
+    #[must_use]
     pub fn sleep(&self) -> Duration {
         self.next_fire.saturating_duration_since(Instant::now())
     }

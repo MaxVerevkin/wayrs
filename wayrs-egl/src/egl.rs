@@ -117,39 +117,47 @@ impl EglDisplay {
         })
     }
 
+    #[must_use]
     pub(crate) fn as_raw(&self) -> egl_ffi::EGLDisplay {
         self.raw
     }
 
+    #[must_use]
     pub(crate) fn gbm_device(&self) -> &gbm::Device {
         &self.gbm_device
     }
 
+    #[must_use]
     pub(crate) fn linux_dmabuf(&self) -> ZwpLinuxDmabufV1 {
         self.linux_dmabuf
     }
 
     /// Major EGL version
+    #[must_use]
     pub fn major_version(&self) -> u32 {
         self.major_version
     }
 
     /// Minor EGL version
+    #[must_use]
     pub fn minor_version(&self) -> u32 {
         self.minor_version
     }
 
     /// The set of extensions this EGL display supports
+    #[must_use]
     pub fn extensions(&self) -> &EglExtensions {
         &self.extensions
     }
 
     /// Get a set of supported buffer formats, in a form of fourcc -> modifiers mapping
+    #[must_use]
     pub fn supported_formats(&self) -> &HashMap<Fourcc, Vec<u64>> {
         &self.supported_formats
     }
 
     /// Check whether a fourcc/modifier pair is supported
+    #[must_use]
     pub fn is_format_supported(&self, fourcc: Fourcc, modifier: u64) -> bool {
         match self.supported_formats.get(&fourcc) {
             Some(mods) => {
@@ -262,6 +270,7 @@ pub struct EglContextBuilder {
 
 impl EglContextBuilder {
     /// Create a new [`EglContext`] builder
+    #[must_use]
     pub fn new(api: GraphicsApi) -> Self {
         Self {
             api,
@@ -272,6 +281,7 @@ impl EglContextBuilder {
     }
 
     /// Set the required API version. Default is `1.0`.
+    #[must_use]
     pub fn version(mut self, major: u32, minor: u32) -> Self {
         self.major_v = major;
         self.minor_v = minor;
@@ -281,6 +291,7 @@ impl EglContextBuilder {
     /// Enable/disable debugging. Default is `false`.
     ///
     /// Ignored if EGL version is lower than 1.5.
+    #[must_use]
     pub fn debug(mut self, enable: bool) -> Self {
         self.debug = enable;
         self
@@ -421,6 +432,7 @@ impl EglExtensions {
     }
 
     /// Check whether a given extension is supported
+    #[must_use]
     pub fn contains(&self, ext: &str) -> bool {
         self.0.contains(ext.as_bytes())
     }
