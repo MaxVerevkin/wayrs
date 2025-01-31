@@ -5,7 +5,7 @@ use std::env;
 use std::fmt;
 use std::io;
 use std::num::NonZeroU32;
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
@@ -98,11 +98,31 @@ impl<D> AsRawFd for Connection<D> {
 }
 
 impl<D> Connection<D> {
-    /// Connect to a Wayland socket at `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` and create a registry.
+    /// Connect to a Wayland socket and create a registry.
     ///
-    /// At the moment, only a single registry can be created. This might or might not change in the
-    /// future, considering registries cannot be destroyed.
+    /// From the [Wayland Book](https://wayland-book.com/protocol-design/wire-protocol.html):
+    ///
+    /// > To find the Unix socket to connect to, most implementations just do what `libwayland` does:
+    /// >
+    /// > 1. If `WAYLAND_SOCKET` is set, interpret it as a file descriptor number on which the
+    /// >    connection is already established, assuming that the parent process configured the
+    /// >    connection for us.
+    /// > 2. If `WAYLAND_DISPLAY` is set, concat with `XDG_RUNTIME_DIR` to form the path to the
+    /// >    Unix socket.
+    /// > 3. Assume the socket name is wayland-0 and concat with `XDG_RUNTIME_DIR` to form the path
+    /// >    to the Unix socket.
+    /// > 4. Give up.
+    ///
+    /// Current implementation follows `libwayland` except for the step 3.
     pub fn connect() -> Result<Self, ConnectError> {
+        if let Some(fd) = env::var("WAYLAND_SOCKET")
+            .ok()
+            .and_then(|fd| fd.parse::<RawFd>().ok())
+        {
+            let stream = unsafe { UnixStream::from_raw_fd(fd) };
+            return Ok(Self::connect_with_unix_stream(stream));
+        }
+
         let runtime_dir = env::var_os("XDG_RUNTIME_DIR").ok_or(ConnectError::NotEnoughEnvVars)?;
         let wayland_disp = env::var_os("WAYLAND_DISPLAY").ok_or(ConnectError::NotEnoughEnvVars)?;
 
@@ -110,11 +130,15 @@ impl<D> Connection<D> {
         path.push(runtime_dir);
         path.push(wayland_disp);
 
+        Ok(Self::connect_with_unix_stream(UnixStream::connect(path)?))
+    }
+
+    fn connect_with_unix_stream(stream: UnixStream) -> Self {
         let mut this = Self {
             #[cfg(feature = "tokio")]
             async_fd: None,
 
-            socket: BufferedSocket::from(UnixStream::connect(path)?),
+            socket: BufferedSocket::from(stream),
             msg_buffers_pool: MessageBuffersPool::default(),
 
             object_mgr: ObjectManager::new(),
@@ -132,7 +156,7 @@ impl<D> Connection<D> {
 
         this.registry = WlDisplay::INSTANCE.get_registry(&mut this);
 
-        Ok(this)
+        this
     }
 
     /// [`connect`](Self::connect) and collect the initial set of advertised globals.
