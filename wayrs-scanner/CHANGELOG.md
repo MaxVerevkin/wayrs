@@ -1,3 +1,7 @@
+# 0.15.3
+
+- Bump MSRV to 1.79
+
 # 0.15.2
 
 - Derive `Clone` and `Copy` for event structs when possible.
