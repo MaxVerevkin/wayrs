@@ -1,3 +1,10 @@
+# 1.3.0
+
+- Bump MSRV to 1.79.
+- Deprecate `cstr!` macro.
+- Mark some functions as `#[must_use]`.
+- Support `WAYLAND_SOCKET` environment variable.
+
 # 1.2.0
 
 - Store a list of globals in the `Connection` struct.
