@@ -1,3 +1,7 @@
+# 0.14.6+1.40
+
+- Update `wayland-protocols` to v1.40.
+
 # 0.14.5+1.39
 
 - Update `wayland-protocols` to v1.39.
