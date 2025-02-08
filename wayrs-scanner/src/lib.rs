@@ -4,10 +4,11 @@
 
 use std::{ffi::CString, path::PathBuf};
 
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 use wayrs_proto_parser::*;
 
+mod mini_syn;
 mod utils;
 use crate::utils::*;
 
@@ -16,41 +17,52 @@ const FROZEN_IFACES: &[&str] = &["wl_display", "wl_registry", "wl_callback", "wl
 
 #[derive(Debug)]
 struct MacroArgs {
-    crate_root: syn::Ident,
+    crate_root: Ident,
     path: String,
 }
 
-impl syn::parse::Parse for MacroArgs {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let lookahead = input.lookahead1();
-        if !lookahead.peek(syn::Ident) {
-            return Err(lookahead.error());
+impl MacroArgs {
+    fn parse(input: TokenStream) -> Option<Self> {
+        let mut tokens = input.into_iter();
+
+        let Some(proc_macro2::TokenTree::Ident(crate_root)) = tokens.next() else {
+            return None;
+        };
+
+        let Some(proc_macro2::TokenTree::Punct(_comma)) = tokens.next() else {
+            return None;
+        };
+
+        let Some(proc_macro2::TokenTree::Group(group)) = tokens.next() else {
+            return None;
+        };
+
+        if tokens.next().is_some() || group.delimiter() != proc_macro2::Delimiter::None {
+            return None;
         }
 
-        let crate_root: syn::Ident = input.parse()?;
+        let mut group = group.stream().into_iter();
 
-        let lookahead = input.lookahead1();
-        if !lookahead.peek(syn::token::Comma) {
-            return Err(lookahead.error());
+        let Some(proc_macro2::TokenTree::Literal(path_lit)) = group.next() else {
+            return None;
+        };
+
+        if group.next().is_some() {
+            return None;
         }
 
-        let _comma: syn::token::Comma = input.parse()?;
+        let path = mini_syn::parse_lit_str_cooked(&path_lit.to_string())?;
 
-        let lookahead = input.lookahead1();
-        if !lookahead.peek(syn::LitStr) {
-            return Err(lookahead.error());
-        }
-
-        let path = input.parse::<syn::LitStr>()?.value();
-
-        Ok(Self { crate_root, path })
+        Some(Self { crate_root, path })
     }
 }
 
 #[doc(hidden)]
 #[proc_macro]
 pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let args = syn::parse_macro_input!(input as MacroArgs);
+    let Some(args) = MacroArgs::parse(input.into()) else {
+        return quote! { compile_error!("invalid macro arguments") }.into();
+    };
 
     let path = match std::env::var_os("CARGO_MANIFEST_DIR") {
         Some(manifest) => {
@@ -83,16 +95,16 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     x.into()
 }
 
-fn make_ident(name: impl AsRef<str>) -> syn::Ident {
-    syn::Ident::new_raw(name.as_ref(), Span::call_site())
+fn make_ident(name: impl AsRef<str>) -> Ident {
+    Ident::new_raw(name.as_ref(), Span::call_site())
 }
 
-fn make_pascal_case_ident(name: impl AsRef<str>) -> syn::Ident {
+fn make_pascal_case_ident(name: impl AsRef<str>) -> Ident {
     let name = name.as_ref();
     if name.chars().next().unwrap().is_ascii_digit() {
-        syn::Ident::new_raw(&format!("_{name}"), Span::call_site())
+        Ident::new_raw(&format!("_{name}"), Span::call_site())
     } else {
-        syn::Ident::new_raw(&snake_to_pascal(name), Span::call_site())
+        Ident::new_raw(&snake_to_pascal(name), Span::call_site())
     }
 }
 
@@ -101,9 +113,9 @@ fn make_proxy_path(iface: impl AsRef<str>) -> TokenStream {
     quote! { super::#proxy_name }
 }
 
-fn gen_interface(iface: &Interface, wayrs_client_path: &syn::Ident) -> TokenStream {
+fn gen_interface(iface: &Interface, wayrs_client_path: &Ident) -> TokenStream {
     let mod_doc = gen_doc(iface.description.as_ref(), None, None);
-    let mod_name = syn::Ident::new(&iface.name, Span::call_site());
+    let mod_name = Ident::new(&iface.name, Span::call_site());
 
     let proxy_name = make_pascal_case_ident(&iface.name);
     let proxy_name_str = snake_to_pascal(&iface.name);
@@ -512,7 +524,7 @@ fn gen_pub_fn(
     }
 }
 
-fn gen_request_fn(opcode: u16, request: &Message, wayrs_client_path: &syn::Ident) -> TokenStream {
+fn gen_request_fn(opcode: u16, request: &Message, wayrs_client_path: &Ident) -> TokenStream {
     assert!(
         request
             .args
@@ -753,21 +765,21 @@ fn gen_doc(
 }
 
 trait ArgExt {
-    fn as_request_fn_arg(&self, wayrs_client_path: &syn::Ident) -> Option<TokenStream>;
-    fn as_event_ty(&self, wayrs_client_path: &syn::Ident) -> TokenStream;
+    fn as_request_fn_arg(&self, wayrs_client_path: &Ident) -> Option<TokenStream>;
+    fn as_event_ty(&self, wayrs_client_path: &Ident) -> TokenStream;
     fn is_clone(&self) -> bool;
     fn is_copy(&self) -> bool;
 }
 
 impl ArgExt for Argument {
-    fn as_request_fn_arg(&self, wayrs_client_path: &syn::Ident) -> Option<TokenStream> {
+    fn as_request_fn_arg(&self, wayrs_client_path: &Ident) -> Option<TokenStream> {
         let arg_name = make_ident(&self.name);
         let retval = match &self.arg_type {
             ArgType::Int => quote!(#arg_name: i32),
             ArgType::Uint => quote!(#arg_name: u32),
             ArgType::Enum(enum_ty) => {
                 if let Some((iface, name)) = enum_ty.split_once('.') {
-                    let iface_name = syn::Ident::new(iface, Span::call_site());
+                    let iface_name = Ident::new(iface, Span::call_site());
                     let enum_name = make_pascal_case_ident(name);
                     quote!(#arg_name: super::#iface_name::#enum_name)
                 } else {
@@ -807,13 +819,13 @@ impl ArgExt for Argument {
         Some(retval)
     }
 
-    fn as_event_ty(&self, wayrs_client_path: &syn::Ident) -> TokenStream {
+    fn as_event_ty(&self, wayrs_client_path: &Ident) -> TokenStream {
         match &self.arg_type {
             ArgType::Int => quote!(i32),
             ArgType::Uint => quote!(u32),
             ArgType::Enum(enum_ty) => {
                 if let Some((iface, name)) = enum_ty.split_once('.') {
-                    let iface_name = syn::Ident::new(iface, Span::call_site());
+                    let iface_name = Ident::new(iface, Span::call_site());
                     let enum_name = make_pascal_case_ident(name);
                     quote!(super::#iface_name::#enum_name)
                 } else {
