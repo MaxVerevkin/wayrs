@@ -1,3 +1,7 @@
+# 0.15.4
+
+- Drop `syn` dependency.
+
 # 0.15.3
 
 - Bump MSRV to 1.79
