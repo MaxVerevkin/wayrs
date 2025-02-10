@@ -200,16 +200,14 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &Ident) -> TokenStream {
     let event_decoding = iface.events.iter().enumerate().map(|(opcode, event)| {
         let event_name = make_pascal_case_ident(&event.name);
         let opcode = opcode as u16;
-        let arg_ty = event.args.iter().map(|x| map_arg_to_argval(x, true));
+        let arg_ty_rev = event.args.iter().rev().map(|x| map_arg_to_argval(x, true));
         let arg_names = event.args.iter().map(|arg| make_ident(&arg.name));
+        let arg_names_rev = event.args.iter().rev().map(|arg| make_ident(&arg.name));
         let arg_decode = event.args.iter().map(|arg| {
             let arg_name = make_ident(&arg.name);
             match &arg.arg_type {
-                ArgType::NewId{iface: Some(iface)} => {
-                    let proxy_name = make_proxy_path(iface);
-                    quote! {
-                        <#proxy_name as Proxy>::new(#arg_name, __self_version)
-                    }
+                ArgType::NewId{ iface: Some(_) } => {
+                    quote! { Proxy::new(#arg_name, __self_version) }
                 },
                 ArgType::Enum(_) => quote! {
                     match #arg_name.try_into() {
@@ -226,7 +224,6 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &Ident) -> TokenStream {
             1 => quote!(Event::#event_name(#( #arg_decode )*)),
             _ => {
                 let struct_name = format_ident!("{event_name}Args");
-                let arg_names = arg_names.clone();
                 quote!(Event::#event_name(#struct_name { #( #arg_names: #arg_decode, )* }))
             }
         };
@@ -235,9 +232,7 @@ fn gen_interface(iface: &Interface, wayrs_client_path: &Ident) -> TokenStream {
                 if __event.args.len() != #args_len {
                     return Err(#wayrs_client_path::object::BadMessage);
                 }
-                let mut __args = __event.args.drain(..);
-                #( let Some(#wayrs_client_path::core::ArgValue::#arg_ty(#arg_names)) = __args.next() else { return Err(#wayrs_client_path::object::BadMessage) }; )*
-                drop(__args);
+                #( let Some(#wayrs_client_path::core::ArgValue::#arg_ty_rev(#arg_names_rev)) = __event.args.pop() else { return Err(#wayrs_client_path::object::BadMessage) }; )*
                 __pool.reuse_args(__event.args);
                 Ok(#retval)
             }
