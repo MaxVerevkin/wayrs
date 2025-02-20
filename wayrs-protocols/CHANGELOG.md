@@ -1,3 +1,8 @@
+# 0.14.7+1.41
+
+- Update `wayland-protocols` to v1.41.
+- New protocols: `color-management-v1`.
+
 # 0.14.6+1.40
 
 - Update `wayland-protocols` to v1.40.
