@@ -1,3 +1,7 @@
+# 3.0.1
+
+- Support self-closing description tag in enums.
+
 # 3.0.0
 
 - Parse `event.deprecated-since`.
