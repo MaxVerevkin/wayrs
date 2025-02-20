@@ -88,7 +88,9 @@ impl<'a> Parser<'a> {
             match self.reader.read_event()? {
                 XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Start(start) => match start.name().as_ref() {
-                    b"description" => protocol.description = Some(self.parse_description(start)?),
+                    b"description" => {
+                        protocol.description = Some(self.parse_description(start, true)?);
+                    }
                     b"interface" => protocol.interfaces.push(self.parse_interface(start)?),
                     b"copyright" => {
                         // TODO?
@@ -126,7 +128,9 @@ impl<'a> Parser<'a> {
             match self.reader.read_event()? {
                 XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Start(start) => match start.name().as_ref() {
-                    b"description" => interface.description = Some(self.parse_description(start)?),
+                    b"description" => {
+                        interface.description = Some(self.parse_description(start, true)?);
+                    }
                     b"request" => interface.requests.push(self.parse_message(start)?),
                     b"event" => interface.events.push(self.parse_message(start)?),
                     b"enum" => interface.enums.push(self.parse_enum(start)?),
@@ -172,19 +176,15 @@ impl<'a> Parser<'a> {
             match self.reader.read_event()? {
                 XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Start(start) => match start.name().as_ref() {
-                    b"description" => message.description = Some(self.parse_description(start)?),
+                    b"description" => {
+                        message.description = Some(self.parse_description(start, true)?)
+                    }
                     other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
                 XmlEvent::Empty(empty) => match empty.name().as_ref() {
                     b"arg" => message.args.push(Self::parse_arg(empty)?),
                     b"description" => {
-                        let summary = empty
-                            .try_get_attribute("summary")?
-                            .map(|attr| attr.unescape_value().unwrap().into_owned());
-                        message.description = Some(Description {
-                            summary,
-                            text: None,
-                        });
+                        message.description = Some(self.parse_description(empty, false)?);
                     }
                     other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
@@ -215,10 +215,11 @@ impl<'a> Parser<'a> {
                 XmlEvent::Eof => return Err(Error::UnexpectedEof),
                 XmlEvent::Empty(empty) => match empty.name().as_ref() {
                     b"entry" => en.items.push(self.parse_enum_item(empty, false)?),
+                    b"description" => en.description = Some(self.parse_description(empty, false)?),
                     other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
                 XmlEvent::Start(start) => match start.name().as_ref() {
-                    b"description" => en.description = Some(self.parse_description(start)?),
+                    b"description" => en.description = Some(self.parse_description(start, true)?),
                     b"entry" => en.items.push(self.parse_enum_item(start, true)?),
                     other => return Err(Error::UnexpectedTag(str::from_utf8(other)?.into())),
                 },
@@ -230,7 +231,11 @@ impl<'a> Parser<'a> {
         Ok(en)
     }
 
-    fn parse_description(&mut self, tag: BytesStart<'a>) -> Result<Description<'a>, Error> {
+    fn parse_description(
+        &mut self,
+        tag: BytesStart<'a>,
+        non_empty_tag: bool,
+    ) -> Result<Description<'a>, Error> {
         let mut description = Description {
             summary: tag
                 .try_get_attribute("summary")?
@@ -238,12 +243,14 @@ impl<'a> Parser<'a> {
             text: None,
         };
 
-        loop {
-            match self.reader.read_event()? {
-                XmlEvent::Eof => return Err(Error::UnexpectedEof),
-                XmlEvent::Text(text) => description.text = Some(text.unescape().unwrap()),
-                XmlEvent::End(end) if end.name() == tag.name() => break,
-                _ => (),
+        if non_empty_tag {
+            loop {
+                match self.reader.read_event()? {
+                    XmlEvent::Eof => return Err(Error::UnexpectedEof),
+                    XmlEvent::Text(text) => description.text = Some(text.unescape().unwrap()),
+                    XmlEvent::End(end) if end.name() == tag.name() => break,
+                    _ => (),
+                }
             }
         }
 
