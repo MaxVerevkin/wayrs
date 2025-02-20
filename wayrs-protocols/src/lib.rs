@@ -57,6 +57,13 @@ gen! {
 }
 
 gen! {
+    mod: color_management_v1,
+    feat: "color-management-v1",
+    file: "wayland-protocols/staging/color-management/color-management-v1.xml",
+    deps: [core],
+}
+
+gen! {
     mod: commit_timing_v1,
     feat: "commit-timing-v1",
     file: "wayland-protocols/staging/commit-timing/commit-timing-v1.xml",

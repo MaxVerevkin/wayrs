@@ -19,6 +19,7 @@ viewporter = []
 xdg-shell = []
 # wayland-staging
 alpha-modifier-v1 = []
+color-management-v1 = []
 commit-timing-v1 = []
 content-type-v1 = []
 cursor-shape-v1 = ["tablet-v2"]
