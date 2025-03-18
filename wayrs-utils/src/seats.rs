@@ -62,8 +62,6 @@ pub trait SeatHandler: Sized + 'static {
     fn get_seats(&mut self) -> &mut Seats;
 
     /// A new seat is added.
-    ///
-    /// This is _not_ called for seats that where advertised during the initial roundtrip.
     fn seat_added(&mut self, _: &mut Connection<Self>, _: WlSeat) {}
 
     /// A seat is removed.
