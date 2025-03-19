@@ -105,11 +105,21 @@ struct Seat {
 }
 
 impl Seats {
-    pub fn bind<D: SeatHandler>(conn: &mut Connection<D>) -> Self {
+    /// Create new `Seats`.
+    ///
+    /// This function sets up the registry callback and nothing else. Call it only once per
+    /// [`Connection`](Connection) and before dispatching any events.
+    pub fn new<D: SeatHandler>(conn: &mut Connection<D>) -> Self {
         conn.add_registry_cb(registry_cb);
         Self { seats: Vec::new() }
     }
 
+    #[deprecated = "use `new` instead (this name is misleading, it does not bind anything)"]
+    pub fn bind<D: SeatHandler>(conn: &mut Connection<D>) -> Self {
+        Self::new(conn)
+    }
+
+    /// Get an iterator of currently available `wl_seat`s.
     pub fn iter(&self) -> impl Iterator<Item = WlSeat> + '_ {
         self.seats.iter().map(|s| s.wl_seat)
     }
