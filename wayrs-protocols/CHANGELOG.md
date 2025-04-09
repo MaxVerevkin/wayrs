@@ -1,3 +1,8 @@
+# 0.14.9+1.43
+
+- Update `wayland-protocols` to v1.43.
+- New protocols: `xdg-toplevel-tag-v1`.
+
 # 0.14.8+1.42
 
 - Update `wayland-protocols` to v1.42.
