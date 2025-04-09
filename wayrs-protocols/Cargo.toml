@@ -43,6 +43,7 @@ xdg-dialog-v1 = ["xdg-shell"]
 xdg-system-bell-v1 = []
 xdg-toplevel-drag-v1 = ["xdg-shell"]
 xdg-toplevel-icon-v1 = ["xdg-shell"]
+xdg-toplevel-tag-v1 = ["xdg-shell"]
 xwayland-shell-v1 = []
 # wayland-unstable
 fullscreen-shell-unstable-v1 = []

@@ -225,6 +225,13 @@ gen! {
 }
 
 gen! {
+    mod: xdg_toplevel_tag_v1,
+    feat: "xdg-toplevel-tag-v1",
+    file: "wayland-protocols/staging/xdg-toplevel-tag/xdg-toplevel-tag-v1.xml",
+    deps: [xdg_shell],
+}
+
+gen! {
     mod: xwayland_shell_v1,
     feat: "xwayland-shell-v1",
     file: "wayland-protocols/staging/xwayland-shell/xwayland-shell-v1.xml",
