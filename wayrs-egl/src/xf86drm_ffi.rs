@@ -14,6 +14,7 @@ pub struct drmDevice {
 
 pub type drmDevicePtr = *mut drmDevice;
 
+#[link(name = "drm")]
 extern "C" {
     pub fn drmGetDeviceFromDevId(
         dev_id: libc::dev_t,
