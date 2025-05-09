@@ -127,7 +127,7 @@ fn backslash_u(mut s: &str) -> (char, &str) {
     if let Some(ch) = char::from_u32(ch) {
         (ch, s)
     } else {
-        panic!("character code {:x} is not a valid unicode character", ch);
+        panic!("character code {ch:x} is not a valid unicode character");
     }
 }
 
