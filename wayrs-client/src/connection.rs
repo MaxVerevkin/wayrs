@@ -324,6 +324,7 @@ impl<D> Connection<D> {
     ///
     /// You can use this function to change the "state type" of a connection.
     #[must_use]
+    #[deprecated = "this function is error-prone and best avoided"]
     pub fn clear_callbacks<D2>(self) -> Connection<D2> {
         Connection {
             #[cfg(feature = "tokio")]
