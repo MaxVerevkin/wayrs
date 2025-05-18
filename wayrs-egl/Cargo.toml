@@ -1,6 +1,6 @@
 [package]
 name = "wayrs-egl"
-version = "0.5.0"
+version = "0.6.0"
 description = "EGL for wayrs-client"
 authors = ["MaxVerevkin <maxxverrr@gmail.com>"]
 keywords = ["wayland", "egl", "opengl"]

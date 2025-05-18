@@ -1,3 +1,8 @@
+# 0.6.0
+
+- Support EGL 1.4.
+- Update dependencies.
+
 # 0.5.0
 
 - Store buffer format and modifiers in `BufferPool`.
