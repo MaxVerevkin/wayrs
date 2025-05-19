@@ -283,11 +283,13 @@ impl<T: Transport> BufferedSocket<T> {
     }
 
     /// Get a reference to the underlying transport.
+    #[must_use]
     pub fn transport(&self) -> &T {
         &self.socket
     }
 
     /// Get a mutable reference to the underlying transport.
+    #[must_use]
     pub fn transport_mut(&mut self) -> &mut T {
         &mut self.socket
     }

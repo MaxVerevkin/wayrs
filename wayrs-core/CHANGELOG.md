@@ -1,3 +1,7 @@
+# 1.0.5
+
+- Add #[must_use] to functions without side-effects.
+
 # 1.0.4
 
 - Drop `thiserror` dependency.
