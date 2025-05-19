@@ -1,3 +1,7 @@
+# 1.3.1
+
+- Deprecate `Client::clear_callbacks`.
+
 # 1.3.0
 
 - Bump MSRV to 1.79.
