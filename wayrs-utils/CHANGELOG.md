@@ -1,3 +1,8 @@
+# 0.17.2
+
+- Add #[must_use] to functions without side-effects.
+- Seats: improve docs.
+
 # 0.17.1
 
 - Update `Seats::bind`, `CursorTheme::new` and `ShmAlloc::bind` to not take the globals list.
