@@ -64,6 +64,13 @@ gen! {
 }
 
 gen! {
+    mod: color_representation_v1,
+    feat: "color-representation-v1",
+    file: "wayland-protocols/staging/color-representation/color-representation-v1.xml",
+    deps: [core],
+}
+
+gen! {
     mod: commit_timing_v1,
     feat: "commit-timing-v1",
     file: "wayland-protocols/staging/commit-timing/commit-timing-v1.xml",

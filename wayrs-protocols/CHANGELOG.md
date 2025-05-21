@@ -1,3 +1,8 @@
+# 0.14.10+1.44
+
+- Update `wayland-protocols` to v1.44.
+- New protocols: `color-representation-v1`.
+
 # 0.14.9+1.43
 
 - Update `wayland-protocols` to v1.43.
