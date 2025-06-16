@@ -99,6 +99,13 @@ gen! {
 }
 
 gen! {
+    mod: ext_background_effect_v1,
+    feat: "ext-background-effect-v1",
+    file: "wayland-protocols/staging/ext-background-effect/ext-background-effect-v1.xml",
+    deps: [core],
+}
+
+gen! {
     mod: ext_data_control_v1,
     feat: "ext-data-control-v1",
     file: "wayland-protocols/staging/ext-data-control/ext-data-control-v1.xml",
@@ -172,6 +179,13 @@ gen! {
     mod: linux_drm_syncobj_v1,
     feat: "linux-drm-syncobj-v1",
     file: "wayland-protocols/staging/linux-drm-syncobj/linux-drm-syncobj-v1.xml",
+    deps: [core],
+}
+
+gen! {
+    mod: pointer_warp_v1,
+    feat: "pointer-warp-v1",
+    file: "wayland-protocols/staging/pointer-warp/pointer-warp-v1.xml",
     deps: [core],
 }
 

@@ -1,3 +1,8 @@
+# 0.14.11+1.45 [unreleased]
+
+- Update `wayland-protocols` to v1.45. This release introduces "experimental protocols", which are not packaged.
+- New protocols: `ext-background-effect-v1` and `pointer-warp`.
+
 # 0.14.10+1.44
 
 - Update `wayland-protocols` to v1.44.
