@@ -11,4 +11,4 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-quick-xml = "0.37"
+quick-xml = "0.41"
