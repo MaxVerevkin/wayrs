@@ -1,3 +1,7 @@
+# 3.0.2
+
+- Update quick-xml to v0.41.
+
 # 3.0.1
 
 - Support self-closing description tag in enums.

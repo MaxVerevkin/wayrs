@@ -2,6 +2,7 @@ use std::fmt;
 use std::str;
 
 use quick_xml::events::{BytesStart, Event as XmlEvent};
+use quick_xml::XmlVersion;
 
 use crate::types::*;
 
@@ -78,7 +79,7 @@ impl<'a> Parser<'a> {
             name: tag
                 .try_get_attribute("name")?
                 .ok_or(Error::MissingAttribute("protocol.name"))?
-                .unescape_value()?
+                .normalized_value(XmlVersion::Implicit1_0)?
                 .into_owned(),
             description: None,
             interfaces: Vec::new(),
@@ -110,12 +111,12 @@ impl<'a> Parser<'a> {
             name: tag
                 .try_get_attribute("name")?
                 .ok_or(Error::MissingAttribute("interface.name"))?
-                .unescape_value()?
+                .normalized_value(XmlVersion::Implicit1_0)?
                 .into_owned(),
             version: tag
                 .try_get_attribute("version")?
                 .ok_or(Error::MissingAttribute("interface.version"))?
-                .unescape_value()?
+                .normalized_value(XmlVersion::Implicit1_0)?
                 .parse()
                 .unwrap(),
             description: None,
@@ -153,11 +154,24 @@ impl<'a> Parser<'a> {
         for attr in tag.attributes() {
             let attr = attr?;
             match attr.key.as_ref() {
-                b"name" => name = Some(attr.unescape_value()?.into_owned()),
-                b"type" => kind = Some(attr.unescape_value()?.into_owned()),
-                b"since" => since = attr.unescape_value()?.parse().unwrap(),
+                b"name" => {
+                    name = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
+                b"type" => {
+                    kind = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
+                b"since" => {
+                    since = attr
+                        .normalized_value(XmlVersion::Implicit1_0)?
+                        .parse()
+                        .unwrap()
+                }
                 b"deprecated-since" => {
-                    deprecated_since = Some(attr.unescape_value()?.parse().unwrap())
+                    deprecated_since = Some(
+                        attr.normalized_value(XmlVersion::Implicit1_0)?
+                            .parse()
+                            .unwrap(),
+                    )
                 }
                 _ => (),
             }
@@ -201,11 +215,11 @@ impl<'a> Parser<'a> {
             name: tag
                 .try_get_attribute("name")?
                 .ok_or(Error::MissingAttribute("enum.name"))?
-                .unescape_value()?
+                .normalized_value(XmlVersion::Implicit1_0)?
                 .into_owned(),
-            is_bitfield: tag
-                .try_get_attribute("bitfield")?
-                .is_some_and(|attr| attr.unescape_value().unwrap() == "true"),
+            is_bitfield: tag.try_get_attribute("bitfield")?.is_some_and(|attr| {
+                attr.normalized_value(XmlVersion::Implicit1_0).unwrap() == "true"
+            }),
             description: None,
             items: Vec::new(),
         };
@@ -237,9 +251,11 @@ impl<'a> Parser<'a> {
         non_empty_tag: bool,
     ) -> Result<Description<'a>, Error> {
         let mut description = Description {
-            summary: tag
-                .try_get_attribute("summary")?
-                .map(|attr| attr.unescape_value().unwrap().into_owned()),
+            summary: tag.try_get_attribute("summary")?.map(|attr| {
+                attr.normalized_value(XmlVersion::Implicit1_0)
+                    .unwrap()
+                    .into_owned()
+            }),
             text: None,
         };
 
@@ -247,7 +263,7 @@ impl<'a> Parser<'a> {
             loop {
                 match self.reader.read_event()? {
                     XmlEvent::Eof => return Err(Error::UnexpectedEof),
-                    XmlEvent::Text(text) => description.text = Some(text.unescape().unwrap()),
+                    XmlEvent::Text(text) => description.text = Some(text.decode().unwrap()),
                     XmlEvent::End(end) if end.name() == tag.name() => break,
                     _ => (),
                 }
@@ -268,12 +284,24 @@ impl<'a> Parser<'a> {
         for attr in arg.attributes().with_checks(false) {
             let attr = attr?;
             match attr.key.as_ref() {
-                b"name" => name = Some(attr.unescape_value()?.into_owned()),
-                b"type" => arg_type = Some(attr.unescape_value()?.into_owned()),
-                b"enum" => enum_ty = Some(attr.unescape_value()?.into_owned()),
-                b"interface" => iface = Some(attr.unescape_value()?.into_owned()),
-                b"summary" => summary = Some(attr.unescape_value()?.into_owned()),
-                b"allow-null" => allow_null = attr.unescape_value()? == "true",
+                b"name" => {
+                    name = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
+                b"type" => {
+                    arg_type = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
+                b"enum" => {
+                    enum_ty = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
+                b"interface" => {
+                    iface = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
+                b"summary" => {
+                    summary = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
+                b"allow-null" => {
+                    allow_null = attr.normalized_value(XmlVersion::Implicit1_0)? == "true"
+                }
                 _ => (),
             }
         }
@@ -312,10 +340,21 @@ impl<'a> Parser<'a> {
         for attr in arg.attributes().with_checks(false) {
             let attr = attr?;
             match attr.key.as_ref() {
-                b"name" => name = Some(attr.unescape_value()?.into_owned()),
-                b"value" => value = Some(attr.unescape_value()?.into_owned()),
-                b"since" => since = attr.unescape_value()?.parse().unwrap(),
-                b"summary" => summary = Some(attr.unescape_value()?.into_owned()),
+                b"name" => {
+                    name = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
+                b"value" => {
+                    value = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
+                b"since" => {
+                    since = attr
+                        .normalized_value(XmlVersion::Implicit1_0)?
+                        .parse()
+                        .unwrap()
+                }
+                b"summary" => {
+                    summary = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned())
+                }
                 _ => (),
             }
         }
