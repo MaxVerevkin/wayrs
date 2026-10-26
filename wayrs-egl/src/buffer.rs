@@ -264,7 +264,7 @@ impl<const N: usize> BufferPool<N> {
         // Try to find any free buffer.
         let buf_i = 'blk: {
             for (i, buf) in self.buffers.iter().enumerate() {
-                if buf.as_ref().map_or(true, |b| b.is_available()) {
+                if buf.as_ref().is_none_or(Buffer::is_available) {
                     break 'blk i;
                 }
             }
