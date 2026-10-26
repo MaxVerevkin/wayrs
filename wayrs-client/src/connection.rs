@@ -508,7 +508,11 @@ impl<D> Connection<D> {
     async fn async_recv_event(&mut self) -> io::Result<QueuedEvent> {
         let mut async_fd = match self.async_fd.take() {
             Some(fd) => fd,
-            None => AsyncFd::new(self.as_raw_fd())?,
+            None => {
+                // SAFETY: This struct owns the socket, and doesn't replace the
+                // underlying FD, so this will remain valid and open.
+                unsafe { AsyncFd::register(self.as_raw_fd())? }
+            }
         };
 
         loop {
@@ -594,7 +598,11 @@ impl<D> Connection<D> {
 
         let mut async_fd = match self.async_fd.take() {
             Some(fd) => fd,
-            None => AsyncFd::new(self.as_raw_fd())?,
+            None => {
+                // SAFETY: This struct owns the socket, and doesn't replace the
+                // underlying FD, so this will remain valid and open.
+                unsafe { AsyncFd::register(self.as_raw_fd())? }
+            }
         };
 
         loop {
