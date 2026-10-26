@@ -36,9 +36,9 @@ pub enum IoMode {
 pub struct ObjectId(pub NonZeroU32);
 
 impl ObjectId {
-    pub const DISPLAY: Self = Self(unsafe { NonZeroU32::new_unchecked(1) });
-    pub const MAX_CLIENT: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFEFFFFFF) });
-    pub const MIN_SERVER: Self = Self(unsafe { NonZeroU32::new_unchecked(0xFF000000) });
+    pub const DISPLAY: Self = Self(NonZeroU32::new(1).unwrap());
+    pub const MAX_CLIENT: Self = Self(NonZeroU32::new(0xFEFFFFFF).unwrap());
+    pub const MIN_SERVER: Self = Self(NonZeroU32::new(0xFF000000).unwrap());
 
     /// Returns the numeric representation of the ID
     #[must_use]
