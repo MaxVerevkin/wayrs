@@ -33,21 +33,29 @@ impl MacroArgs {
             return None;
         };
 
-        let Some(proc_macro2::TokenTree::Group(group)) = tokens.next() else {
-            return None;
+        let path_lit = match tokens.next()? {
+            proc_macro2::TokenTree::Group(group) => {
+                if group.delimiter() != proc_macro2::Delimiter::None {
+                    return None;
+                }
+
+                let mut group = group.stream().into_iter();
+
+                let Some(proc_macro2::TokenTree::Literal(path_lit)) = group.next() else {
+                    return None;
+                };
+
+                if group.next().is_some() {
+                    return None;
+                }
+
+                path_lit
+            }
+            proc_macro2::TokenTree::Literal(path_lit) => path_lit,
+            _ => return None,
         };
 
-        if tokens.next().is_some() || group.delimiter() != proc_macro2::Delimiter::None {
-            return None;
-        }
-
-        let mut group = group.stream().into_iter();
-
-        let Some(proc_macro2::TokenTree::Literal(path_lit)) = group.next() else {
-            return None;
-        };
-
-        if group.next().is_some() {
+        if tokens.next().is_some() {
             return None;
         }
 
