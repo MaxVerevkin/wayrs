@@ -63,9 +63,14 @@ impl Transport for UnixStream {
         fds: &mut VecDeque<OwnedFd>,
         mode: IoMode,
     ) -> io::Result<usize> {
-        let mut flags = libc::MSG_CMSG_CLOEXEC | libc::MSG_NOSIGNAL;
+        let mut flags = libc::MSG_NOSIGNAL;
         if mode == IoMode::NonBlocking {
             flags |= libc::MSG_DONTWAIT;
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            flags |= libc::MSG_CMSG_CLOEXEC;
         }
 
         let mut cmsg = [std::mem::MaybeUninit::<u8>::uninit();
@@ -113,6 +118,10 @@ impl Transport for UnixStream {
                 for i in 0..n {
                     let fd = unsafe { p.add(i).read_unaligned() };
                     assert_ne!(fd, -1);
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        unsafe { try_set_cloexec(fd) };
+                    }
                     fds.push_back(unsafe { OwnedFd::from_raw_fd(fd) });
                 }
             }
@@ -132,4 +141,12 @@ impl Transport for UnixStream {
 
 const fn cmsg_space(len: usize) -> usize {
     unsafe { libc::CMSG_SPACE(len as libc::c_uint) as usize }
+}
+
+#[cfg(not(target_os = "linux"))]
+unsafe fn try_set_cloexec(fd: RawFd) {
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
+    if flags != -1 {
+        unsafe { libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC) };
+    }
 }
