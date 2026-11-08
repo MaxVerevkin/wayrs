@@ -13,6 +13,14 @@ A simple Rust implementation of Wayland client library.
 
 - The main crate, `wayrs-client`, is feature complete and stable.
 
+## Cloning the repository
+
+After cloning this repository, initialize the submodules (this will fetch Wayland protocols .xml files):
+
+```
+git submodule update --init --recursive
+```
+
 ## Project structure
 
 The project is split into multiple crates:
